@@ -27,7 +27,7 @@ export function ClinicianPage() {
               <div><strong>{appointment.timeLabel}</strong><span>{appointment.dateLabel}</span></div>
               <StatusPill tone={appointment.status === 'ready' ? 'green' : 'neutral'}>{appointment.status === 'ready' ? 'Ready' : 'Upcoming'}</StatusPill>
               {index === 0 ? (
-                <Link className="button button-primary button-small" to={`/consultation/${appointment.id}`}><Video size={17} /> Start call</Link>
+                <Link className="button button-primary button-small" to={`/consultation/${appointment.id}?role=clinician`}><Video size={17} /> Start call</Link>
               ) : (
                 <button className="icon-button" aria-label={`Open ${appointment.patient}`}><ArrowRight size={19} /></button>
               )}

@@ -3,8 +3,9 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 export function AppShell() {
   const location = useLocation();
-  const isClinician = location.pathname.startsWith('/clinician');
   const isConsultation = location.pathname.startsWith('/consultation');
+  const consultationRole = new URLSearchParams(location.search).get('role');
+  const isClinician = location.pathname.startsWith('/clinician') || (isConsultation && consultationRole === 'clinician');
 
   return (
     <div className="app-shell">

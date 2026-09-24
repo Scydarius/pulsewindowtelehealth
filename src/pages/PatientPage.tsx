@@ -25,7 +25,7 @@ export function PatientPage() {
               <div><span><Clock3 /> {nextAppointment.timeLabel}</span><span><CalendarDays /> About 30 minutes</span></div>
             </div>
           </div>
-          <Link to={`/consultation/${nextAppointment.id}`} className="button button-light">Join consultation <ArrowRight size={18} /></Link>
+          <Link to={`/consultation/${nextAppointment.id}?role=patient`} className="button button-light">Join consultation <ArrowRight size={18} /></Link>
         </article>
 
         <article className="panel care-plan-card">

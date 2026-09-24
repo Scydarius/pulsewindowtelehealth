@@ -203,6 +203,17 @@ h1, h2, h3, p { margin-top: 0; }
 .video-stage, .livekit-frame { height: min(67vh, 720px); min-height: 500px; background: #092c25; border-radius: 24px; overflow: hidden; position: relative; box-shadow: var(--shadow); }
 .video-stage video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 .video-stage video.is-hidden { opacity: 0; }
+.local-call-stage .remote-video { transform: none; background: #092c25; }
+.local-video-tile { position: absolute; z-index: 4; right: 18px; top: 18px; width: 180px; aspect-ratio: 4 / 3; overflow: hidden; border: 2px solid rgba(255,255,255,.7); border-radius: 16px; background: #153f37; box-shadow: 0 12px 30px rgba(0,0,0,.2); }
+.local-video-tile video { transform: scaleX(-1); }
+.local-video-tile > svg { position: absolute; inset: 0; margin: auto; color: rgba(255,255,255,.72); }
+.local-video-tile span { position: absolute; inset: auto 7px 7px; padding: 5px 7px; border-radius: 7px; color: white; background: rgba(3,26,22,.72); font-size: .62rem; font-weight: 700; }
+.call-waiting-state { position: absolute; z-index: 2; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 30px; color: white; text-align: center; }
+.call-waiting-state span { color: rgba(255,255,255,.65); font-size: .78rem; line-height: 1.5; max-width: 370px; }
+.connection-chip { position: absolute; z-index: 3; left: 18px; top: 58px; display: flex; align-items: center; gap: 7px; padding: 8px 10px; color: white; background: rgba(6,32,27,.65); backdrop-filter: blur(8px); border-radius: 10px; font-size: .66rem; font-weight: 700; }
+.connection-chip > span { width: 7px; height: 7px; border-radius: 50%; background: #e2a849; }
+.connection-chip.connection-connected > span { background: #63dda7; box-shadow: 0 0 0 3px rgba(99,221,167,.18); }
+.connection-chip.connection-failed > span { background: #ff6761; }
 .remote-participant { position: absolute; z-index: 3; right: 18px; top: 18px; width: 190px; padding: 12px; border: 1px solid rgba(255,255,255,.22); border-radius: 16px; background: rgba(6, 32, 27, .78); backdrop-filter: blur(8px); color: white; display: flex; align-items: center; gap: 10px; }
 .remote-avatar { width: 40px; height: 40px; border-radius: 12px; background: #dcebe5; color: var(--green-dark); display: grid; place-items: center; font-weight: 800; }
 .remote-participant strong, .remote-participant span { display: block; }
@@ -294,6 +305,9 @@ h1, h2, h3, p { margin-top: 0; }
   .consultation-grid { gap: 14px; }
   .video-stage, .livekit-frame { min-height: 440px; height: 62vh; border-radius: 19px; }
   .remote-participant { width: 145px; }
+  .local-video-tile { width: 128px; right: 12px; top: 12px; }
+  .privacy-chip { left: 12px; top: 12px; }
+  .connection-chip { left: 12px; top: 52px; max-width: calc(100% - 164px); }
   .medication-context { grid-template-columns: auto 1fr; }
   .medication-context .text-button { grid-column: 2; justify-self: start; }
 }
