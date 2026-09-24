@@ -7,6 +7,7 @@ type MeasurementBody = {
   respiratoryRateBpm?: number;
   signalQuality?: number;
   algorithmVersion?: string;
+  diagnostics?: Record<string, unknown>;
 };
 
 const encoder = new TextEncoder();
@@ -38,14 +39,14 @@ export default {
         const appointmentId = new URL(request.url).searchParams.get('appointmentId');
         if (!appointmentId) return Response.json({ error: 'Appointment is required.' }, { status: 400 });
         const db = await requireClinician(request, appointmentId);
-        const { data, error } = await db.from('measurements').select('measured_at, heart_rate_bpm, respiratory_rate_bpm, signal_quality, algorithm_version').eq('appointment_id', appointmentId).order('measured_at', { ascending: false }).limit(30);
+        const { data, error } = await db.from('measurements').select('measured_at, heart_rate_bpm, respiratory_rate_bpm, signal_quality, algorithm_version, diagnostics').eq('appointment_id', appointmentId).order('measured_at', { ascending: false }).limit(30);
         if (error) throw new Error('Unable to load the patient measurement.');
         const measurements = (data ?? []).reverse();
         return Response.json({ measurement: measurements.at(-1) ?? null, measurements }, { headers: { 'Cache-Control': 'no-store' } });
       }
       if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 });
       const body = await request.json() as MeasurementBody;
-      const { appointmentId, invitationToken, heartRateBpm, respiratoryRateBpm, signalQuality, algorithmVersion } = body;
+      const { appointmentId, invitationToken, heartRateBpm, respiratoryRateBpm, signalQuality, algorithmVersion, diagnostics } = body;
       if (!appointmentId || !invitationToken || invitationToken.length < 32) throw new Error('A valid patient link is required to save a measurement.');
       if (![heartRateBpm, respiratoryRateBpm, signalQuality].every(Number.isFinite)) throw new Error('A valid measurement is required.');
       if (heartRateBpm! < 25 || heartRateBpm! > 240 || respiratoryRateBpm! < 2 || respiratoryRateBpm! > 80 || signalQuality! < 0 || signalQuality! > 1) throw new Error('Measurement values were outside the permitted prototype range.');
@@ -58,6 +59,7 @@ export default {
         respiratory_rate_bpm: respiratoryRateBpm,
         signal_quality: signalQuality,
         algorithm_version: algorithmVersion ?? 'railway-rppg',
+        diagnostics: diagnostics ?? null,
       });
       if (error) throw new Error('Unable to save the measurement.');
       return Response.json({ message: 'Measurement saved.' }, { headers: { 'Cache-Control': 'no-store' } });

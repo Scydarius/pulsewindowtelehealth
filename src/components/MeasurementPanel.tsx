@@ -25,6 +25,36 @@ function HeartRateTrend({ samples }: { samples: SavedMeasurement[] }) {
   return <div className="trend-chart" role="img" aria-label="Heart rate over the current 30-second camera check"><div className="trend-scale"><span>{Math.round(max)}</span><span>{Math.round(min)}</span></div><svg viewBox="0 0 100 46" preserveAspectRatio="none"><polyline points={points} /></svg><div className="trend-axis"><span>Start</span><span>30 seconds</span></div></div>;
 }
 
+function values(value: unknown) { return Array.isArray(value) ? value.map(Number).filter(Number.isFinite) : []; }
+function SignalPlot({ title, values: series, tone = 'green' }: { title: string; values: number[]; tone?: 'green' | 'blue' | 'amber' }) {
+  if (series.length < 2) return <div className="research-plot-empty">Waiting for live engine telemetry…</div>;
+  const min = Math.min(...series); const max = Math.max(...series); const range = Math.max(.0001, max - min);
+  const points = series.map((value, index) => `${(index / (series.length - 1)) * 100},${42 - ((value - min) / range) * 34}`).join(' ');
+  return <section className={`research-plot research-${tone}`}><div><strong>{title}</strong><span>{series.length} samples</span></div><svg viewBox="0 0 100 46" preserveAspectRatio="none"><polyline points={points} /></svg></section>;
+}
+function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unknown> | null }) {
+  if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Research telemetry</p><h3>DSP diagnostics</h3></div></div><div className="trend-empty">The patient’s live DSP telemetry appears here during an accepted camera check.</div></section>;
+  const engine = (diagnostics.engine ?? {}) as Record<string, unknown>;
+  const roi = (diagnostics.roi_weights ?? {}) as Record<string, unknown>;
+  const snr = Number(diagnostics.snr_db ?? 0);
+  const latency = Number(diagnostics.processing_latency_ms ?? 0);
+  return <details className="research-diagnostics" open>
+    <summary><div><p className="eyebrow">Research telemetry</p><h3>DSP diagnostics</h3></div><span>Clinician only</span></summary>
+    <div className="diagnostics-grid">
+      <span><strong>{Number.isFinite(snr) ? `${snr.toFixed(1)} dB` : '—'}</strong>SNR</span>
+      <span><strong>{Number(diagnostics.quality_score ?? 0).toFixed(2)}</strong>Signal quality</span>
+      <span><strong>{Number.isFinite(latency) ? `${Math.round(latency)} ms` : '—'}</strong>Processing latency</span>
+      <span><strong>{String(diagnostics.tracking_state ?? '—')}</strong>Tracking state</span>
+    </div>
+    <div className="roi-grid"><strong>ROI weighting</strong><span>Forehead {Math.round(Number(roi.Forehead ?? 0) * 100)}%</span><span>Left cheek {Math.round(Number(roi['Left Cheek'] ?? 0) * 100)}%</span><span>Right cheek {Math.round(Number(roi['Right Cheek'] ?? 0) * 100)}%</span></div>
+    <SignalPlot title="Photoplethysmogram waveform" values={values(diagnostics.cardiac_waveform)} />
+    <SignalPlot title="Respiratory modulation waveform" values={values(diagnostics.respiratory_waveform)} tone="blue" />
+    <SignalPlot title="Cardiac spectral power" values={values(diagnostics.cardiac_spectrum_power)} tone="amber" />
+    <SignalPlot title="Respiratory spectral power" values={values(diagnostics.respiration_spectrum_power)} tone="blue" />
+    <div className="engine-line">Algorithm {String(engine.algorithm ?? 'POS')} · Kalman {Number(engine.kalman_bpm ?? 0).toFixed(1)} BPM · 95% interval ±{Number(engine.confidence_interval_bpm ?? 0).toFixed(1)} BPM · Face landmarks {String(engine.landmarks_detected ?? '—')} · Skin pixels {String(engine.skin_pixels ?? '—')}</div>
+  </details>;
+}
+
 export function MeasurementPanel({ appointmentId, role, invitationToken }: MeasurementPanelProps) {
   const [measurement, setMeasurement] = useState<MeasurementUpdate>(initialState);
   const stopRef = useRef<(() => void) | null>(null);
@@ -49,7 +79,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         if (!active || !readings.length) return;
         const latest = readings.at(-1)!;
         setTrend(readings);
-        setMeasurement({ status: 'complete', progress: 100, signalQuality: latest.signal_quality, heartRateBpm: latest.heart_rate_bpm, respiratoryRate: latest.respiratory_rate_bpm, message: `${readings.length}-point camera-check trend received`, algorithmVersion: latest.algorithm_version ?? undefined, faceDetected: true, trackingState: 'LOCKED' });
+        setMeasurement({ status: 'complete', progress: 100, signalQuality: latest.signal_quality, heartRateBpm: latest.heart_rate_bpm, respiratoryRate: latest.respiratory_rate_bpm, message: `${readings.length}-point camera-check trend received`, algorithmVersion: latest.algorithm_version ?? undefined, faceDetected: true, trackingState: 'LOCKED', diagnostics: latest.diagnostics ?? undefined });
       } catch {
         // A clinician may open the call before their authenticated session has refreshed.
       }
@@ -63,7 +93,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
     const sample = measurement.sample;
     if (role !== 'patient' || !sample || !invitationToken || savedSampleIdsRef.current.has(sample.capturedAt)) return;
     savedSampleIdsRef.current.add(sample.capturedAt);
-    void savePatientMeasurement({ appointmentId, invitationToken, heartRateBpm: sample.heartRateBpm, respiratoryRateBpm: sample.respiratoryRate, signalQuality: sample.signalQuality, algorithmVersion: measurement.algorithmVersion })
+    void savePatientMeasurement({ appointmentId, invitationToken, heartRateBpm: sample.heartRateBpm, respiratoryRateBpm: sample.respiratoryRate, signalQuality: sample.signalQuality, algorithmVersion: measurement.algorithmVersion, diagnostics: sample.diagnostics })
       .then(() => { if (measurement.status === 'complete') setRecordMessage('30-second trend saved for your clinician.'); })
       .catch(() => setRecordMessage('Reading is visible here, but could not be saved for your clinician.'));
   }, [appointmentId, invitationToken, measurement, role]);
@@ -135,6 +165,8 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         <div><strong>Heart-rate trend</strong><span>Current 30-second camera check</span></div>
         <HeartRateTrend samples={trend} />
       </section>
+
+      <ResearchDiagnostics diagnostics={measurement.diagnostics} />
 
       <div className="progress-block">
         <div className="progress-label"><span>{measurement.message}</span><strong>{measurement.progress}%</strong></div>

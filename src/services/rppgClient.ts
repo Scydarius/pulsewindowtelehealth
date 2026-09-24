@@ -1,5 +1,7 @@
 export type MeasurementStatus = 'idle' | 'preparing' | 'measuring' | 'complete' | 'failed';
 
+export type ResearchDiagnostics = Record<string, unknown>;
+
 export type MeasurementUpdate = {
   status: MeasurementStatus;
   progress: number;
@@ -10,7 +12,8 @@ export type MeasurementUpdate = {
   algorithmVersion?: string;
   faceDetected?: boolean;
   trackingState?: string;
-  sample?: { capturedAt: string; heartRateBpm: number; respiratoryRate: number; signalQuality: number };
+  diagnostics?: ResearchDiagnostics;
+  sample?: { capturedAt: string; heartRateBpm: number; respiratoryRate: number; signalQuality: number; diagnostics?: ResearchDiagnostics };
 };
 
 const CAPTURE_WINDOW_MS = 30_000;
@@ -165,7 +168,25 @@ class WebSocketRppgClient implements RppgClient {
           captureTimer = window.setTimeout(finishWindow, CAPTURE_WINDOW_MS);
         }
         const candidateSample = eligible && recordingStartedAt
-          ? { capturedAt: new Date().toISOString(), heartRateBpm: bpm, respiratoryRate: brpm, signalQuality: quality }
+          ? {
+              capturedAt: new Date().toISOString(), heartRateBpm: bpm, respiratoryRate: brpm, signalQuality: quality,
+              diagnostics: {
+                snr_db: Number(eventData.snr_db ?? 0),
+                quality_score: quality,
+                tracking_state: state,
+                face_detected: eventData.face_detected === true,
+                motion_detected: motionDetected,
+                processing_latency_ms: Number(eventData.processing_latency_ms ?? 0),
+                roi_weights: eventData.roi_weights ?? {},
+                cardiac_waveform: (eventData.cardiac as { waveform?: unknown[] } | undefined)?.waveform ?? [],
+                respiratory_waveform: (eventData.respiration as { waveform?: unknown[] } | undefined)?.waveform ?? [],
+                cardiac_spectrum_freq_hz: eventData.cardiac_spectrum_freq_hz ?? [],
+                cardiac_spectrum_power: eventData.cardiac_spectrum_power ?? [],
+                respiration_spectrum_freq_hz: eventData.respiration_spectrum_freq_hz ?? [],
+                respiration_spectrum_power: eventData.respiration_spectrum_power ?? [],
+                engine: eventData.diagnostics ?? {},
+              },
+            }
           : undefined;
         if (candidateSample) latestSample = candidateSample;
         if (now - lastUpdateAt < 900) return;
@@ -174,7 +195,7 @@ class WebSocketRppgClient implements RppgClient {
         const stabilityElapsed = stableSince ? now - stableSince : 0;
         const captureElapsed = recordingStartedAt ? Math.min(CAPTURE_WINDOW_MS, now - recordingStartedAt) : 0;
         const message = recordingStartedAt ? `High-quality recording · ${Math.ceil((CAPTURE_WINDOW_MS - captureElapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : motionDetected || state === 'HOLDING' ? 'Movement detected — hold still' : eligible ? `Signal stable · hold still for ${Math.ceil((STABILITY_WINDOW_MS - stabilityElapsed) / 1000)}s` : quality < MIN_SIGNAL_QUALITY ? 'Improve lighting and keep your face centred' : 'Calibrating face and signal quality…';
-        onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : Math.min(15, Math.round((stabilityElapsed / STABILITY_WINDOW_MS) * 15)), signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state, sample });
+        onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : Math.min(15, Math.round((stabilityElapsed / STABILITY_WINDOW_MS) * 15)), signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state, diagnostics: candidateSample?.diagnostics, sample });
       }
     });
     socket.addEventListener('error', () => {
