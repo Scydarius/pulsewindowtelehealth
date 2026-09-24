@@ -7,6 +7,7 @@ export type ClinicAppointment = {
   reason: string;
   starts_at: string;
   patient: { display_name: string; email: string } | null;
+  latestMeasurement: { measured_at: string; heart_rate_bpm: number; respiratory_rate_bpm: number; signal_quality: number } | null;
 };
 
 export async function loadClinicianWorkspace() {
@@ -28,5 +29,19 @@ export async function loadClinicianWorkspace() {
     .order('starts_at', { ascending: true });
   if (appointmentError) throw new Error('Unable to load appointments.');
 
-  return { profile: profile as ClinicianProfile, appointments: (appointments ?? []) as unknown as ClinicAppointment[] };
+  const appointmentRows = (appointments ?? []) as unknown as Omit<ClinicAppointment, 'latestMeasurement'>[];
+  const appointmentIds = appointmentRows.map((appointment) => appointment.id);
+  const latestMeasurements = new Map<string, ClinicAppointment['latestMeasurement']>();
+  if (appointmentIds.length) {
+    const { data: measurements } = await supabase
+      .from('measurements')
+      .select('appointment_id, measured_at, heart_rate_bpm, respiratory_rate_bpm, signal_quality')
+      .in('appointment_id', appointmentIds)
+      .order('measured_at', { ascending: false });
+    for (const measurement of measurements ?? []) {
+      if (!latestMeasurements.has(measurement.appointment_id)) latestMeasurements.set(measurement.appointment_id, measurement);
+    }
+  }
+
+  return { profile: profile as ClinicianProfile, appointments: appointmentRows.map((appointment) => ({ ...appointment, latestMeasurement: latestMeasurements.get(appointment.id) ?? null })) };
 }

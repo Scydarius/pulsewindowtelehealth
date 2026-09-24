@@ -1,4 +1,4 @@
-import { CalendarClock, CircleAlert, Copy, Link2, LoaderCircle, UsersRound, Video } from 'lucide-react';
+import { Activity, ArrowRight, CalendarClock, CircleAlert, Copy, Link2, LoaderCircle, Search, UsersRound, Video } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
@@ -15,6 +15,7 @@ export function ClinicianPage() {
   const [linkError, setLinkError] = useState('');
   const [creatingLink, setCreatingLink] = useState<string>();
   const [claimingAccess, setClaimingAccess] = useState(false);
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -31,6 +32,13 @@ export function ClinicianPage() {
     return () => window.clearTimeout(initialLoad);
   }, [load]);
   const scheduled = appointments.filter((appointment) => new Date(appointment.starts_at) >= new Date());
+  const today = new Date();
+  const todayAppointments = appointments.filter((appointment) => new Date(appointment.starts_at).toDateString() === today.toDateString());
+  const readingsToReview = appointments.filter((appointment) => appointment.latestMeasurement);
+  const visibleAppointments = appointments.filter((appointment) => {
+    const term = search.trim().toLowerCase();
+    return !term || [appointment.patient?.display_name, appointment.patient?.email, appointment.reason].filter(Boolean).some((value) => value!.toLowerCase().includes(term));
+  });
   const createReplacementLink = async (appointmentId: string) => {
     setCreatingLink(appointmentId); setLinkError('');
     try {
@@ -54,19 +62,20 @@ export function ClinicianPage() {
   return (
     <div className="dashboard-page">
       <section className="page-intro clinician-intro">
-        <div><p className="eyebrow">Clinician workspace</p><h1>Welcome, {profile?.display_name}.</h1><p>Patients and consultations shown here are drawn from your secure clinic records.</p></div>
-        <Link className="button button-secondary" to="/admin/clinicians">Manage clinicians</Link>
+        <div><p className="eyebrow">Clinician workspace</p><h1>Today’s consultations</h1><p>Welcome, {profile?.display_name}. Review your patients, appointments and readings in one secure workspace.</p></div>
+        <div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search patients" /></label><Link className="button button-secondary" to="/admin/clinicians">Manage clinicians</Link></div>
       </section>
 
       <section className="summary-strip">
-        <article><div><CalendarClock /></div><span><strong>{scheduled.length}</strong>Scheduled consultations</span></article>
+        <article><div><CalendarClock /></div><span><strong>{todayAppointments.length}</strong>Appointments today</span></article>
         <article><div><UsersRound /></div><span><strong>{new Set(appointments.map((appointment) => appointment.patient?.email)).size}</strong>Patients in your care</span></article>
+        <article><div><Activity /></div><span><strong>{readingsToReview.length}</strong>Readings received</span></article>
       </section>
 
       <section className="panel" id="appointments">
-        <div className="section-heading"><div><p className="eyebrow">Schedule</p><h2>Your consultations</h2></div><InvitePatientForm onCreated={() => void load()} /></div>
+        <div className="section-heading"><div><p className="eyebrow">Schedule</p><h2>Upcoming appointments</h2></div><InvitePatientForm onCreated={() => void load()} /></div>
         <div className="appointment-table">
-          {appointments.length === 0 ? <div className="empty-records"><UsersRound /><strong>No patients yet</strong><span>Create your first secure patient link to add a patient and appointment.</span></div> : appointments.map((appointment) => (
+          {visibleAppointments.length === 0 ? <div className="empty-records"><UsersRound /><strong>{appointments.length ? 'No matching appointments' : 'No patients yet'}</strong><span>{appointments.length ? 'Try a different search term.' : 'Create your first secure patient link to add a patient and appointment.'}</span></div> : visibleAppointments.map((appointment) => (
             <article className="appointment-row" key={appointment.id}>
               <div className="patient-avatar">{(appointment.patient?.display_name ?? '?').split(' ').map((part) => part[0]).join('').slice(0, 2)}</div>
               <div><strong>{appointment.patient?.display_name ?? 'Patient'}</strong><span>{appointment.reason}</span></div>
@@ -78,6 +87,17 @@ export function ClinicianPage() {
           ))}
         </div>
         {linkError && <p className="form-error">{linkError}</p>}
+      </section>
+
+      <section className="clinician-lower-grid">
+        <article className="panel" id="measurements">
+          <div className="section-heading"><div><p className="eyebrow">Follow-up</p><h2>Measurements to review</h2></div></div>
+          {readingsToReview.length === 0 ? <div className="empty-records compact-empty"><Activity /><strong>No readings received yet</strong><span>Completed 30-second camera checks will appear here for review.</span></div> : readingsToReview.slice(0, 4).map((appointment) => {
+            const reading = appointment.latestMeasurement!;
+            return <div className="review-card" key={appointment.id}><div className="patient-avatar coral">{(appointment.patient?.display_name ?? '?').split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><strong>{appointment.patient?.display_name ?? 'Patient'}</strong><span>{Math.round(reading.heart_rate_bpm)} BPM · {Math.round(reading.respiratory_rate_bpm)} breaths/min · captured {new Date(reading.measured_at).toLocaleString()}</span></div><Link className="text-button" to={`/consultation/${appointment.id}?role=clinician`}>Review <ArrowRight size={16} /></Link></div>;
+          })}
+        </article>
+        <article className="panel platform-note"><p className="eyebrow">PulseWindow</p><h2>Measurement context, not a diagnosis.</h2><p>Use signal quality and longitudinal trends to support your assessment. Experimental readings should be verified using approved clinical devices.</p></article>
       </section>
     </div>
   );
