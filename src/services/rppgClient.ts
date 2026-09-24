@@ -93,7 +93,6 @@ class WebSocketRppgClient implements RppgClient {
     let interval: number | undefined;
 
     let stopped = false;
-    let receivedTelemetry = false;
     let receivedReady = false;
     let serverFailureMessage = '';
     const startedAt = Date.now();
@@ -134,7 +133,6 @@ class WebSocketRppgClient implements RppgClient {
         }, 1000 / 15);
       }
       if (eventData.type === 'telemetry') {
-        receivedTelemetry = true;
         const cardiac = eventData.cardiac as { bpm?: number } | undefined;
         const respiration = eventData.respiration as { brpm?: number | null } | undefined;
         const quality = Number(eventData.quality_score ?? 0);
@@ -167,7 +165,7 @@ class WebSocketRppgClient implements RppgClient {
     });
     socket.addEventListener('close', () => {
       if (!completed) window.clearTimeout(windowTimer);
-      if (!stopped && !completed && !receivedTelemetry) onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: serverFailureMessage || (receivedReady ? 'Railway ended the measurement before it produced a reading.' : 'Railway rejected the secure measurement connection. Check that its RPPG_TICKET_SECRET exactly matches Vercel.') });
+      if (!stopped && !completed) onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: serverFailureMessage || (receivedReady ? 'Railway ended the measurement before the 30-second check finished.' : 'Railway rejected the secure measurement connection. Check that its RPPG_TICKET_SECRET exactly matches Vercel.') });
     });
 
     return () => { stopped = true; window.clearTimeout(windowTimer); if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; context.onCameraStream?.(null); };
