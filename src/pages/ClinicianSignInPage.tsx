@@ -29,13 +29,13 @@ export function ClinicianSignInPage() {
       <div className="access-icon"><LockKeyhole /></div>
       <p className="eyebrow">Clinician access</p>
       <h1>Sign in to your workspace</h1>
-      <p>Only authorised clinicians can create patient links or view consultation measurements.</p>
+      <p>Use your clinician work email as your username, then enter the password you set up for that email.</p>
       {!hasClinicalDatabaseConfiguration ? <p className="access-warning">Clinical access is not configured yet. Add the Supabase environment settings before inviting real patients.</p> : <form onSubmit={(event) => void signIn(event)} className="access-form">
-        <label>Work email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@clinic.com" autoComplete="email" required /></label>
+        <label>Work email <span className="field-hint">(username)</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@clinic.com" autoComplete="email" required /></label>
         <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
         <button className="button button-primary button-full" disabled={submitting}><LogIn size={18} /> {submitting ? 'Signing in…' : 'Sign in'}</button>
       </form>}
-      <Link className="password-help-link" to="/clinician/reset-password">Set or reset your password</Link>
+      <Link className="password-help-link" to="/clinician/reset-password">New clinician or forgotten password? Set up your sign-in</Link>
       {message && <p className="access-message" role="status">{message}</p>}
     </section>
   </main>;
