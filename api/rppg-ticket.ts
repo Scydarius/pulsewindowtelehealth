@@ -21,6 +21,7 @@ export default {
       const secret = process.env.RPPG_TICKET_SECRET;
       const apiUrl = process.env.RPPG_API_URL;
       if (!appointmentId || !secret || !apiUrl || (role !== 'patient' && role !== 'clinician')) throw new Error('rPPG access is not configured.');
+      if (!process.env.VITE_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('The clinical database is not configured yet.');
       const { database, requireClinician, tokenHash } = await import('./clinic');
 
       if (role === 'clinician') {
