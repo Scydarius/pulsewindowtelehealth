@@ -34,7 +34,18 @@ The two tabs exchange camera and microphone streams using WebRTC. Local mode use
 
 Set `VITE_LIVEKIT_URL` and `VITE_LIVEKIT_TOKEN_ENDPOINT` to enable real calls. The token endpoint must generate short-lived room tokens on a trusted server. Never place the LiveKit API secret in this repository.
 
-For a deployed multi-device call, set `VITE_VIDEO_PROVIDER=livekit` together with `VITE_LIVEKIT_URL` and `VITE_LIVEKIT_TOKEN_ENDPOINT`. Without those settings, the consultation uses the local two-tab WebRTC mode described above.
+For a deployed multi-device call, create a LiveKit Cloud project and add these environment variables to the Vercel project:
+
+```text
+VITE_VIDEO_PROVIDER=livekit
+VITE_LIVEKIT_URL=wss://your-project.livekit.cloud
+LIVEKIT_API_KEY=your-key
+LIVEKIT_API_SECRET=your-secret
+```
+
+The frontend calls the included `/api/livekit-token` Vercel Function. `LIVEKIT_API_SECRET` is server-only and must never be prefixed with `VITE_`. You may override the endpoint with `VITE_LIVEKIT_TOKEN_ENDPOINT`; otherwise the same-origin function is used automatically.
+
+The current token endpoint is suitable for a closed prototype. Add authenticated user sessions and appointment authorization before allowing public or clinical use.
 
 ## rPPG API
 

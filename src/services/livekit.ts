@@ -6,7 +6,7 @@ export type ConsultationIdentity = {
 };
 
 export const liveKitUrl = import.meta.env.VITE_LIVEKIT_URL ?? '';
-const tokenEndpoint = import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT ?? '';
+const tokenEndpoint = import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT ?? '/api/livekit-token';
 
 export const hasLiveKitConfiguration = Boolean(liveKitUrl && tokenEndpoint);
 

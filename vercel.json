@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["syd1"],
+  "rewrites": [
+    { "source": "/patient", "destination": "/index.html" },
+    { "source": "/clinician", "destination": "/index.html" },
+    { "source": "/consultation/:path*", "destination": "/index.html" }
+  ]
+}
