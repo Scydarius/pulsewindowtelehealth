@@ -1,11 +1,14 @@
 import { CalendarDays, LayoutDashboard, LogOut, Stethoscope, UserRound } from 'lucide-react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
 
 export function AppShell() {
   const location = useLocation();
   const isConsultation = location.pathname.startsWith('/consultation');
   const consultationRole = new URLSearchParams(location.search).get('role');
   const isClinician = location.pathname.startsWith('/clinician') || (isConsultation && consultationRole === 'clinician');
+  const navigate = useNavigate();
+  const signOut = async () => { await supabase?.auth.signOut(); navigate('/'); };
 
   return (
     <div className="app-shell">
@@ -17,7 +20,7 @@ export function AppShell() {
 
         {!isConsultation && (
           <nav className="primary-nav" aria-label="Primary navigation">
-            <NavLink to={isClinician ? '/clinician' : '/patient'}>
+            <NavLink to="/clinician">
               <LayoutDashboard size={18} /> Overview
             </NavLink>
             <a href="#appointments"><CalendarDays size={18} /> Appointments</a>
@@ -28,10 +31,10 @@ export function AppShell() {
         <div className="header-user">
           <div className="avatar"><UserRound size={19} /></div>
           <div className="header-user-copy">
-            <strong>{isClinician ? 'Dr Maya Patel' : 'Claire Williams'}</strong>
-            <span>{isClinician ? 'Clinician portal' : 'Patient portal'}</span>
+            <strong>{isClinician ? 'Clinician workspace' : 'Secure appointment'}</strong>
+            <span>{isClinician ? 'Protected clinic access' : 'Patient access'}</span>
           </div>
-          <NavLink to="/" className="icon-button" aria-label="Sign out"><LogOut size={19} /></NavLink>
+          <button className="icon-button" onClick={() => void signOut()} aria-label="Sign out"><LogOut size={19} /></button>
         </div>
       </header>
       <main className="app-main">
