@@ -38,9 +38,10 @@ export default {
         const appointmentId = new URL(request.url).searchParams.get('appointmentId');
         if (!appointmentId) return Response.json({ error: 'Appointment is required.' }, { status: 400 });
         const db = await requireClinician(request, appointmentId);
-        const { data, error } = await db.from('measurements').select('measured_at, heart_rate_bpm, respiratory_rate_bpm, signal_quality, algorithm_version').eq('appointment_id', appointmentId).order('measured_at', { ascending: false }).limit(1).maybeSingle();
+        const { data, error } = await db.from('measurements').select('measured_at, heart_rate_bpm, respiratory_rate_bpm, signal_quality, algorithm_version').eq('appointment_id', appointmentId).order('measured_at', { ascending: false }).limit(30);
         if (error) throw new Error('Unable to load the patient measurement.');
-        return Response.json({ measurement: data ?? null }, { headers: { 'Cache-Control': 'no-store' } });
+        const measurements = (data ?? []).reverse();
+        return Response.json({ measurement: measurements.at(-1) ?? null, measurements }, { headers: { 'Cache-Control': 'no-store' } });
       }
       if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 });
       const body = await request.json() as MeasurementBody;

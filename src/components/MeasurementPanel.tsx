@@ -1,7 +1,7 @@
 import { Activity, CheckCircle2, CircleAlert, LoaderCircle, Play, RotateCcw, ShieldCheck, Wind } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
-import { loadLatestPatientMeasurement, savePatientMeasurement } from '../services/clinicAccess';
+import { loadPatientMeasurementTrend, savePatientMeasurement, type SavedMeasurement } from '../services/clinicAccess';
 
 type MeasurementPanelProps = { appointmentId: string; role: 'patient' | 'clinician'; invitationToken?: string };
 
@@ -14,13 +14,26 @@ const initialState: MeasurementUpdate = {
   message: 'Ready when the patient is comfortable and still.',
 };
 
+function HeartRateTrend({ samples }: { samples: SavedMeasurement[] }) {
+  if (samples.length < 2) return <div className="trend-empty">The 30-second trend will appear here once stable readings arrive.</div>;
+  const values = samples.map((sample) => Number(sample.heart_rate_bpm)).filter(Number.isFinite);
+  if (values.length < 2) return <div className="trend-empty">Waiting for stable heart-rate observations.</div>;
+  const min = Math.min(...values) - 2;
+  const max = Math.max(...values) + 2;
+  const range = Math.max(1, max - min);
+  const points = values.map((value, index) => `${(index / (values.length - 1)) * 100},${42 - ((value - min) / range) * 34}`).join(' ');
+  return <div className="trend-chart" role="img" aria-label="Heart rate over the current 30-second camera check"><div className="trend-scale"><span>{Math.round(max)}</span><span>{Math.round(min)}</span></div><svg viewBox="0 0 100 46" preserveAspectRatio="none"><polyline points={points} /></svg><div className="trend-axis"><span>Start</span><span>30 seconds</span></div></div>;
+}
+
 export function MeasurementPanel({ appointmentId, role, invitationToken }: MeasurementPanelProps) {
   const [measurement, setMeasurement] = useState<MeasurementUpdate>(initialState);
   const stopRef = useRef<(() => void) | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const savedReadingRef = useRef(false);
+  const savedSampleIdsRef = useRef(new Set<string>());
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [recordMessage, setRecordMessage] = useState('');
+  const [trend, setTrend] = useState<SavedMeasurement[]>([]);
 
   useEffect(() => () => stopRef.current?.(), []);
   useEffect(() => {
@@ -32,9 +45,11 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
     let active = true;
     const loadResult = async () => {
       try {
-        const latest = await loadLatestPatientMeasurement(appointmentId);
-        if (!active || !latest) return;
-        setMeasurement({ status: 'complete', progress: 100, signalQuality: latest.signal_quality, heartRateBpm: latest.heart_rate_bpm, respiratoryRate: latest.respiratory_rate_bpm, message: `Patient reading saved ${new Date(latest.measured_at).toLocaleTimeString()}`, algorithmVersion: latest.algorithm_version ?? undefined, faceDetected: true, trackingState: 'LOCKED' });
+        const readings = await loadPatientMeasurementTrend(appointmentId);
+        if (!active || !readings.length) return;
+        const latest = readings.at(-1)!;
+        setTrend(readings);
+        setMeasurement({ status: 'complete', progress: 100, signalQuality: latest.signal_quality, heartRateBpm: latest.heart_rate_bpm, respiratoryRate: latest.respiratory_rate_bpm, message: `${readings.length}-point camera-check trend received`, algorithmVersion: latest.algorithm_version ?? undefined, faceDetected: true, trackingState: 'LOCKED' });
       } catch {
         // A clinician may open the call before their authenticated session has refreshed.
       }
@@ -45,16 +60,18 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
   }, [appointmentId, role]);
 
   useEffect(() => {
-    if (role !== 'patient' || measurement.status !== 'complete' || savedReadingRef.current || !invitationToken || measurement.heartRateBpm === null || measurement.respiratoryRate === null) return;
-    savedReadingRef.current = true;
-    void savePatientMeasurement({ appointmentId, invitationToken, heartRateBpm: measurement.heartRateBpm, respiratoryRateBpm: measurement.respiratoryRate, signalQuality: measurement.signalQuality, algorithmVersion: measurement.algorithmVersion })
-      .then(() => setRecordMessage('Reading saved for your clinician.'))
+    const sample = measurement.sample;
+    if (role !== 'patient' || !sample || !invitationToken || savedSampleIdsRef.current.has(sample.capturedAt)) return;
+    savedSampleIdsRef.current.add(sample.capturedAt);
+    void savePatientMeasurement({ appointmentId, invitationToken, heartRateBpm: sample.heartRateBpm, respiratoryRateBpm: sample.respiratoryRate, signalQuality: sample.signalQuality, algorithmVersion: measurement.algorithmVersion })
+      .then(() => { if (measurement.status === 'complete') setRecordMessage('30-second trend saved for your clinician.'); })
       .catch(() => setRecordMessage('Reading is visible here, but could not be saved for your clinician.'));
   }, [appointmentId, invitationToken, measurement, role]);
 
   const startMeasurement = async () => {
     stopRef.current?.();
     savedReadingRef.current = false;
+    savedSampleIdsRef.current.clear();
     setRecordMessage('');
     setCameraStream(null);
     setMeasurement({ ...initialState, status: 'preparing', message: 'Preparing measurement…' });
@@ -113,6 +130,11 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
           <small>breaths/min</small>
         </article>
       </div>
+
+      <section className="measurement-trend">
+        <div><strong>Heart-rate trend</strong><span>Current 30-second camera check</span></div>
+        <HeartRateTrend samples={trend} />
+      </section>
 
       <div className="progress-block">
         <div className="progress-label"><span>{measurement.message}</span><strong>{measurement.progress}%</strong></div>

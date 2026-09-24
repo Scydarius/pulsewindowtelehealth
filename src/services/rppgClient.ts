@@ -10,7 +10,10 @@ export type MeasurementUpdate = {
   algorithmVersion?: string;
   faceDetected?: boolean;
   trackingState?: string;
+  sample?: { capturedAt: string; heartRateBpm: number; respiratoryRate: number; signalQuality: number };
 };
+
+const CAPTURE_WINDOW_MS = 30_000;
 
 export interface RppgClient {
   startMeasurement(context: MeasurementContext, onUpdate: (update: MeasurementUpdate) => void): Promise<() => void>;
@@ -39,7 +42,7 @@ class MockRppgClient implements RppgClient {
 
     const interval = window.setInterval(() => {
       if (cancelled) return;
-      progress = Math.min(progress + 4, 100);
+      progress = Math.min(progress + 1, 100);
       const complete = progress === 100;
       const wave = Math.sin(progress / 7);
 
@@ -47,10 +50,11 @@ class MockRppgClient implements RppgClient {
         status: complete ? 'complete' : 'measuring',
         progress,
         signalQuality: Math.min(0.94, 0.55 + progress / 260),
-        heartRateBpm: progress > 20 ? Math.round(72 + wave * 2) : null,
-        respiratoryRate: complete ? 15 : null,
-        message: complete ? 'Measurement complete' : 'Keep still and breathe normally',
+        heartRateBpm: progress > 12 ? Math.round(72 + wave * 2) : null,
+        respiratoryRate: progress > 12 ? 15 : null,
+        message: complete ? '30-second measurement complete' : `Recording ${Math.ceil((100 - progress) * .3)}s remaining`,
         algorithmVersion: complete ? 'demo-0.1.0' : undefined,
+        sample: progress > 12 && progress % 3 === 0 ? { capturedAt: new Date().toISOString(), heartRateBpm: Math.round(72 + wave * 2), respiratoryRate: 15, signalQuality: Math.min(0.94, 0.55 + progress / 260) } : undefined,
       });
 
       if (complete) window.clearInterval(interval);
@@ -92,6 +96,25 @@ class WebSocketRppgClient implements RppgClient {
     let receivedTelemetry = false;
     let receivedReady = false;
     let serverFailureMessage = '';
+    const startedAt = Date.now();
+    let lastUpdateAt = 0;
+    let latestSample: MeasurementUpdate['sample'];
+    let completed = false;
+    const finishWindow = () => {
+      if (completed || stopped) return;
+      completed = true;
+      if (interval) window.clearInterval(interval);
+      socket.close();
+      stream.getTracks().forEach((track) => track.stop());
+      video.srcObject = null;
+      context.onCameraStream?.(null);
+      if (latestSample) {
+        onUpdate({ status: 'complete', progress: 100, signalQuality: latestSample.signalQuality, heartRateBpm: latestSample.heartRateBpm, respiratoryRate: latestSample.respiratoryRate, message: '30-second camera check complete', algorithmVersion: 'railway-rppg-2.16', faceDetected: true, trackingState: 'LOCKED', sample: latestSample });
+      } else {
+        onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'No stable reading was received during the 30-second camera check.' });
+      }
+    };
+    const windowTimer = window.setTimeout(finishWindow, CAPTURE_WINDOW_MS);
     socket.addEventListener('message', (event) => {
       let eventData: Record<string, unknown>;
       try { eventData = JSON.parse(event.data) as Record<string, unknown>; }
@@ -117,10 +140,22 @@ class WebSocketRppgClient implements RppgClient {
         const quality = Number(eventData.quality_score ?? 0);
         const state = String(eventData.tracking_state ?? 'CALIBRATING');
         const validReadout = eventData.is_valid_readout === true;
-        onUpdate({ status: validReadout ? 'complete' : state === 'SEARCHING' ? 'preparing' : 'measuring', progress: validReadout ? 100 : Math.min(95, Math.round(quality * 100)), signalQuality: quality, heartRateBpm: validReadout ? cardiac?.bpm ?? null : null, respiratoryRate: validReadout ? respiration?.brpm ?? null : null, message: validReadout ? 'Face tracked · reading ready' : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : state === 'HOLDING' ? 'Movement detected — hold still' : 'Face tracked · calibrating measurement…', algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state });
+        const bpm = Number(cardiac?.bpm);
+        const brpm = Number(respiration?.brpm);
+        const candidateSample = validReadout && Number.isFinite(bpm) && Number.isFinite(brpm)
+          ? { capturedAt: new Date().toISOString(), heartRateBpm: bpm, respiratoryRate: brpm, signalQuality: quality }
+          : undefined;
+        if (candidateSample) latestSample = candidateSample;
+        const now = Date.now();
+        if (now - lastUpdateAt < 900) return;
+        lastUpdateAt = now;
+        const sample = candidateSample;
+        const elapsed = Math.min(CAPTURE_WINDOW_MS, now - startedAt);
+        onUpdate({ status: state === 'SEARCHING' ? 'preparing' : 'measuring', progress: Math.min(99, Math.round((elapsed / CAPTURE_WINDOW_MS) * 100)), signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message: validReadout ? `Face tracked · recording ${Math.ceil((CAPTURE_WINDOW_MS - elapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : state === 'HOLDING' ? 'Movement detected — hold still' : 'Face tracked · calibrating measurement…', algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state, sample });
       }
     });
     socket.addEventListener('error', () => {
+      window.clearTimeout(windowTimer);
       onUpdate({
         status: 'failed',
         progress: 0,
@@ -131,10 +166,11 @@ class WebSocketRppgClient implements RppgClient {
       });
     });
     socket.addEventListener('close', () => {
-      if (!stopped && !receivedTelemetry) onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: serverFailureMessage || (receivedReady ? 'Railway ended the measurement before it produced a reading.' : 'Railway rejected the secure measurement connection. Check that its RPPG_TICKET_SECRET exactly matches Vercel.') });
+      if (!completed) window.clearTimeout(windowTimer);
+      if (!stopped && !completed && !receivedTelemetry) onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: serverFailureMessage || (receivedReady ? 'Railway ended the measurement before it produced a reading.' : 'Railway rejected the secure measurement connection. Check that its RPPG_TICKET_SECRET exactly matches Vercel.') });
     });
 
-    return () => { stopped = true; if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; context.onCameraStream?.(null); };
+    return () => { stopped = true; window.clearTimeout(windowTimer); if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; context.onCameraStream?.(null); };
   }
 }
 

@@ -39,6 +39,14 @@ export async function loadLatestPatientMeasurement(appointmentId: string) {
   return body.measurement ?? null;
 }
 
+export async function loadPatientMeasurementTrend(appointmentId: string) {
+  const token = await getClinicianAccessToken();
+  const response = await fetch(`/api/measurements?appointmentId=${encodeURIComponent(appointmentId)}`, { headers: { Authorization: `Bearer ${token}` } });
+  const body = await response.json().catch(() => ({ error: 'The measurement record could not be loaded.' })) as { measurements?: SavedMeasurement[]; error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'The measurement record could not be loaded.');
+  return body.measurements ?? [];
+}
+
 export async function createPatientInvitation(invitation: PatientInvitation) {
   const token = await getClinicianAccessToken();
   const response = await fetch('/api/clinician-invitations', {
