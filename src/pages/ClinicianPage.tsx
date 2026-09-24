@@ -27,7 +27,7 @@ export function ClinicianPage() {
   }, [load]);
   const scheduled = appointments.filter((appointment) => new Date(appointment.starts_at) >= new Date());
 
-  if (loading) return <div className="workspace-state"><LoaderCircle className="spin" /><strong>Loading your clinical workspace…</strong></div>;
+  if (loading && !profile) return <div className="workspace-state"><LoaderCircle className="spin" /><strong>Loading your clinical workspace…</strong></div>;
   if (error) return <div className="workspace-state"><CircleAlert /><strong>Access required</strong><span>{error}</span><Link className="button button-primary" to="/clinician/sign-in">Sign in</Link></div>;
 
   return (
