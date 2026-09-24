@@ -1,3 +1,5 @@
+import { database, requireClinician, tokenHash } from './clinic';
+
 type RequestBody = { appointmentId?: string; role?: 'patient' | 'clinician'; invitationToken?: string };
 
 const encoder = new TextEncoder();
@@ -22,8 +24,6 @@ export default {
       const apiUrl = process.env.RPPG_API_URL;
       if (!appointmentId || !secret || !apiUrl || (role !== 'patient' && role !== 'clinician')) throw new Error('rPPG access is not configured.');
       if (!process.env.VITE_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('The clinical database is not configured yet.');
-      const { database, requireClinician, tokenHash } = await import('./clinic');
-
       if (role === 'clinician') {
         const { db, clinician } = await requireClinician(request);
         const { data: appointment } = await db.from('appointments').select('id').eq('id', appointmentId).eq('clinician_id', clinician.id).maybeSingle();
