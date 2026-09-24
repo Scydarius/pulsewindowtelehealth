@@ -14,6 +14,10 @@ export type MeasurementUpdate = {
 };
 
 const CAPTURE_WINDOW_MS = 30_000;
+const STABILITY_WINDOW_MS = 5_000;
+const SETUP_TIMEOUT_MS = 90_000;
+const MIN_SIGNAL_QUALITY = 0.7;
+const CAPTURE_FPS = 30;
 
 export interface RppgClient {
   startMeasurement(context: MeasurementContext, onUpdate: (update: MeasurementUpdate) => void): Promise<() => void>;
@@ -79,7 +83,7 @@ class WebSocketRppgClient implements RppgClient {
     try { ticket = JSON.parse(responseText) as typeof ticket; } catch { throw new Error('The secure measurement service is temporarily unavailable.'); }
     if (!response.ok || !ticket.websocketUrl) throw new Error(ticket.error ?? 'Unable to start secure measurement.');
 
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } }, audio: false });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: CAPTURE_FPS } }, audio: false });
     context.onCameraStream?.(stream);
     const video = document.createElement('video');
     video.srcObject = stream;
@@ -95,10 +99,12 @@ class WebSocketRppgClient implements RppgClient {
     let stopped = false;
     let receivedReady = false;
     let serverFailureMessage = '';
-    const startedAt = Date.now();
     let lastUpdateAt = 0;
     let latestSample: MeasurementUpdate['sample'];
     let completed = false;
+    let stableSince: number | undefined;
+    let recordingStartedAt: number | undefined;
+    let captureTimer: number | undefined;
     const finishWindow = () => {
       if (completed || stopped) return;
       completed = true;
@@ -113,7 +119,16 @@ class WebSocketRppgClient implements RppgClient {
         onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'No stable reading was received during the 30-second camera check.' });
       }
     };
-    const windowTimer = window.setTimeout(finishWindow, CAPTURE_WINDOW_MS);
+    const setupTimer = window.setTimeout(() => {
+      if (stopped || completed || recordingStartedAt) return;
+      stopped = true;
+      if (interval) window.clearInterval(interval);
+      socket.close();
+      stream.getTracks().forEach((track) => track.stop());
+      video.srcObject = null;
+      context.onCameraStream?.(null);
+      onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'A stable, well-lit face could not be confirmed. No measurement was recorded.' });
+    }, SETUP_TIMEOUT_MS);
     socket.addEventListener('message', (event) => {
       let eventData: Record<string, unknown>;
       try { eventData = JSON.parse(event.data) as Record<string, unknown>; }
@@ -130,7 +145,7 @@ class WebSocketRppgClient implements RppgClient {
           if (socket.readyState !== WebSocket.OPEN || !drawingContext) return;
           drawingContext.drawImage(video, 0, 0, canvas.width, canvas.height);
           canvas.toBlob((blob) => { if (blob && socket.readyState === WebSocket.OPEN) socket.send(blob); }, 'image/jpeg', 0.75);
-        }, 1000 / 15);
+        }, 1000 / CAPTURE_FPS);
       }
       if (eventData.type === 'telemetry') {
         const cardiac = eventData.cardiac as { bpm?: number } | undefined;
@@ -140,20 +155,30 @@ class WebSocketRppgClient implements RppgClient {
         const validReadout = eventData.is_valid_readout === true;
         const bpm = Number(cardiac?.bpm);
         const brpm = Number(respiration?.brpm);
-        const candidateSample = validReadout && Number.isFinite(bpm) && Number.isFinite(brpm)
+        const motionDetected = eventData.motion_detected === true;
+        const eligible = validReadout && state === 'LOCKED' && !motionDetected && quality >= MIN_SIGNAL_QUALITY && Number.isFinite(bpm) && Number.isFinite(brpm);
+        const now = Date.now();
+        if (!eligible) stableSince = undefined;
+        else if (!stableSince) stableSince = now;
+        if (eligible && !recordingStartedAt && now - stableSince! >= STABILITY_WINDOW_MS) {
+          recordingStartedAt = now;
+          captureTimer = window.setTimeout(finishWindow, CAPTURE_WINDOW_MS);
+        }
+        const candidateSample = eligible && recordingStartedAt
           ? { capturedAt: new Date().toISOString(), heartRateBpm: bpm, respiratoryRate: brpm, signalQuality: quality }
           : undefined;
         if (candidateSample) latestSample = candidateSample;
-        const now = Date.now();
         if (now - lastUpdateAt < 900) return;
         lastUpdateAt = now;
         const sample = candidateSample;
-        const elapsed = Math.min(CAPTURE_WINDOW_MS, now - startedAt);
-        onUpdate({ status: state === 'SEARCHING' ? 'preparing' : 'measuring', progress: Math.min(99, Math.round((elapsed / CAPTURE_WINDOW_MS) * 100)), signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message: validReadout ? `Face tracked · recording ${Math.ceil((CAPTURE_WINDOW_MS - elapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : state === 'HOLDING' ? 'Movement detected — hold still' : 'Face tracked · calibrating measurement…', algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state, sample });
+        const stabilityElapsed = stableSince ? now - stableSince : 0;
+        const captureElapsed = recordingStartedAt ? Math.min(CAPTURE_WINDOW_MS, now - recordingStartedAt) : 0;
+        const message = recordingStartedAt ? `High-quality recording · ${Math.ceil((CAPTURE_WINDOW_MS - captureElapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : motionDetected || state === 'HOLDING' ? 'Movement detected — hold still' : eligible ? `Signal stable · hold still for ${Math.ceil((STABILITY_WINDOW_MS - stabilityElapsed) / 1000)}s` : quality < MIN_SIGNAL_QUALITY ? 'Improve lighting and keep your face centred' : 'Calibrating face and signal quality…';
+        onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : Math.min(15, Math.round((stabilityElapsed / STABILITY_WINDOW_MS) * 15)), signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state, sample });
       }
     });
     socket.addEventListener('error', () => {
-      window.clearTimeout(windowTimer);
+      window.clearTimeout(setupTimer); if (captureTimer) window.clearTimeout(captureTimer);
       onUpdate({
         status: 'failed',
         progress: 0,
@@ -164,11 +189,11 @@ class WebSocketRppgClient implements RppgClient {
       });
     });
     socket.addEventListener('close', () => {
-      if (!completed) window.clearTimeout(windowTimer);
+      if (!completed) { window.clearTimeout(setupTimer); if (captureTimer) window.clearTimeout(captureTimer); }
       if (!stopped && !completed) onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: serverFailureMessage || (receivedReady ? 'Railway ended the measurement before the 30-second check finished.' : 'Railway rejected the secure measurement connection. Check that its RPPG_TICKET_SECRET exactly matches Vercel.') });
     });
 
-    return () => { stopped = true; window.clearTimeout(windowTimer); if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; context.onCameraStream?.(null); };
+    return () => { stopped = true; window.clearTimeout(setupTimer); if (captureTimer) window.clearTimeout(captureTimer); if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; context.onCameraStream?.(null); };
   }
 }
 
