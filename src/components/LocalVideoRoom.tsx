@@ -28,6 +28,11 @@ type SignalMessage = {
 
 type ConnectionState = 'preparing' | 'waiting' | 'connecting' | 'connected' | 'failed';
 
+function createLocalParticipantId(role: LocalVideoRoomProps['role']) {
+  const randomPart = Math.random().toString(36).slice(2);
+  return `${role}-${Date.now().toString(36)}-${randomPart}`;
+}
+
 export default function LocalVideoRoom({ appointmentId, displayName, role }: LocalVideoRoomProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -37,7 +42,7 @@ export default function LocalVideoRoom({ appointmentId, displayName, role }: Loc
   const channelRef = useRef<BroadcastChannel | undefined>(undefined);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const makingOfferRef = useRef(false);
-  const localIdRef = useRef(`${role}-${crypto.randomUUID()}`);
+  const localIdRef = useRef(createLocalParticipantId(role));
   const [connectionState, setConnectionState] = useState<ConnectionState>('preparing');
   const [remoteName, setRemoteName] = useState(role === 'patient' ? 'Your clinician' : 'Your patient');
   const [cameraEnabled, setCameraEnabled] = useState(true);
@@ -179,6 +184,19 @@ export default function LocalVideoRoom({ appointmentId, displayName, role }: Loc
     };
 
     channel.addEventListener('message', handleSignal);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      queueMicrotask(() => {
+        if (!active) return;
+        setConnectionState('failed');
+        setError('This network address can display the portal, but this browser requires HTTPS before it will allow camera and microphone access.');
+      });
+      return () => {
+        active = false;
+        channel.removeEventListener('message', handleSignal);
+        channel.close();
+      };
+    }
 
     navigator.mediaDevices
       .getUserMedia({
