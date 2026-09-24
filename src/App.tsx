@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { ClinicianSessionGate } from './components/ClinicianSessionGate';
 import { LandingPage } from './pages/LandingPage';
 
 const ClinicianPage = lazy(() => import('./pages/ClinicianPage').then((module) => ({ default: module.ClinicianPage })));
@@ -27,8 +28,8 @@ export default function App() {
       <Route path="/clinician/activate" element={page(<ClinicianActivateAccountPage />)} />
       <Route path="/join" element={page(<PatientInvitePage />)} />
       <Route element={<AppShell />}>
-        <Route path="/clinician" element={page(<ClinicianPage />)} />
-        <Route path="/admin/clinicians" element={page(<AdminCliniciansPage />)} />
+        <Route path="/clinician" element={page(<ClinicianSessionGate><ClinicianPage /></ClinicianSessionGate>)} />
+        <Route path="/admin/clinicians" element={page(<ClinicianSessionGate><AdminCliniciansPage /></ClinicianSessionGate>)} />
         <Route path="/consultation/:appointmentId" element={page(<ConsultationPage />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

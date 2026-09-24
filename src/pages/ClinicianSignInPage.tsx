@@ -8,27 +8,32 @@ export function ClinicianSignInPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) { setRestoring(false); return; }
     void supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate('/clinician', { replace: true });
+      else setRestoring(false);
     });
   }, [navigate]);
 
   const signIn = async (event: FormEvent) => {
     event.preventDefault();
     if (!supabase) return;
-    setSubmitting(true);
+    setSubmitting(true); setMessage('');
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) { setMessage(error.message); return; }
-      navigate('/clinician');
+      if (!data.session) { setMessage('Your sign-in could not be completed. Please try again.'); return; }
+      navigate('/clinician', { replace: true });
     } catch {
       setMessage('Unable to sign in. Please try again.');
     } finally { setSubmitting(false); }
   };
+
+  if (restoring) return <main className="access-page"><div className="session-loading"><LockKeyhole /><strong>Checking your secure sign-in…</strong></div></main>;
 
   return <main className="access-page">
     <section className="access-card">

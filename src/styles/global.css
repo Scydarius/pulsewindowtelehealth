@@ -104,6 +104,16 @@ h1, h2, h3, p { margin-top: 0; }
 .header-sign-out { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--green-dark); font: inherit; font-size: .73rem; font-weight: 750; cursor: pointer; }.header-sign-out:disabled { opacity: .6; cursor: wait; }
 .app-main { width: min(1380px, calc(100% - 48px)); margin: 0 auto; padding: 44px 0 70px; }
 .page-loading { min-height: 45vh; display: grid; place-items: center; color: var(--muted); font-weight: 700; }
+.app-page-enter { animation: page-enter .34s cubic-bezier(.2,.75,.25,1) both; }
+.access-card, .admin-card, .panel, .measurement-panel { animation: surface-enter .42s cubic-bezier(.2,.75,.25,1) both; }
+.dashboard-page > * { animation: surface-enter .38s cubic-bezier(.2,.75,.25,1) both; }
+.dashboard-page > *:nth-child(2) { animation-delay: .05s; }
+.dashboard-page > *:nth-child(3) { animation-delay: .1s; }
+@keyframes page-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes surface-enter { from { opacity: 0; transform: translateY(10px) scale(.992); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.session-loading { min-height: 170px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: .88rem; }
+.access-page .session-loading { width: min(100%, 460px); min-height: 190px; padding: 30px; border: 1px solid var(--line); border-radius: 24px; background: white; box-shadow: var(--shadow); color: var(--green-dark); }
+@media (prefers-reduced-motion: reduce) { .app-page-enter, .access-card, .admin-card, .panel, .measurement-panel, .dashboard-page > * { animation: none; } }
 .dashboard-page { display: flex; flex-direction: column; gap: 28px; }
 .page-intro { display: flex; justify-content: space-between; gap: 25px; align-items: center; }
 .page-intro h1 { font-family: Georgia, serif; font-size: clamp(2.4rem, 4vw, 4rem); font-weight: 500; letter-spacing: -.045em; color: var(--green-dark); margin-bottom: 10px; }

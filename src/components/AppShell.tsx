@@ -51,7 +51,7 @@ export function AppShell() {
           {isClinician && <button className="header-sign-out" onClick={() => void signOut()} disabled={signingOut}><LogOut size={16} /> {signingOut ? 'Signing out…' : 'Sign out'}</button>}
         </div>
       </header>
-      <main className="app-main">
+      <main key={`${location.pathname}${location.search}`} className="app-main app-page-enter">
         <Outlet />
       </main>
     </div>
