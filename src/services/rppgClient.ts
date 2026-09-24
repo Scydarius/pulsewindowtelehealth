@@ -11,13 +11,13 @@ export type MeasurementUpdate = {
 };
 
 export interface RppgClient {
-  startMeasurement(onUpdate: (update: MeasurementUpdate) => void): Promise<() => void>;
+  startMeasurement(context: MeasurementContext, onUpdate: (update: MeasurementUpdate) => void): Promise<() => void>;
 }
 
-const apiUrl = import.meta.env.VITE_RPPG_API_URL ?? 'http://localhost:8000/api/v1';
+export type MeasurementContext = { appointmentId: string; role: 'patient' | 'clinician'; invitationToken?: string };
 
 class MockRppgClient implements RppgClient {
-  async startMeasurement(onUpdate: (update: MeasurementUpdate) => void) {
+  async startMeasurement(_context: MeasurementContext, onUpdate: (update: MeasurementUpdate) => void) {
     let progress = 0;
     let cancelled = false;
 
@@ -57,20 +57,44 @@ class MockRppgClient implements RppgClient {
 }
 
 class WebSocketRppgClient implements RppgClient {
-  async startMeasurement(onUpdate: (update: MeasurementUpdate) => void) {
-    const response = await fetch(`${apiUrl}/measurement-sessions`, {
+  async startMeasurement(context: MeasurementContext, onUpdate: (update: MeasurementUpdate) => void) {
+    const response = await fetch('/api/rppg-ticket', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ metrics: ['heart_rate', 'respiratory_rate'] }),
+      body: JSON.stringify(context),
     });
+    const ticket = (await response.json()) as { websocketUrl?: string; error?: string };
+    if (!response.ok || !ticket.websocketUrl) throw new Error(ticket.error ?? 'Unable to start secure measurement.');
 
-    if (!response.ok) throw new Error('Unable to create a measurement session.');
-    const session = (await response.json()) as { sessionId: string; websocketUrl?: string };
-    const websocketUrl = session.websocketUrl ?? `${apiUrl.replace(/^http/, 'ws')}/measurement-sessions/${session.sessionId}/stream`;
-    const socket = new WebSocket(websocketUrl);
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } }, audio: false });
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    await video.play();
+    const canvas = document.createElement('canvas');
+    canvas.width = 640; canvas.height = 480;
+    const drawingContext = canvas.getContext('2d');
+    const socket = new WebSocket(ticket.websocketUrl);
+    let interval: number | undefined;
 
     socket.addEventListener('message', (event) => {
-      onUpdate(JSON.parse(event.data) as MeasurementUpdate);
+      const eventData = JSON.parse(event.data) as Record<string, unknown>;
+      if (eventData.type === 'ready') {
+        onUpdate({ status: 'preparing', progress: 5, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'Checking lighting and face position…' });
+        interval = window.setInterval(() => {
+          if (socket.readyState !== WebSocket.OPEN || !drawingContext) return;
+          drawingContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => { if (blob && socket.readyState === WebSocket.OPEN) socket.send(blob); }, 'image/jpeg', 0.75);
+        }, 1000 / 15);
+      }
+      if (eventData.type === 'telemetry') {
+        const cardiac = eventData.cardiac as { bpm?: number } | undefined;
+        const respiration = eventData.respiration as { brpm?: number | null } | undefined;
+        const quality = Number(eventData.quality_score ?? 0);
+        const state = String(eventData.tracking_state ?? 'CALIBRATING');
+        onUpdate({ status: state === 'SEARCHING' ? 'preparing' : 'measuring', progress: state === 'LOCKED' ? 100 : Math.min(95, Math.round(quality * 100)), signalQuality: quality, heartRateBpm: eventData.is_valid_readout ? cardiac?.bpm ?? null : null, respiratoryRate: eventData.is_valid_readout ? respiration?.brpm ?? null : null, message: state === 'LOCKED' ? 'Signal locked · keep still for a stable reading' : state === 'SEARCHING' ? 'Keep your face in the frame' : state === 'HOLDING' ? 'Hold still while the signal recovers' : 'Calibrating measurement…', algorithmVersion: 'railway-rppg-2.16' });
+      }
     });
     socket.addEventListener('error', () => {
       onUpdate({
@@ -83,7 +107,7 @@ class WebSocketRppgClient implements RppgClient {
       });
     });
 
-    return () => socket.close();
+    return () => { if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; };
   }
 }
 

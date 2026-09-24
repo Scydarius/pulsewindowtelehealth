@@ -2,6 +2,8 @@ import { Activity, CheckCircle2, CircleAlert, LoaderCircle, Play, RotateCcw, Win
 import { useEffect, useRef, useState } from 'react';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
 
+type MeasurementPanelProps = { appointmentId: string; role: 'patient' | 'clinician'; invitationToken?: string };
+
 const initialState: MeasurementUpdate = {
   status: 'idle',
   progress: 0,
@@ -11,7 +13,7 @@ const initialState: MeasurementUpdate = {
   message: 'Ready when the patient is comfortable and still.',
 };
 
-export function MeasurementPanel() {
+export function MeasurementPanel({ appointmentId, role, invitationToken }: MeasurementPanelProps) {
   const [measurement, setMeasurement] = useState<MeasurementUpdate>(initialState);
   const stopRef = useRef<(() => void) | null>(null);
 
@@ -21,7 +23,7 @@ export function MeasurementPanel() {
     stopRef.current?.();
     setMeasurement({ ...initialState, status: 'preparing', message: 'Preparing measurement…' });
     try {
-      stopRef.current = await rppgClient.startMeasurement(setMeasurement);
+      stopRef.current = await rppgClient.startMeasurement({ appointmentId, role, invitationToken }, setMeasurement);
     } catch (error) {
       setMeasurement({
         ...initialState,

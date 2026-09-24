@@ -24,7 +24,7 @@ export function ConsultationPage() {
           <VideoRoom appointmentId={appointmentId} displayName={displayName} role={role} invitationToken={invitationToken} />
           <div className="medication-context"><div><Pill /></div><span><strong>Medication context</strong>Morning dose recorded at 8:00 am · measurement requested during consultation</span><button className="text-button">View care plan</button></div>
         </section>
-        <MeasurementPanel />
+        <MeasurementPanel appointmentId={appointmentId} role={role} invitationToken={invitationToken} />
       </div>
     </div>
   );
