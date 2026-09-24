@@ -1,7 +1,17 @@
 import { ArrowRight, Camera, ShieldCheck, Stethoscope, Video } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../services/supabase';
 
 export function LandingPage() {
+  const [clinicianSignedIn, setClinicianSignedIn] = useState(false);
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase.auth.getSession().then(({ data: { session } }) => setClinicianSignedIn(Boolean(session)));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setClinicianSignedIn(Boolean(session)));
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <div className="landing-page">
       <header className="landing-header">
@@ -16,9 +26,9 @@ export function LandingPage() {
           <p className="landing-intro">PulseWindow brings secure video consultations and contactless wellbeing checks into one simple appointment.</p>
 
           <div className="role-grid">
-            <Link to="/clinician/sign-in" className="role-card">
+            <Link to={clinicianSignedIn ? '/clinician' : '/clinician/sign-in'} className="role-card">
               <div className="role-icon"><Stethoscope /></div>
-              <div><span>For clinicians</span><strong>Sign in to your workspace</strong></div>
+              <div><span>For clinicians</span><strong>{clinicianSignedIn ? 'Return to your workspace' : 'Sign in to your workspace'}</strong></div>
               <ArrowRight />
             </Link>
             <div className="role-card role-patient">

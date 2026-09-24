@@ -10,7 +10,12 @@ export function AppShell() {
   const isClinician = location.pathname.startsWith('/clinician') || (isConsultation && consultationRole === 'clinician');
   const navigate = useNavigate();
   const [signedInEmail, setSignedInEmail] = useState('');
-  const signOut = async () => { await supabase?.auth.signOut(); navigate('/'); };
+  const [signingOut, setSigningOut] = useState(false);
+  const signOut = async () => {
+    setSigningOut(true);
+    await supabase?.auth.signOut({ scope: 'local' });
+    navigate('/');
+  };
   useEffect(() => {
     if (!supabase) return;
     const setEmail = (session: { user: { email?: string } } | null) => setSignedInEmail(session?.user.email ?? '');
@@ -43,7 +48,7 @@ export function AppShell() {
             <strong>{isClinician ? 'Clinician workspace' : 'Secure appointment'}</strong>
             <span>{isClinician ? (signedInEmail || 'Restoring sign-in…') : 'Patient access'}</span>
           </div>
-          <button className="icon-button" onClick={() => void signOut()} aria-label="Sign out"><LogOut size={19} /></button>
+          {isClinician && <button className="header-sign-out" onClick={() => void signOut()} disabled={signingOut}><LogOut size={16} /> {signingOut ? 'Signing out…' : 'Sign out'}</button>}
         </div>
       </header>
       <main className="app-main">

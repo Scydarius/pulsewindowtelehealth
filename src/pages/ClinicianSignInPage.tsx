@@ -1,5 +1,5 @@
 import { ArrowLeft, LockKeyhole, LogIn } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { hasClinicalDatabaseConfiguration, supabase } from '../services/supabase';
 
@@ -9,6 +9,13 @@ export function ClinicianSignInPage() {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) navigate('/clinician', { replace: true });
+    });
+  }, [navigate]);
 
   const signIn = async (event: FormEvent) => {
     event.preventDefault();
