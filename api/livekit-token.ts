@@ -1,10 +1,12 @@
 import { AccessToken } from 'livekit-server-sdk';
+import { database, requireClinician, tokenHash } from './clinic';
 
 type TokenRequest = {
   roomName?: string;
   identity?: string;
   displayName?: string;
   role?: 'patient' | 'clinician';
+  invitationToken?: string;
 };
 
 const safeIdentifier = /^[a-zA-Z0-9_-]{1,80}$/;
@@ -24,7 +26,7 @@ export default {
 
     try {
       const body = await request.json() as TokenRequest;
-      const { roomName, identity, displayName, role } = body;
+      const { roomName, identity, displayName, role, invitationToken } = body;
 
       if (
         !roomName || !safeIdentifier.test(roomName)
@@ -33,6 +35,24 @@ export default {
         || (role !== 'patient' && role !== 'clinician')
       ) {
         return Response.json({ error: 'Invalid consultation request' }, { status: 400 });
+      }
+
+      // When the clinical database is configured, a LiveKit room can only be
+      // joined by its clinician or by a holder of the matching patient link.
+      if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VITE_SUPABASE_URL) {
+        if (role === 'clinician') {
+          const { db, clinician } = await requireClinician(request);
+          const { data: appointment } = await db.from('appointments').select('id').eq('id', roomName).eq('clinician_id', clinician.id).maybeSingle();
+          if (!appointment) return Response.json({ error: 'You are not authorised for this consultation.' }, { status: 403 });
+        } else {
+          if (!invitationToken || invitationToken.length < 32) return Response.json({ error: 'A valid patient link is required.' }, { status: 403 });
+          const db = database();
+          const { data: invite } = await db.from('patient_invites').select('expires_at, revoked_at, appointment:appointments(id)').eq('token_hash', tokenHash(invitationToken)).maybeSingle();
+          const appointment = invite?.appointment as unknown as { id: string } | null;
+          if (!invite || invite.revoked_at || new Date(invite.expires_at) <= new Date() || appointment?.id !== roomName) {
+            return Response.json({ error: 'This patient link is not authorised for this consultation.' }, { status: 403 });
+          }
+        }
       }
 
       const token = new AccessToken(apiKey, apiSecret, {

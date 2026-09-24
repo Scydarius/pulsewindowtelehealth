@@ -7,6 +7,7 @@ export function ConsultationPage() {
   const { appointmentId = 'demo' } = useParams();
   const [searchParams] = useSearchParams();
   const role = searchParams.get('role') === 'clinician' ? 'clinician' : 'patient';
+  const invitationToken = searchParams.get('invite') ?? undefined;
   const displayName = role === 'clinician' ? 'Dr Maya Patel' : 'Claire Williams';
   const dashboardPath = role === 'clinician' ? '/clinician' : '/patient';
 
@@ -20,7 +21,7 @@ export function ConsultationPage() {
 
       <div className="consultation-grid">
         <section className="video-column">
-          <VideoRoom appointmentId={appointmentId} displayName={displayName} role={role} />
+          <VideoRoom appointmentId={appointmentId} displayName={displayName} role={role} invitationToken={invitationToken} />
           <div className="medication-context"><div><Pill /></div><span><strong>Medication context</strong>Morning dose recorded at 8:00 am · measurement requested during consultation</span><button className="text-button">View care plan</button></div>
         </section>
         <MeasurementPanel />

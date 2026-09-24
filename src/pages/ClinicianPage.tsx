@@ -1,6 +1,7 @@
 import { Activity, ArrowRight, CalendarClock, Search, UsersRound, Video } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { StatusPill } from '../components/StatusPill';
+import { InvitePatientForm } from '../components/InvitePatientForm';
 import { clinicianAppointments } from '../data/mockData';
 
 export function ClinicianPage() {
@@ -18,7 +19,7 @@ export function ClinicianPage() {
       </section>
 
       <section className="panel" id="appointments">
-        <div className="section-heading"><div><p className="eyebrow">Schedule</p><h2>Upcoming appointments</h2></div><button className="button button-secondary">New appointment</button></div>
+        <div className="section-heading"><div><p className="eyebrow">Schedule</p><h2>Upcoming appointments</h2></div><InvitePatientForm /></div>
         <div className="appointment-table">
           {clinicianAppointments.map((appointment, index) => (
             <article className="appointment-row" key={appointment.id}>

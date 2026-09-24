@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { CameraOff, LoaderCircle } from 'lucide-react';
 import { fetchLiveKitToken, hasLiveKitConfiguration } from '../services/livekit';
+import { getClinicianAccessToken } from '../services/clinicAccess';
+import { hasClinicalDatabaseConfiguration } from '../services/supabase';
 
 const LiveKitConnectedRoom = lazy(() => import('./LiveKitConnectedRoom'));
 const LocalVideoRoom = lazy(() => import('./LocalVideoRoom'));
@@ -9,9 +11,10 @@ type VideoRoomProps = {
   appointmentId: string;
   displayName: string;
   role: 'patient' | 'clinician';
+  invitationToken?: string;
 };
 
-export function VideoRoom({ appointmentId, displayName, role }: VideoRoomProps) {
+export function VideoRoom({ appointmentId, displayName, role, invitationToken }: VideoRoomProps) {
   const [token, setToken] = useState<string>();
   const [connectionError, setConnectionError] = useState<string>();
   const useLiveKit = import.meta.env.VITE_VIDEO_PROVIDER === 'livekit' && hasLiveKitConfiguration;
@@ -19,13 +22,11 @@ export function VideoRoom({ appointmentId, displayName, role }: VideoRoomProps) 
   useEffect(() => {
     if (!useLiveKit) return;
 
-    void fetchLiveKitToken({
-      roomName: appointmentId,
-      identity: `${role}-${appointmentId}`,
-      displayName,
-      role,
-    }).then(setToken).catch((error: Error) => setConnectionError(error.message));
-  }, [appointmentId, displayName, role, useLiveKit]);
+    void (async () => {
+      const accessToken = role === 'clinician' && hasClinicalDatabaseConfiguration ? await getClinicianAccessToken() : undefined;
+      return fetchLiveKitToken({ roomName: appointmentId, identity: `${role}-${appointmentId}`, displayName, role, invitationToken }, accessToken);
+    })().then(setToken).catch((error: Error) => setConnectionError(error.message));
+  }, [appointmentId, displayName, invitationToken, role, useLiveKit]);
 
   if (!useLiveKit) {
     return (
