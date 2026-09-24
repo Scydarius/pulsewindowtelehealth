@@ -7,6 +7,7 @@ const ClinicianPage = lazy(() => import('./pages/ClinicianPage').then((module) =
 const ConsultationPage = lazy(() => import('./pages/ConsultationPage').then((module) => ({ default: module.ConsultationPage })));
 const ClinicianSignInPage = lazy(() => import('./pages/ClinicianSignInPage').then((module) => ({ default: module.ClinicianSignInPage })));
 const ClinicianResetPasswordPage = lazy(() => import('./pages/ClinicianResetPasswordPage').then((module) => ({ default: module.ClinicianResetPasswordPage })));
+const ClinicianActivateAccountPage = lazy(() => import('./pages/ClinicianActivateAccountPage').then((module) => ({ default: module.ClinicianActivateAccountPage })));
 const PatientInvitePage = lazy(() => import('./pages/PatientInvitePage').then((module) => ({ default: module.PatientInvitePage })));
 const AdminCliniciansPage = lazy(() => import('./pages/AdminCliniciansPage').then((module) => ({ default: module.AdminCliniciansPage })));
 
@@ -21,7 +22,9 @@ export default function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/clinician/sign-in" element={page(<ClinicianSignInPage />)} />
+      <Route path="/clinician/forgot-password" element={page(<ClinicianResetPasswordPage />)} />
       <Route path="/clinician/reset-password" element={page(<ClinicianResetPasswordPage />)} />
+      <Route path="/clinician/activate" element={page(<ClinicianActivateAccountPage />)} />
       <Route path="/join" element={page(<PatientInvitePage />)} />
       <Route element={<AppShell />}>
         <Route path="/clinician" element={page(<ClinicianPage />)} />

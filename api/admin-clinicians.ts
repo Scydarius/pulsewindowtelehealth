@@ -32,7 +32,7 @@ export default {
       if (!email?.trim() || !displayName?.trim()) return Response.json({ error: 'Clinician name and work email are required.' }, { status: 400 });
       const db = await requireAdministrator(request);
       const { data: invitation, error: invitationError } = await db.auth.admin.inviteUserByEmail(email.trim().toLowerCase(), {
-        redirectTo: `${new URL(request.url).origin}/clinician/sign-in`,
+        redirectTo: `${new URL(request.url).origin}/clinician/activate`,
       });
       if (invitationError || !invitation.user) throw new Error(invitationError?.message ?? 'Unable to invite this clinician.');
       const { error: profileError } = await db.from('clinician_profiles').upsert({

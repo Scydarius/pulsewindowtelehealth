@@ -35,7 +35,8 @@ export function ClinicianSignInPage() {
         <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
         <button className="button button-primary button-full" disabled={submitting}><LogIn size={18} /> {submitting ? 'Signing in…' : 'Sign in'}</button>
       </form>}
-      <Link className="password-help-link" to="/clinician/reset-password">New clinician or forgotten password? Set up your sign-in</Link>
+      <Link className="password-help-link" to="/clinician/forgot-password">Forgot password?</Link>
+      <p className="account-help">Need a clinician account? Ask your PulseWindow administrator to add your work email.</p>
       {message && <p className="access-message" role="status">{message}</p>}
     </section>
   </main>;

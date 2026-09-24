@@ -5,7 +5,9 @@
     { "source": "/patient", "destination": "/index.html" },
     { "source": "/clinician", "destination": "/index.html" },
     { "source": "/clinician/sign-in", "destination": "/index.html" },
+    { "source": "/clinician/forgot-password", "destination": "/index.html" },
     { "source": "/clinician/reset-password", "destination": "/index.html" },
+    { "source": "/clinician/activate", "destination": "/index.html" },
     { "source": "/admin/clinicians", "destination": "/index.html" },
     { "source": "/join", "destination": "/index.html" },
     { "source": "/consultation/:path*", "destination": "/index.html" }
