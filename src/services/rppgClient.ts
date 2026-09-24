@@ -63,7 +63,9 @@ class WebSocketRppgClient implements RppgClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(context),
     });
-    const ticket = (await response.json()) as { websocketUrl?: string; error?: string };
+    const responseText = await response.text();
+    let ticket: { websocketUrl?: string; error?: string } = {};
+    try { ticket = JSON.parse(responseText) as typeof ticket; } catch { throw new Error('The secure measurement service is temporarily unavailable.'); }
     if (!response.ok || !ticket.websocketUrl) throw new Error(ticket.error ?? 'Unable to start secure measurement.');
 
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } }, audio: false });

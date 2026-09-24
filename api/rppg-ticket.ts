@@ -1,5 +1,3 @@
-import { database, requireClinician, tokenHash } from './clinic';
-
 type RequestBody = { appointmentId?: string; role?: 'patient' | 'clinician'; invitationToken?: string };
 
 const encoder = new TextEncoder();
@@ -23,6 +21,7 @@ export default {
       const secret = process.env.RPPG_TICKET_SECRET;
       const apiUrl = process.env.RPPG_API_URL;
       if (!appointmentId || !secret || !apiUrl || (role !== 'patient' && role !== 'clinician')) throw new Error('rPPG access is not configured.');
+      const { database, requireClinician, tokenHash } = await import('./clinic');
 
       if (role === 'clinician') {
         const { db, clinician } = await requireClinician(request);
