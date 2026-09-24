@@ -62,3 +62,7 @@ https://api.pulsewindow.me/api/v1
 ```
 
 The frontend should not import or depend on Python algorithm code. Algorithm changes and deployments remain independent of this application.
+
+## Clinician-created patient links
+
+The portal now includes clinician sign-in, clinician-created patient links and database access rules for appointments and measurements. Follow [the clinical prototype setup guide](docs/clinical-setup.md) before enabling it. Until that setup is complete, the existing sample data and simulated rPPG values remain a demonstration only.
