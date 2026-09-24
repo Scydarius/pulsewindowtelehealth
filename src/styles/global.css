@@ -199,6 +199,7 @@ h1, h2, h3, p { margin-top: 0; }
 .call-time { justify-self: end; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .78rem; font-weight: 700; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #23a36d; box-shadow: 0 0 0 5px #dff4e9; margin-right: 4px; }
 .consultation-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 22px; align-items: start; }
+.patient-consultation-grid { grid-template-columns: minmax(0, 1fr); max-width: 1040px; margin: 0 auto; }
 .video-column { min-width: 0; }
 .video-stage, .livekit-frame { height: min(67vh, 720px); min-height: 500px; background: #092c25; border-radius: 24px; overflow: hidden; position: relative; box-shadow: var(--shadow); }
 .video-stage video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
@@ -245,8 +246,16 @@ h1, h2, h3, p { margin-top: 0; }
 .face-guide-small video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 .face-guide-small i { position: absolute; inset: 5px; border: 1.5px solid #f0a342; border-radius: 45%; pointer-events: none; }
 .face-guide-small i.face-locked { border-color: #19a974; box-shadow: 0 0 0 1px rgba(25, 169, 116, .2); }
-.patient-capture-panel { align-self: start; }
-.patient-capture-guide { grid-template-columns: 76px 1fr; min-height: 92px; }
+.patient-camera-check { display: flex; align-items: center; gap: 16px; margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: white; }
+.patient-camera-copy { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; color: var(--green); }
+.patient-camera-copy > div { min-width: 0; }
+.patient-camera-copy strong, .patient-camera-copy span, .patient-camera-running strong, .patient-camera-running span { display: block; }
+.patient-camera-copy strong, .patient-camera-running strong { color: var(--ink); font-size: .8rem; }
+.patient-camera-copy span, .patient-camera-running span { margin-top: 3px; color: var(--muted); font-size: .7rem; line-height: 1.4; }
+.patient-camera-button { flex: 0 0 auto; white-space: nowrap; }
+.patient-camera-check-active { flex-wrap: wrap; }
+.patient-camera-running { flex-basis: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; background: #f1f7f4; }
+.patient-camera-running > div:last-child { min-width: 0; }
 .patient-camera-preview { width: 70px; height: 78px; }
 .live-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
 .live-metrics article { position: relative; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: #fcfdfc; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 5px 7px; }
@@ -323,6 +332,8 @@ h1, h2, h3, p { margin-top: 0; }
   .consultation-heading { grid-template-columns: 1fr auto; }
   .consultation-person { display: none; }
   .consultation-grid { gap: 14px; }
+  .patient-camera-check { align-items: stretch; flex-direction: column; }
+  .patient-camera-button { width: 100%; justify-content: center; }
   .invite-form { grid-template-columns: 1fr; }
   .video-stage, .livekit-frame { min-height: 440px; height: 62vh; border-radius: 19px; }
   .remote-participant { width: 145px; }

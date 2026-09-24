@@ -19,12 +19,13 @@ export function ConsultationPage() {
         <div className="call-time"><span className="live-dot" /><Clock3 size={16} /> 00:00</div>
       </div>
 
-      <div className="consultation-grid">
+      <div className={`consultation-grid ${role === 'patient' ? 'patient-consultation-grid' : ''}`}>
         <section className="video-column">
           <VideoRoom appointmentId={appointmentId} displayName={displayName} role={role} invitationToken={invitationToken} />
           <div className="medication-context"><div><Pill /></div><span><strong>Appointment privacy</strong>This call is available only to the clinician and the holder of the secure patient link.</span></div>
+          {role === 'patient' && <MeasurementPanel appointmentId={appointmentId} role={role} invitationToken={invitationToken} />}
         </section>
-        <MeasurementPanel appointmentId={appointmentId} role={role} invitationToken={invitationToken} />
+        {role === 'clinician' && <MeasurementPanel appointmentId={appointmentId} role={role} invitationToken={invitationToken} />}
       </div>
     </div>
   );

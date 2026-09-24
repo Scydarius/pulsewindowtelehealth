@@ -1,4 +1,4 @@
-import { Activity, CheckCircle2, CircleAlert, LoaderCircle, Play, RotateCcw, Wind } from 'lucide-react';
+import { Activity, CheckCircle2, CircleAlert, LoaderCircle, Play, RotateCcw, ShieldCheck, Wind } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
 import { loadLatestPatientMeasurement, savePatientMeasurement } from '../services/clinicAccess';
@@ -74,23 +74,13 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
   const isPatient = role === 'patient';
 
   if (isPatient) return (
-    <aside className="measurement-panel patient-capture-panel">
-      <div className="section-heading compact"><div><p className="eyebrow">Camera check</p><h2>Check your pulse</h2></div><span className={`status-dot ${isRunning ? 'active' : ''}`} aria-hidden="true" /></div>
-      <div className="instruction-card patient-capture-guide">
-        <div className={`face-guide-small patient-camera-preview ${cameraStream ? 'camera-active' : ''}`}>{cameraStream ? <video ref={videoRef} autoPlay muted playsInline /> : <span />} {cameraStream && <i className={measurement.faceDetected ? 'face-locked' : ''} />}</div>
-        <div><strong>{measurement.faceDetected ? 'Face tracking active' : 'Face the camera'}</strong><span>{cameraStream ? measurement.message : 'When your clinician asks, start the camera check and keep your face centred.'}</span></div>
-      </div>
-      <div className="progress-block">
-        <div className="progress-label"><span>{measurement.message}</span><strong>{measurement.progress}%</strong></div>
-        <div className="progress-track"><span style={{ width: `${measurement.progress}%` }} /></div>
-        {isRunning && <div className="signal-line"><LoaderCircle className="spin" size={16} /> Checking face position and signal quality</div>}
-        {isComplete && <div className="signal-line success"><CheckCircle2 size={16} /> {recordMessage || 'Check complete — your clinician can view the result.'}</div>}
-        {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> {measurement.message}</div>}
-      </div>
-      <button className="button button-primary button-full" onClick={() => void startMeasurement()} disabled={isRunning}>
-        {isComplete ? <><RotateCcw size={18} /> Check again</> : <><Play size={18} /> {isRunning ? 'Checking…' : 'Start camera check'}</>}
+    <aside className={`patient-camera-check ${isRunning ? 'patient-camera-check-active' : ''}`}>
+      <div className="patient-camera-copy"><ShieldCheck size={21} /><div><strong>{isComplete ? 'Camera check complete' : 'Camera check'}</strong><span>{isComplete ? (recordMessage || 'Your clinician can now view the reading.') : 'Only start this when your clinician asks. Results are shown to your clinician, not in this call view.'}</span></div></div>
+      {isRunning && <div className="patient-camera-running"><div className={`face-guide-small patient-camera-preview ${cameraStream ? 'camera-active' : ''}`}>{cameraStream ? <video ref={videoRef} autoPlay muted playsInline /> : <span />} {cameraStream && <i className={measurement.faceDetected ? 'face-locked' : ''} />}</div><div><strong>{measurement.faceDetected ? 'Face tracking active' : 'Centre your face'}</strong><span>{measurement.message} · {measurement.progress}%</span></div></div>}
+      {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> {measurement.message}</div>}
+      <button className="button button-secondary patient-camera-button" onClick={() => void startMeasurement()} disabled={isRunning}>
+        {isComplete ? <><RotateCcw size={17} /> Run again</> : <><Play size={17} /> {isRunning ? 'Camera check running…' : 'Enable camera check'}</>}
       </button>
-      <p className="clinical-note">This research prototype does not provide a diagnosis or emergency assessment.</p>
     </aside>
   );
 
@@ -106,7 +96,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
 
       <div className="instruction-card">
         <div className="face-guide-small"><span /></div>
-        <div><strong>Patient measurement</strong><span>{measurement.status === 'complete' ? 'Latest patient reading is shown below.' : 'Waiting for the patient to complete their camera check.'}</span></div>
+        <div><strong>{measurement.status === 'complete' ? 'Patient reading received' : 'Patient camera status'}</strong><span>{measurement.status === 'complete' ? 'Latest patient reading is shown below.' : 'The patient completes a small camera check from their call screen. Results appear here automatically.'}</span></div>
       </div>
 
       <div className="live-metrics">
@@ -132,7 +122,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> Video consultation remains available</div>}
       </div>
 
-      <p className="clinician-measurement-note">This panel updates automatically when the patient completes their camera check.</p>
+      <p className="clinician-measurement-note">This is the clinician-only results panel. It updates automatically when the patient completes their camera check.</p>
 
       <p className="clinical-note">Measurements are not intended for diagnosis or emergency assessment.</p>
     </aside>
