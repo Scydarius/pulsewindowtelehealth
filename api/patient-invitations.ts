@@ -1,4 +1,16 @@
-import { database, tokenHash } from './clinic';
+import { createClient } from '@supabase/supabase-js';
+
+const encoder = new TextEncoder();
+const database = () => {
+  const url = process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) throw new Error('The clinical database is not configured.');
+  return createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+};
+const tokenHash = async (token: string) => {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(token));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+};
 
 export default {
   async fetch(request: Request) {

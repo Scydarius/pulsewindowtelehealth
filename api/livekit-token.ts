@@ -1,4 +1,5 @@
 import { AccessToken } from 'livekit-server-sdk';
+import { createClient } from '@supabase/supabase-js';
 
 type TokenRequest = {
   roomName?: string;
@@ -9,6 +10,27 @@ type TokenRequest = {
 };
 
 const safeIdentifier = /^[a-zA-Z0-9_-]{1,80}$/;
+const encoder = new TextEncoder();
+const database = () => {
+  const url = process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) throw new Error('The clinical database is not configured.');
+  return createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+};
+const tokenHash = async (token: string) => {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(token));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+async function requireClinician(request: Request) {
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  if (!token) throw new Error('Sign in is required.');
+  const db = database();
+  const { data: userData, error: userError } = await db.auth.getUser(token);
+  if (userError || !userData.user) throw new Error('Your sign-in session is invalid.');
+  const { data: clinician, error } = await db.from('clinician_profiles').select('id').eq('id', userData.user.id).maybeSingle();
+  if (error || !clinician) throw new Error('This account is not an authorised clinician.');
+  return { db, clinician };
+}
 
 export default {
   async fetch(request: Request) {
@@ -39,7 +61,6 @@ export default {
       // When the clinical database is configured, a LiveKit room can only be
       // joined by its clinician or by a holder of the matching patient link.
       if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VITE_SUPABASE_URL) {
-        const { database, requireClinician, tokenHash } = await import('./clinic');
         if (role === 'clinician') {
           const { db, clinician } = await requireClinician(request);
           const { data: appointment } = await db.from('appointments').select('id').eq('id', roomName).eq('clinician_id', clinician.id).maybeSingle();

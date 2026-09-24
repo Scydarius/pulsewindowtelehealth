@@ -20,7 +20,7 @@ export async function fetchLiveKitToken(identity: ConsultationIdentity, accessTo
     body: JSON.stringify(identity),
   });
 
-  if (!response.ok) throw new Error('Unable to join the consultation.');
-  const body = (await response.json()) as { token: string };
+  const body = await response.json().catch(() => ({ error: 'The video service is temporarily unavailable.' })) as { token?: string; error?: string };
+  if (!response.ok || !body.token) throw new Error(body.error ?? 'Unable to join the consultation.');
   return body.token;
 }
