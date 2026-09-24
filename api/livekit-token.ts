@@ -1,5 +1,4 @@
 import { AccessToken } from 'livekit-server-sdk';
-import { database, requireClinician, tokenHash } from './clinic';
 
 type TokenRequest = {
   roomName?: string;
@@ -40,6 +39,7 @@ export default {
       // When the clinical database is configured, a LiveKit room can only be
       // joined by its clinician or by a holder of the matching patient link.
       if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VITE_SUPABASE_URL) {
+        const { database, requireClinician, tokenHash } = await import('./clinic');
         if (role === 'clinician') {
           const { db, clinician } = await requireClinician(request);
           const { data: appointment } = await db.from('appointments').select('id').eq('id', roomName).eq('clinician_id', clinician.id).maybeSingle();
