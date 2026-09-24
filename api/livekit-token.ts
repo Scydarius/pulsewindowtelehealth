@@ -58,21 +58,24 @@ export default {
         return Response.json({ error: 'Invalid consultation request' }, { status: 400 });
       }
 
+      let liveKitRoomName = roomName;
       // When the clinical database is configured, a LiveKit room can only be
       // joined by its clinician or by a holder of the matching patient link.
       if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VITE_SUPABASE_URL) {
         if (role === 'clinician') {
           const { db, clinician } = await requireClinician(request);
-          const { data: appointment } = await db.from('appointments').select('id').eq('id', roomName).eq('clinician_id', clinician.id).maybeSingle();
+          const { data: appointment } = await db.from('appointments').select('id, room_name').eq('id', roomName).eq('clinician_id', clinician.id).maybeSingle();
           if (!appointment) return Response.json({ error: 'You are not authorised for this consultation.' }, { status: 403 });
+          liveKitRoomName = appointment.room_name;
         } else {
           if (!invitationToken || invitationToken.length < 32) return Response.json({ error: 'A valid patient link is required.' }, { status: 403 });
           const db = database();
-          const { data: invite } = await db.from('patient_invites').select('expires_at, revoked_at, appointment:appointments(id)').eq('token_hash', await tokenHash(invitationToken)).maybeSingle();
-          const appointment = invite?.appointment as unknown as { id: string } | null;
+          const { data: invite } = await db.from('patient_invites').select('expires_at, revoked_at, appointment:appointments(id, room_name)').eq('token_hash', await tokenHash(invitationToken)).maybeSingle();
+          const appointment = invite?.appointment as unknown as { id: string; room_name: string } | null;
           if (!invite || invite.revoked_at || new Date(invite.expires_at) <= new Date() || appointment?.id !== roomName) {
             return Response.json({ error: 'This patient link is not authorised for this consultation.' }, { status: 403 });
           }
+          liveKitRoomName = appointment.room_name;
         }
       }
 
@@ -84,7 +87,7 @@ export default {
       });
 
       token.addGrant({
-        room: roomName,
+        room: liveKitRoomName,
         roomJoin: true,
         canPublish: true,
         canSubscribe: true,
