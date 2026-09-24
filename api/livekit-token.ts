@@ -47,7 +47,7 @@ export default {
         } else {
           if (!invitationToken || invitationToken.length < 32) return Response.json({ error: 'A valid patient link is required.' }, { status: 403 });
           const db = database();
-          const { data: invite } = await db.from('patient_invites').select('expires_at, revoked_at, appointment:appointments(id)').eq('token_hash', tokenHash(invitationToken)).maybeSingle();
+          const { data: invite } = await db.from('patient_invites').select('expires_at, revoked_at, appointment:appointments(id)').eq('token_hash', await tokenHash(invitationToken)).maybeSingle();
           const appointment = invite?.appointment as unknown as { id: string } | null;
           if (!invite || invite.revoked_at || new Date(invite.expires_at) <= new Date() || appointment?.id !== roomName) {
             return Response.json({ error: 'This patient link is not authorised for this consultation.' }, { status: 403 });

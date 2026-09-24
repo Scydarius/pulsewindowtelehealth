@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { createHash, randomBytes } from 'node:crypto';
 
 export function database() {
   const url = process.env.VITE_SUPABASE_URL;
@@ -8,12 +7,14 @@ export function database() {
   return createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-export function tokenHash(token: string) {
-  return createHash('sha256').update(token).digest('hex');
+export async function tokenHash(token: string) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export function newOpaqueToken() {
-  return randomBytes(32).toString('base64url');
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export async function requireClinician(request: Request) {

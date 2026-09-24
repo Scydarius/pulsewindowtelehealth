@@ -6,7 +6,7 @@ export default {
     if (!token || token.length < 32) return Response.json({ error: 'Invalid patient link.' }, { status: 400 });
     try {
       const db = database();
-      const { data: invite } = await db.from('patient_invites').select('appointment_id, expires_at, revoked_at').eq('token_hash', tokenHash(token)).maybeSingle();
+      const { data: invite } = await db.from('patient_invites').select('appointment_id, expires_at, revoked_at').eq('token_hash', await tokenHash(token)).maybeSingle();
       if (!invite || invite.revoked_at || new Date(invite.expires_at) <= new Date()) return Response.json({ error: 'This patient link has expired or was revoked.' }, { status: 410 });
       const { data: appointment } = await db.from('appointments').select('id, reason, starts_at, clinician:clinician_profiles(display_name)').eq('id', invite.appointment_id).single();
       if (!appointment) return Response.json({ error: 'Appointment not found.' }, { status: 404 });

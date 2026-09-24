@@ -1,5 +1,4 @@
 import { newOpaqueToken, requireClinician, tokenHash } from './clinic';
-import { randomUUID } from 'node:crypto';
 
 type RequestBody = { patientName?: string; patientEmail?: string; reason?: string; startsAt?: string };
 
@@ -18,14 +17,14 @@ export default {
         clinician_id: clinician.id, display_name: body.patientName.trim(), email: body.patientEmail.trim().toLowerCase(),
       }).select('id').single();
       if (patientError || !patient) throw new Error('Could not save the patient record.');
-      const roomName = `pw-${randomUUID().replaceAll('-', '').slice(0, 24)}`;
+      const roomName = `pw-${newOpaqueToken().slice(0, 24)}`;
       const { data: appointment, error: appointmentError } = await db.from('appointments').insert({
         clinician_id: clinician.id, patient_id: patient.id, room_name: roomName, reason: body.reason.trim(), starts_at: startsAt.toISOString(),
       }).select('id').single();
       if (appointmentError || !appointment) throw new Error('Could not create the appointment.');
       const token = newOpaqueToken();
       const { error: inviteError } = await db.from('patient_invites').insert({
-        appointment_id: appointment.id, token_hash: tokenHash(token),
+        appointment_id: appointment.id, token_hash: await tokenHash(token),
         expires_at: new Date(startsAt.valueOf() + 24 * 60 * 60 * 1000).toISOString(),
       });
       if (inviteError) throw new Error('Could not create the patient link.');
