@@ -90,15 +90,19 @@ class WebSocketRppgClient implements RppgClient {
 
     let stopped = false;
     let receivedTelemetry = false;
+    let receivedReady = false;
+    let serverFailureMessage = '';
     socket.addEventListener('message', (event) => {
       let eventData: Record<string, unknown>;
       try { eventData = JSON.parse(event.data) as Record<string, unknown>; }
       catch { return; }
       if (eventData.type === 'error') {
-        onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: String(eventData.message ?? 'The measurement service rejected this stream.') });
+        serverFailureMessage = String(eventData.message ?? 'The measurement service rejected this stream.');
+        onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: serverFailureMessage });
         return;
       }
       if (eventData.type === 'ready') {
+        receivedReady = true;
         onUpdate({ status: 'preparing', progress: 5, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'Checking lighting and face position…' });
         interval = window.setInterval(() => {
           if (socket.readyState !== WebSocket.OPEN || !drawingContext) return;
@@ -127,7 +131,7 @@ class WebSocketRppgClient implements RppgClient {
       });
     });
     socket.addEventListener('close', () => {
-      if (!stopped && !receivedTelemetry) onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'The measurement connection closed before a reading was received.' });
+      if (!stopped && !receivedTelemetry) onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: serverFailureMessage || (receivedReady ? 'Railway ended the measurement before it produced a reading.' : 'Railway rejected the secure measurement connection. Check that its RPPG_TICKET_SECRET exactly matches Vercel.') });
     });
 
     return () => { stopped = true; if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; context.onCameraStream?.(null); };
