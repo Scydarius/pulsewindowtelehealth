@@ -1,5 +1,6 @@
 import { CalendarDays, LayoutDashboard, LogOut, Stethoscope, UserRound } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 
 export function AppShell() {
@@ -8,7 +9,15 @@ export function AppShell() {
   const consultationRole = new URLSearchParams(location.search).get('role');
   const isClinician = location.pathname.startsWith('/clinician') || (isConsultation && consultationRole === 'clinician');
   const navigate = useNavigate();
+  const [signedInEmail, setSignedInEmail] = useState('');
   const signOut = async () => { await supabase?.auth.signOut(); navigate('/'); };
+  useEffect(() => {
+    if (!supabase) return;
+    const setEmail = (session: { user: { email?: string } } | null) => setSignedInEmail(session?.user.email ?? '');
+    void supabase.auth.getSession().then(({ data: { session } }) => setEmail(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setEmail(session));
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <div className="app-shell">
@@ -32,7 +41,7 @@ export function AppShell() {
           <div className="avatar"><UserRound size={19} /></div>
           <div className="header-user-copy">
             <strong>{isClinician ? 'Clinician workspace' : 'Secure appointment'}</strong>
-            <span>{isClinician ? 'Protected clinic access' : 'Patient access'}</span>
+            <span>{isClinician ? (signedInEmail || 'Restoring sign-in…') : 'Patient access'}</span>
           </div>
           <button className="icon-button" onClick={() => void signOut()} aria-label="Sign out"><LogOut size={19} /></button>
         </div>

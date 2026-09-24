@@ -8,13 +8,20 @@ export type MeasurementUpdate = {
   respiratoryRate: number | null;
   message: string;
   algorithmVersion?: string;
+  faceDetected?: boolean;
+  trackingState?: string;
 };
 
 export interface RppgClient {
   startMeasurement(context: MeasurementContext, onUpdate: (update: MeasurementUpdate) => void): Promise<() => void>;
 }
 
-export type MeasurementContext = { appointmentId: string; role: 'patient' | 'clinician'; invitationToken?: string };
+export type MeasurementContext = {
+  appointmentId: string;
+  role: 'patient' | 'clinician';
+  invitationToken?: string;
+  onCameraStream?: (stream: MediaStream | null) => void;
+};
 
 class MockRppgClient implements RppgClient {
   async startMeasurement(_context: MeasurementContext, onUpdate: (update: MeasurementUpdate) => void) {
@@ -69,6 +76,7 @@ class WebSocketRppgClient implements RppgClient {
     if (!response.ok || !ticket.websocketUrl) throw new Error(ticket.error ?? 'Unable to start secure measurement.');
 
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } }, audio: false });
+    context.onCameraStream?.(stream);
     const video = document.createElement('video');
     video.srcObject = stream;
     video.muted = true;
@@ -80,8 +88,16 @@ class WebSocketRppgClient implements RppgClient {
     const socket = new WebSocket(ticket.websocketUrl);
     let interval: number | undefined;
 
+    let stopped = false;
+    let receivedTelemetry = false;
     socket.addEventListener('message', (event) => {
-      const eventData = JSON.parse(event.data) as Record<string, unknown>;
+      let eventData: Record<string, unknown>;
+      try { eventData = JSON.parse(event.data) as Record<string, unknown>; }
+      catch { return; }
+      if (eventData.type === 'error') {
+        onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: String(eventData.message ?? 'The measurement service rejected this stream.') });
+        return;
+      }
       if (eventData.type === 'ready') {
         onUpdate({ status: 'preparing', progress: 5, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'Checking lighting and face position…' });
         interval = window.setInterval(() => {
@@ -91,11 +107,13 @@ class WebSocketRppgClient implements RppgClient {
         }, 1000 / 15);
       }
       if (eventData.type === 'telemetry') {
+        receivedTelemetry = true;
         const cardiac = eventData.cardiac as { bpm?: number } | undefined;
         const respiration = eventData.respiration as { brpm?: number | null } | undefined;
         const quality = Number(eventData.quality_score ?? 0);
         const state = String(eventData.tracking_state ?? 'CALIBRATING');
-        onUpdate({ status: state === 'SEARCHING' ? 'preparing' : 'measuring', progress: state === 'LOCKED' ? 100 : Math.min(95, Math.round(quality * 100)), signalQuality: quality, heartRateBpm: eventData.is_valid_readout ? cardiac?.bpm ?? null : null, respiratoryRate: eventData.is_valid_readout ? respiration?.brpm ?? null : null, message: state === 'LOCKED' ? 'Signal locked · keep still for a stable reading' : state === 'SEARCHING' ? 'Keep your face in the frame' : state === 'HOLDING' ? 'Hold still while the signal recovers' : 'Calibrating measurement…', algorithmVersion: 'railway-rppg-2.16' });
+        const validReadout = eventData.is_valid_readout === true;
+        onUpdate({ status: validReadout ? 'complete' : state === 'SEARCHING' ? 'preparing' : 'measuring', progress: validReadout ? 100 : Math.min(95, Math.round(quality * 100)), signalQuality: quality, heartRateBpm: validReadout ? cardiac?.bpm ?? null : null, respiratoryRate: validReadout ? respiration?.brpm ?? null : null, message: validReadout ? 'Face tracked · reading ready' : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : state === 'HOLDING' ? 'Movement detected — hold still' : 'Face tracked · calibrating measurement…', algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state });
       }
     });
     socket.addEventListener('error', () => {
@@ -108,8 +126,11 @@ class WebSocketRppgClient implements RppgClient {
         message: 'The measurement service is unavailable. The consultation can continue.',
       });
     });
+    socket.addEventListener('close', () => {
+      if (!stopped && !receivedTelemetry) onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'The measurement connection closed before a reading was received.' });
+    });
 
-    return () => { if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; };
+    return () => { stopped = true; if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; context.onCameraStream?.(null); };
   }
 }
 

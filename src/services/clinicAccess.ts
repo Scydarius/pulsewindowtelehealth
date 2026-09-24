@@ -23,6 +23,22 @@ export async function claimInitialAdministratorAccess() {
   if (!response.ok) throw new Error(body.error ?? 'Unable to complete administrator setup.');
 }
 
+export type SavedMeasurement = { measured_at: string; heart_rate_bpm: number; respiratory_rate_bpm: number; signal_quality: number; algorithm_version: string | null };
+
+export async function savePatientMeasurement(input: { appointmentId: string; invitationToken: string; heartRateBpm: number; respiratoryRateBpm: number; signalQuality: number; algorithmVersion?: string }) {
+  const response = await fetch('/api/measurements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+  const body = await response.json().catch(() => ({ error: 'The measurement record could not be saved.' })) as { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'The measurement record could not be saved.');
+}
+
+export async function loadLatestPatientMeasurement(appointmentId: string) {
+  const token = await getClinicianAccessToken();
+  const response = await fetch(`/api/measurements?appointmentId=${encodeURIComponent(appointmentId)}`, { headers: { Authorization: `Bearer ${token}` } });
+  const body = await response.json().catch(() => ({ error: 'The measurement record could not be loaded.' })) as { measurement?: SavedMeasurement | null; error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'The measurement record could not be loaded.');
+  return body.measurement ?? null;
+}
+
 export async function createPatientInvitation(invitation: PatientInvitation) {
   const token = await getClinicianAccessToken();
   const response = await fetch('/api/clinician-invitations', {

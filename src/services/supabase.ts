@@ -9,7 +9,7 @@ const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
  */
 export const supabase = url && publishableKey
   ? createClient(url, publishableKey, {
-      auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true },
+      auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: window.localStorage, storageKey: 'pulsewindow-clinician-session' },
     })
   : null;
 

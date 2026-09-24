@@ -240,8 +240,11 @@ h1, h2, h3, p { margin-top: 0; }
 .instruction-card strong, .instruction-card span { display: block; }
 .instruction-card strong { font-size: .8rem; }
 .instruction-card span { color: var(--muted); font-size: .68rem; line-height: 1.4; margin-top: 3px; }
-.face-guide-small { width: 43px; height: 51px; border: 2px solid var(--green); border-radius: 46% 46% 42% 42%; display: grid; place-items: center; }
+.face-guide-small { position: relative; overflow: hidden; width: 43px; height: 51px; border: 2px solid var(--green); border-radius: 46% 46% 42% 42%; display: grid; place-items: center; background: #e5f0eb; }
 .face-guide-small span { width: 17px; height: 8px; border-radius: 4px; border: 1.5px solid var(--coral); }
+.face-guide-small video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.face-guide-small i { position: absolute; inset: 5px; border: 1.5px solid #f0a342; border-radius: 45%; pointer-events: none; }
+.face-guide-small i.face-locked { border-color: #19a974; box-shadow: 0 0 0 1px rgba(25, 169, 116, .2); }
 .live-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
 .live-metrics article { position: relative; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: #fcfdfc; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 5px 7px; }
 .live-metrics svg { color: var(--green); width: 18px; }
