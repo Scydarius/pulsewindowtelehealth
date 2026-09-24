@@ -29,7 +29,7 @@ export function AdminCliniciansPage() {
     <Link to="/clinician" className="back-link"><ArrowLeft size={18} /> Back to workspace</Link>
     <section className="admin-card">
       <p className="eyebrow">Clinic administration</p><h1>Add a clinician</h1>
-      <p>Invite a clinician using their work email. They receive a secure sign-in link and are prepared with their own empty workspace.</p>
+      <p>Invite a clinician using their work email. If they already have a PulseWindow account, this safely adds clinician access and sends a password-setup email instead.</p>
       <form onSubmit={(event) => void submit(event)} className="access-form">
         <label>Clinician name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Dr Taylor Morgan" required /></label>
         <label>Work email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@clinic.com" required /></label>
