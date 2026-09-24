@@ -26,6 +26,17 @@ export async function createPatientInvitation(invitation: PatientInvitation) {
   return body.invitationUrl;
 }
 
+export async function createReplacementPatientInvitation(appointmentId: string) {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/appointment-patient-link', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ appointmentId }),
+  });
+  const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable.' })) as { invitationUrl?: string; error?: string };
+  if (!response.ok || !body.invitationUrl) throw new Error(body.error ?? 'Unable to create a replacement patient link.');
+  return body.invitationUrl;
+}
+
 export async function fetchPatientInvitation(token: string) {
   const response = await fetch(`/api/patient-invitations?token=${encodeURIComponent(token)}`);
   const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as {
