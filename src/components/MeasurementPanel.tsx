@@ -73,6 +73,27 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
   const isComplete = measurement.status === 'complete';
   const isPatient = role === 'patient';
 
+  if (isPatient) return (
+    <aside className="measurement-panel patient-capture-panel">
+      <div className="section-heading compact"><div><p className="eyebrow">Camera check</p><h2>Check your pulse</h2></div><span className={`status-dot ${isRunning ? 'active' : ''}`} aria-hidden="true" /></div>
+      <div className="instruction-card patient-capture-guide">
+        <div className={`face-guide-small patient-camera-preview ${cameraStream ? 'camera-active' : ''}`}>{cameraStream ? <video ref={videoRef} autoPlay muted playsInline /> : <span />} {cameraStream && <i className={measurement.faceDetected ? 'face-locked' : ''} />}</div>
+        <div><strong>{measurement.faceDetected ? 'Face tracking active' : 'Face the camera'}</strong><span>{cameraStream ? measurement.message : 'When your clinician asks, start the camera check and keep your face centred.'}</span></div>
+      </div>
+      <div className="progress-block">
+        <div className="progress-label"><span>{measurement.message}</span><strong>{measurement.progress}%</strong></div>
+        <div className="progress-track"><span style={{ width: `${measurement.progress}%` }} /></div>
+        {isRunning && <div className="signal-line"><LoaderCircle className="spin" size={16} /> Checking face position and signal quality</div>}
+        {isComplete && <div className="signal-line success"><CheckCircle2 size={16} /> {recordMessage || 'Check complete — your clinician can view the result.'}</div>}
+        {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> {measurement.message}</div>}
+      </div>
+      <button className="button button-primary button-full" onClick={() => void startMeasurement()} disabled={isRunning}>
+        {isComplete ? <><RotateCcw size={18} /> Check again</> : <><Play size={18} /> {isRunning ? 'Checking…' : 'Start camera check'}</>}
+      </button>
+      <p className="clinical-note">This research prototype does not provide a diagnosis or emergency assessment.</p>
+    </aside>
+  );
+
   return (
     <aside className="measurement-panel">
       <div className="section-heading compact">
@@ -84,8 +105,8 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
       </div>
 
       <div className="instruction-card">
-        <div className={`face-guide-small ${cameraStream ? 'camera-active' : ''}`}>{cameraStream ? <video ref={videoRef} autoPlay muted playsInline /> : <span />} {cameraStream && <i className={measurement.faceDetected ? 'face-locked' : ''} />}</div>
-        <div><strong>{isPatient ? (measurement.faceDetected ? 'Face tracking active' : 'Face the camera') : 'Patient measurement'}</strong><span>{isPatient ? (cameraStream ? measurement.message : 'Start the check to open the camera and begin face tracking.') : measurement.status === 'complete' ? 'Latest patient reading is shown below.' : 'The patient starts their camera-based check from their secure appointment link.'}</span></div>
+        <div className="face-guide-small"><span /></div>
+        <div><strong>Patient measurement</strong><span>{measurement.status === 'complete' ? 'Latest patient reading is shown below.' : 'Waiting for the patient to complete their camera check.'}</span></div>
       </div>
 
       <div className="live-metrics">
@@ -111,9 +132,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> Video consultation remains available</div>}
       </div>
 
-      {isPatient ? <button className="button button-primary button-full" onClick={() => void startMeasurement()} disabled={isRunning}>
-        {isComplete ? <><RotateCcw size={18} /> Measure again</> : <><Play size={18} /> {isRunning ? 'Measuring…' : 'Start measurement'}</>}
-      </button> : <p className="clinician-measurement-note">The patient’s live measurement will be shown here once the clinician results view is connected.</p>}
+      <p className="clinician-measurement-note">This panel updates automatically when the patient completes their camera check.</p>
 
       <p className="clinical-note">Measurements are not intended for diagnosis or emergency assessment.</p>
     </aside>
