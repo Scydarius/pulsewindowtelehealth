@@ -35,6 +35,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
 
   const isRunning = measurement.status === 'preparing' || measurement.status === 'measuring';
   const isComplete = measurement.status === 'complete';
+  const isPatient = role === 'patient';
 
   return (
     <aside className="measurement-panel">
@@ -48,7 +49,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
 
       <div className="instruction-card">
         <div className="face-guide-small"><span /></div>
-        <div><strong>Face the camera</strong><span>Stay still and breathe normally while PulseWindow measures.</span></div>
+        <div><strong>{isPatient ? 'Face the camera' : 'Patient measurement'}</strong><span>{isPatient ? 'Stay still and breathe normally while PulseWindow measures.' : 'The patient starts their camera-based check from their secure appointment link.'}</span></div>
       </div>
 
       <div className="live-metrics">
@@ -74,11 +75,11 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> Video consultation remains available</div>}
       </div>
 
-      <button className="button button-primary button-full" onClick={() => void startMeasurement()} disabled={isRunning}>
+      {isPatient ? <button className="button button-primary button-full" onClick={() => void startMeasurement()} disabled={isRunning}>
         {isComplete ? <><RotateCcw size={18} /> Measure again</> : <><Play size={18} /> {isRunning ? 'Measuring…' : 'Start measurement'}</>}
-      </button>
+      </button> : <p className="clinician-measurement-note">The patient’s live measurement will be shown here once the clinician results view is connected.</p>}
 
-      <p className="clinical-note">Research prototype only. Measurements are not intended for diagnosis or emergency assessment.</p>
+      <p className="clinical-note">Measurements are not intended for diagnosis or emergency assessment.</p>
     </aside>
   );
 }
