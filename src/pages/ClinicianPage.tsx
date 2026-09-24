@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
 import { InvitePatientForm } from '../components/InvitePatientForm';
 import { type ClinicAppointment, type ClinicianProfile, loadClinicianWorkspace } from '../services/clinicianData';
-import { createReplacementPatientInvitation } from '../services/clinicAccess';
+import { claimInitialAdministratorAccess, createReplacementPatientInvitation } from '../services/clinicAccess';
 
 export function ClinicianPage() {
   const [profile, setProfile] = useState<ClinicianProfile>();
@@ -14,6 +14,7 @@ export function ClinicianPage() {
   const [replacementLinks, setReplacementLinks] = useState<Record<string, string>>({});
   const [linkError, setLinkError] = useState('');
   const [creatingLink, setCreatingLink] = useState<string>();
+  const [claimingAccess, setClaimingAccess] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -40,9 +41,15 @@ export function ClinicianPage() {
     finally { setCreatingLink(undefined); }
   };
   const copyLink = async (appointmentId: string) => { await navigator.clipboard.writeText(replacementLinks[appointmentId]); };
+  const claimAccess = async () => {
+    setClaimingAccess(true); setError('');
+    try { await claimInitialAdministratorAccess(); await load(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to complete administrator setup.'); }
+    finally { setClaimingAccess(false); }
+  };
 
   if (loading && !profile) return <div className="workspace-state"><LoaderCircle className="spin" /><strong>Loading your clinical workspace…</strong></div>;
-  if (error) return <div className="workspace-state"><CircleAlert /><strong>Access required</strong><span>{error}</span><Link className="button button-primary" to="/clinician/sign-in">Sign in</Link></div>;
+  if (error) return <div className="workspace-state"><CircleAlert /><strong>Access required</strong><span>{error}</span>{error === 'This account is not an authorised clinician.' ? <button className="button button-primary" onClick={() => void claimAccess()} disabled={claimingAccess}>{claimingAccess ? <LoaderCircle className="spin" size={18} /> : null}{claimingAccess ? 'Completing setup…' : 'Complete administrator setup'}</button> : <Link className="button button-primary" to="/clinician/sign-in">Sign in</Link>}</div>;
 
   return (
     <div className="dashboard-page">

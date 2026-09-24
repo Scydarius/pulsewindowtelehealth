@@ -14,6 +14,15 @@ export async function getClinicianAccessToken() {
   return session.access_token;
 }
 
+export async function claimInitialAdministratorAccess() {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/claim-initial-admin', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await response.json().catch(() => ({ error: 'The administrator setup service is temporarily unavailable.' })) as { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Unable to complete administrator setup.');
+}
+
 export async function createPatientInvitation(invitation: PatientInvitation) {
   const token = await getClinicianAccessToken();
   const response = await fetch('/api/clinician-invitations', {
