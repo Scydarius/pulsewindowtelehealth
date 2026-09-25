@@ -26,33 +26,40 @@ function HeartRateTrend({ samples }: { samples: SavedMeasurement[] }) {
 }
 
 function values(value: unknown) { return Array.isArray(value) ? value.map(Number).filter(Number.isFinite) : []; }
-function SignalPlot({ title, values: series, tone = 'green' }: { title: string; values: number[]; tone?: 'green' | 'blue' | 'amber' }) {
+function SignalPlot({ title, values: series, tone = 'green', primary = false, detail }: { title: string; values: number[]; tone?: 'green' | 'blue' | 'amber'; primary?: boolean; detail?: string }) {
   if (series.length < 2) return <div className="research-plot-empty">Waiting for live engine telemetry…</div>;
   const min = Math.min(...series); const max = Math.max(...series); const range = Math.max(.0001, max - min);
   const points = series.map((value, index) => `${(index / (series.length - 1)) * 100},${42 - ((value - min) / range) * 34}`).join(' ');
-  return <section className={`research-plot research-${tone}`}><div><strong>{title}</strong><span>{series.length} samples</span></div><svg viewBox="0 0 100 46" preserveAspectRatio="none"><polyline points={points} /></svg></section>;
+  return <section className={`research-plot research-${tone} ${primary ? 'research-plot-primary' : ''}`}><div><strong>{title}</strong><span>{detail ?? `${series.length} samples`}</span></div><svg viewBox="0 0 100 46" preserveAspectRatio="none" role="img" aria-label={title}><polyline points={points} /></svg></section>;
 }
 function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unknown> | null }) {
-  if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Research telemetry</p><h3>DSP diagnostics</h3></div></div><div className="trend-empty">The patient’s live DSP telemetry appears here during an accepted camera check.</div></section>;
+  if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live plethysmography and DSP</h3></div><span>Research use only</span></div><div className="trend-empty">The patient’s live waveforms, spectra, and processing telemetry will appear here as their camera check starts.</div></section>;
   const engine = (diagnostics.engine ?? {}) as Record<string, unknown>;
   const roi = (diagnostics.roi_weights ?? {}) as Record<string, unknown>;
   const snr = Number(diagnostics.snr_db ?? 0);
   const latency = Number(diagnostics.processing_latency_ms ?? 0);
-  return <details className="research-diagnostics" open>
-    <summary><div><p className="eyebrow">Research telemetry</p><h3>DSP diagnostics</h3></div><span>Clinician only</span></summary>
-    <div className="diagnostics-grid">
+  const cardiacFrequencies = values(diagnostics.cardiac_spectrum_freq_hz);
+  const respirationFrequencies = values(diagnostics.respiration_spectrum_freq_hz);
+  const frequencyLabel = (frequencies: number[]) => frequencies.length > 1 ? `${Math.min(...frequencies).toFixed(2)}–${Math.max(...frequencies).toFixed(2)} Hz` : 'Frequency spectrum';
+  return <section className="research-diagnostics">
+    <div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live plethysmography and DSP</h3></div><span>Research use only</span></div>
+    <div className="diagnostics-grid diagnostics-grid-wide">
       <span><strong>{Number.isFinite(snr) ? `${snr.toFixed(1)} dB` : '—'}</strong>SNR</span>
       <span><strong>{Number(diagnostics.quality_score ?? 0).toFixed(2)}</strong>Signal quality</span>
       <span><strong>{Number.isFinite(latency) ? `${Math.round(latency)} ms` : '—'}</strong>Processing latency</span>
       <span><strong>{String(diagnostics.tracking_state ?? '—')}</strong>Tracking state</span>
+      <span><strong>{Number(engine.kalman_bpm ?? 0).toFixed(1)} BPM</strong>Kalman estimate</span>
+      <span><strong>±{Number(engine.confidence_interval_bpm ?? 0).toFixed(1)} BPM</strong>95% interval</span>
     </div>
-    <div className="roi-grid"><strong>ROI weighting</strong><span>Forehead {Math.round(Number(roi.Forehead ?? 0) * 100)}%</span><span>Left cheek {Math.round(Number(roi['Left Cheek'] ?? 0) * 100)}%</span><span>Right cheek {Math.round(Number(roi['Right Cheek'] ?? 0) * 100)}%</span></div>
-    <SignalPlot title="Photoplethysmogram waveform" values={values(diagnostics.cardiac_waveform)} />
-    <SignalPlot title="Respiratory modulation waveform" values={values(diagnostics.respiratory_waveform)} tone="blue" />
-    <SignalPlot title="Cardiac spectral power" values={values(diagnostics.cardiac_spectrum_power)} tone="amber" />
-    <SignalPlot title="Respiratory spectral power" values={values(diagnostics.respiration_spectrum_power)} tone="blue" />
-    <div className="engine-line">Algorithm {String(engine.algorithm ?? 'POS')} · Kalman {Number(engine.kalman_bpm ?? 0).toFixed(1)} BPM · 95% interval ±{Number(engine.confidence_interval_bpm ?? 0).toFixed(1)} BPM · Face landmarks {String(engine.landmarks_detected ?? '—')} · Skin pixels {String(engine.skin_pixels ?? '—')}</div>
-  </details>;
+    <div className="roi-grid"><strong>Regions of interest</strong><span>Forehead {Math.round(Number(roi.Forehead ?? 0) * 100)}%</span><span>Left cheek {Math.round(Number(roi['Left Cheek'] ?? 0) * 100)}%</span><span>Right cheek {Math.round(Number(roi['Right Cheek'] ?? 0) * 100)}%</span><span>Face mesh {String(engine.landmarks_detected ?? '—')} points</span><span>Skin {String(engine.skin_pixels ?? '—')} px</span></div>
+    <SignalPlot title="Photoplethysmogram (PPG) waveform" values={values(diagnostics.cardiac_waveform)} primary detail="Live filtered optical pulse signal" />
+    <div className="research-secondary-plots">
+      <SignalPlot title="Respiratory modulation waveform" values={values(diagnostics.respiratory_waveform)} tone="blue" detail="Live respiratory signal" />
+      <SignalPlot title="Cardiac power spectrum" values={values(diagnostics.cardiac_spectrum_power)} tone="amber" detail={frequencyLabel(cardiacFrequencies)} />
+      <SignalPlot title="Respiratory power spectrum" values={values(diagnostics.respiration_spectrum_power)} tone="blue" detail={frequencyLabel(respirationFrequencies)} />
+    </div>
+    <div className="engine-line">POS algorithm · motion {Number(engine.motion_velocity ?? 0).toFixed(2)} IOD/s · landmark displacement {Number(engine.motion_displacement_px ?? 0).toFixed(2)} px · spectral entropy {Number(engine.spectral_entropy ?? 0).toFixed(2)} · buffer {String(engine.buffer_samples ?? '—')}/{String(engine.buffer_capacity ?? '—')} samples</div>
+  </section>;
 }
 
 export function MeasurementPanel({ appointmentId, role, invitationToken }: MeasurementPanelProps) {
