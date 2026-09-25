@@ -19,7 +19,10 @@ export type MeasurementUpdate = {
 const CAPTURE_WINDOW_MS = 30_000;
 const STABILITY_WINDOW_MS = 5_000;
 const SETUP_TIMEOUT_MS = 90_000;
-const MIN_SIGNAL_QUALITY = 0.7;
+// Match the model's own SQI acceptance rule (see SignalQualityEstimator),
+// rather than applying a separate browser-only threshold.
+const MIN_SIGNAL_QUALITY = 0.25;
+const MIN_SNR_DB = -2;
 const CAPTURE_FPS = 30;
 
 export interface RppgClient {
@@ -159,7 +162,8 @@ class WebSocketRppgClient implements RppgClient {
         const bpm = Number(cardiac?.bpm);
         const brpm = Number(respiration?.brpm);
         const motionDetected = eventData.motion_detected === true;
-        const eligible = validReadout && state === 'LOCKED' && !motionDetected && quality >= MIN_SIGNAL_QUALITY && Number.isFinite(bpm) && Number.isFinite(brpm);
+        const snr = Number(eventData.snr_db ?? -20);
+        const eligible = validReadout && state === 'LOCKED' && !motionDetected && quality >= MIN_SIGNAL_QUALITY && snr >= MIN_SNR_DB && Number.isFinite(bpm) && Number.isFinite(brpm);
         const now = Date.now();
         if (!eligible) stableSince = undefined;
         else if (!stableSince) stableSince = now;
@@ -194,7 +198,7 @@ class WebSocketRppgClient implements RppgClient {
         const sample = candidateSample;
         const stabilityElapsed = stableSince ? now - stableSince : 0;
         const captureElapsed = recordingStartedAt ? Math.min(CAPTURE_WINDOW_MS, now - recordingStartedAt) : 0;
-        const message = recordingStartedAt ? `High-quality recording · ${Math.ceil((CAPTURE_WINDOW_MS - captureElapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : motionDetected || state === 'HOLDING' ? 'Movement detected — hold still' : eligible ? `Signal stable · hold still for ${Math.ceil((STABILITY_WINDOW_MS - stabilityElapsed) / 1000)}s` : quality < MIN_SIGNAL_QUALITY ? 'Improve lighting and keep your face centred' : 'Calibrating face and signal quality…';
+        const message = recordingStartedAt ? `High-quality recording · ${Math.ceil((CAPTURE_WINDOW_MS - captureElapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : motionDetected || state === 'HOLDING' ? 'Movement detected — hold still' : eligible ? `Signal stable · hold still for ${Math.ceil((STABILITY_WINDOW_MS - stabilityElapsed) / 1000)}s` : quality < MIN_SIGNAL_QUALITY || snr < MIN_SNR_DB ? 'Signal is not stable yet — hold still and keep your face centred' : 'Calibrating face and signal quality…';
         onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : Math.min(15, Math.round((stabilityElapsed / STABILITY_WINDOW_MS) * 15)), signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state, diagnostics: candidateSample?.diagnostics, sample });
       }
     });
