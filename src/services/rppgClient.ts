@@ -17,12 +17,7 @@ export type MeasurementUpdate = {
 };
 
 const CAPTURE_WINDOW_MS = 30_000;
-const STABILITY_WINDOW_MS = 5_000;
 const SETUP_TIMEOUT_MS = 90_000;
-// Match the model's own SQI acceptance rule (see SignalQualityEstimator),
-// rather than applying a separate browser-only threshold.
-const MIN_SIGNAL_QUALITY = 0.25;
-const MIN_SNR_DB = -2;
 // The original validated browser stream ran at 15 FPS.  Keeping the browser,
 // pipeline timing and face-mesh motion model on the same cadence avoids
 // treating normal landmark jitter as continuous head movement.
@@ -111,7 +106,6 @@ class WebSocketRppgClient implements RppgClient {
     let lastUpdateAt = 0;
     let latestSample: MeasurementUpdate['sample'];
     let completed = false;
-    let stableSince: number | undefined;
     let recordingStartedAt: number | undefined;
     let captureTimer: number | undefined;
     const finishWindow = () => {
@@ -165,16 +159,15 @@ class WebSocketRppgClient implements RppgClient {
         const bpm = Number(cardiac?.bpm);
         const brpm = Number(respiration?.brpm);
         const motionDetected = eventData.motion_detected === true;
-        const snr = Number(eventData.snr_db ?? -20);
-        const eligible = validReadout && state === 'LOCKED' && !motionDetected && quality >= MIN_SIGNAL_QUALITY && snr >= MIN_SNR_DB && Number.isFinite(bpm) && Number.isFinite(brpm);
+        // The engine owns all signal-quality decisions.  The browser must not
+        // apply another quality, SNR, movement, or tracking-state threshold.
+        const acceptedByEngine = validReadout && Number.isFinite(bpm) && Number.isFinite(brpm);
         const now = Date.now();
-        if (!eligible) stableSince = undefined;
-        else if (!stableSince) stableSince = now;
-        if (eligible && !recordingStartedAt && now - stableSince! >= STABILITY_WINDOW_MS) {
+        if (acceptedByEngine && !recordingStartedAt) {
           recordingStartedAt = now;
           captureTimer = window.setTimeout(finishWindow, CAPTURE_WINDOW_MS);
         }
-        const candidateSample = eligible && recordingStartedAt
+        const candidateSample = acceptedByEngine && recordingStartedAt
           ? {
               capturedAt: new Date().toISOString(), heartRateBpm: bpm, respiratoryRate: brpm, signalQuality: quality,
               diagnostics: {
@@ -199,10 +192,9 @@ class WebSocketRppgClient implements RppgClient {
         if (now - lastUpdateAt < 900) return;
         lastUpdateAt = now;
         const sample = candidateSample;
-        const stabilityElapsed = stableSince ? now - stableSince : 0;
         const captureElapsed = recordingStartedAt ? Math.min(CAPTURE_WINDOW_MS, now - recordingStartedAt) : 0;
-        const message = recordingStartedAt ? `High-quality recording · ${Math.ceil((CAPTURE_WINDOW_MS - captureElapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : motionDetected || state === 'HOLDING' ? 'Movement detected — hold still' : eligible ? `Signal stable · hold still for ${Math.ceil((STABILITY_WINDOW_MS - stabilityElapsed) / 1000)}s` : quality < MIN_SIGNAL_QUALITY || snr < MIN_SNR_DB ? 'Signal is not stable yet — hold still and keep your face centred' : 'Calibrating face and signal quality…';
-        onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : Math.min(15, Math.round((stabilityElapsed / STABILITY_WINDOW_MS) * 15)), signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state, diagnostics: candidateSample?.diagnostics, sample });
+        const message = recordingStartedAt ? `Recording · ${Math.ceil((CAPTURE_WINDOW_MS - captureElapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : motionDetected || state === 'HOLDING' ? 'Movement detected — hold still' : 'Calibrating the rPPG engine…';
+        onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : 5, signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state, diagnostics: candidateSample?.diagnostics, sample });
       }
     });
     socket.addEventListener('error', () => {
