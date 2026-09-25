@@ -23,7 +23,10 @@ const SETUP_TIMEOUT_MS = 90_000;
 // rather than applying a separate browser-only threshold.
 const MIN_SIGNAL_QUALITY = 0.25;
 const MIN_SNR_DB = -2;
-const CAPTURE_FPS = 30;
+// The original validated browser stream ran at 15 FPS.  Keeping the browser,
+// pipeline timing and face-mesh motion model on the same cadence avoids
+// treating normal landmark jitter as continuous head movement.
+const CAPTURE_FPS = 15;
 
 export interface RppgClient {
   startMeasurement(context: MeasurementContext, onUpdate: (update: MeasurementUpdate) => void): Promise<() => void>;

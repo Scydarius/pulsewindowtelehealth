@@ -66,7 +66,7 @@ export default {
       const sessionId = `rppg-${crypto.randomUUID().replaceAll('-', '')}`;
       const ticket = await sign({ aud: 'pulsewindow-rppg', appointment_id: appointmentId, role, session_id: sessionId, exp: Math.floor(Date.now() / 1000) + 120, jti: crypto.randomUUID() }, secret);
       const websocketBase = apiUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:').replace(/\/$/, '');
-      return Response.json({ websocketUrl: `${websocketBase}/api/v1/stream?session_id=${encodeURIComponent(sessionId)}&ticket=${encodeURIComponent(ticket)}&algorithm=POS&fps=30` }, { headers: { 'Cache-Control': 'no-store' } });
+      return Response.json({ websocketUrl: `${websocketBase}/api/v1/stream?session_id=${encodeURIComponent(sessionId)}&ticket=${encodeURIComponent(ticket)}&algorithm=POS&fps=15` }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       return Response.json({ error: error instanceof Error ? error.message : 'Unable to start measurement.' }, { status: 403 });
     }
