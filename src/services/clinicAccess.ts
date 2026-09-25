@@ -47,6 +47,24 @@ export async function loadPatientMeasurementTrend(appointmentId: string) {
   return body.measurements ?? [];
 }
 
+export type PrivateClinicalNote = { content: string; updated_at: string | null };
+
+export async function loadPrivateClinicalNote(appointmentId: string) {
+  const token = await getClinicianAccessToken();
+  const response = await fetch(`/api/clinical-notes?appointmentId=${encodeURIComponent(appointmentId)}`, { headers: { Authorization: `Bearer ${token}` } });
+  const body = await response.json().catch(() => ({ error: 'Private notes could not be loaded.' })) as { note?: PrivateClinicalNote; error?: string };
+  if (!response.ok || !body.note) throw new Error(body.error ?? 'Private notes could not be loaded.');
+  return body.note;
+}
+
+export async function savePrivateClinicalNote(appointmentId: string, content: string) {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/clinical-notes', { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ appointmentId, content }) });
+  const body = await response.json().catch(() => ({ error: 'Private notes could not be saved.' })) as { note?: PrivateClinicalNote; error?: string };
+  if (!response.ok || !body.note) throw new Error(body.error ?? 'Private notes could not be saved.');
+  return body.note;
+}
+
 export async function createPatientInvitation(invitation: PatientInvitation) {
   const token = await getClinicianAccessToken();
   const response = await fetch('/api/clinician-invitations', {
