@@ -14,14 +14,17 @@ export function InvitePatientForm({ onCreated }: InvitePatientFormProps) {
   const [reason, setReason] = useState('');
   const [startsAt, setStartsAt] = useState(tomorrow);
   const [link, setLink] = useState('');
+  const [emailStatus, setEmailStatus] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    setSaving(true); setError(''); setLink('');
+    setSaving(true); setError(''); setLink(''); setEmailStatus('');
     try {
-      setLink(await createPatientInvitation({ patientName, patientEmail, reason, startsAt: new Date(startsAt).toISOString() }));
+      const invitation = await createPatientInvitation({ patientName, patientEmail, reason, startsAt: new Date(startsAt).toISOString() });
+      setLink(invitation.invitationUrl);
+      setEmailStatus(invitation.emailSent ? `Appointment link sent to ${patientEmail}.` : invitation.emailWarning ?? 'Appointment link created. Share it with the patient manually.');
       onCreated?.();
     } catch (reasonError) {
       setError(reasonError instanceof Error ? reasonError.message : 'Unable to create patient link.');
@@ -43,6 +46,6 @@ export function InvitePatientForm({ onCreated }: InvitePatientFormProps) {
       <button className="button button-primary" disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Link2 size={17} />}{saving ? 'Creating…' : 'Create secure link'}</button>
     </form>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    {link && <div className="created-link"><strong>Patient link ready</strong><span>Share this directly with the patient. It expires 24 hours after the appointment start time.</span><div><input value={link} readOnly aria-label="Patient invitation link" /><button className="button button-secondary button-small" onClick={() => void copy()}><Copy size={16} /> Copy</button></div></div>}
+    {link && <div className="created-link"><strong>Patient link ready</strong><span>{emailStatus} The link expires 24 hours after the appointment start time.</span><div><input value={link} readOnly aria-label="Patient invitation link" /><button className="button button-secondary button-small" onClick={() => void copy()}><Copy size={16} /> Copy</button></div></div>}
   </section>;
 }

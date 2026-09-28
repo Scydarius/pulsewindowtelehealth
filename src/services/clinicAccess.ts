@@ -24,6 +24,8 @@ export async function claimInitialAdministratorAccess() {
 }
 
 export type SavedMeasurement = { measured_at: string; heart_rate_bpm: number; respiratory_rate_bpm: number; signal_quality: number; algorithm_version: string | null; diagnostics?: Record<string, unknown> | null };
+export type MeasurementSummary = { sample_count: number; average_heart_rate_bpm: number | null; average_respiratory_rate_bpm: number | null; average_signal_quality: number | null; started_at: string | null; ended_at: string | null };
+export type PatientProfile = { email: string; display_name: string; appointments: Array<{ id: string; reason: string; starts_at: string; created_at: string; summary: MeasurementSummary | null; measurements: SavedMeasurement[] }> };
 
 export async function savePatientMeasurement(input: { appointmentId: string; invitationToken: string; heartRateBpm: number; respiratoryRateBpm: number; signalQuality: number; algorithmVersion?: string; diagnostics?: Record<string, unknown> }) {
   const response = await fetch('/api/measurements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
@@ -45,6 +47,14 @@ export async function loadPatientMeasurementTrend(appointmentId: string) {
   const body = await response.json().catch(() => ({ error: 'The measurement record could not be loaded.' })) as { measurements?: SavedMeasurement[]; error?: string };
   if (!response.ok) throw new Error(body.error ?? 'The measurement record could not be loaded.');
   return body.measurements ?? [];
+}
+
+export async function loadPatientProfile(patientEmail: string) {
+  const token = await getClinicianAccessToken();
+  const response = await fetch(`/api/patient-profile?email=${encodeURIComponent(patientEmail)}`, { headers: { Authorization: `Bearer ${token}` } });
+  const body = await response.json().catch(() => ({ error: 'The patient profile could not be loaded.' })) as { patient?: PatientProfile; error?: string };
+  if (!response.ok || !body.patient) throw new Error(body.error ?? 'The patient profile could not be loaded.');
+  return body.patient;
 }
 
 export type PrivateClinicalNote = { content: string; updated_at: string | null };
@@ -72,9 +82,9 @@ export async function createPatientInvitation(invitation: PatientInvitation) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(invitation),
   });
-  const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as { invitationUrl?: string; error?: string };
+  const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as { invitationUrl?: string; emailSent?: boolean; emailWarning?: string; error?: string };
   if (!response.ok || !body.invitationUrl) throw new Error(body.error ?? 'Unable to create the patient link.');
-  return body.invitationUrl;
+  return { invitationUrl: body.invitationUrl, emailSent: body.emailSent === true, emailWarning: body.emailWarning };
 }
 
 export async function createReplacementPatientInvitation(appointmentId: string) {

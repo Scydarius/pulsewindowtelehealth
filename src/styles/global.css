@@ -191,11 +191,25 @@ h1, h2, h3, p { margin-top: 0; }
 .appointment-row > div:nth-child(2) strong, .appointment-row > div:nth-child(2) span, .appointment-row > div:nth-child(3) strong, .appointment-row > div:nth-child(3) span { display: block; }
 .appointment-row span { color: var(--muted); font-size: .74rem; margin-top: 4px; }
 .appointment-row strong { font-size: .87rem; }
+.patient-profile-link { color: var(--ink); font-size: .87rem; font-weight: 750; text-decoration: none; }
+.patient-profile-link:hover { color: var(--green); text-decoration: underline; }
 .clinician-lower-grid { display: grid; grid-template-columns: 1.3fr .7fr; gap: 24px; }
 .review-card { display: grid; grid-template-columns: auto 1fr auto; gap: 13px; align-items: center; padding: 15px 0; border-top: 1px solid var(--line); }
 .review-card strong, .review-card span { display: block; }
 .review-card strong { font-size: .88rem; }
 .review-card span { color: var(--muted); font-size: .74rem; margin-top: 4px; }
+.patient-profile-page { width: min(100% - 48px, 1120px); margin: 34px auto 70px; display: flex; flex-direction: column; gap: 24px; }
+.back-link { display: inline-flex; width: fit-content; align-items: center; gap: 8px; color: var(--muted); font-weight: 700; text-decoration: none; }
+.back-link:hover { color: var(--green); }
+.patient-profile-hero { display: flex; align-items: center; gap: 18px; padding: 28px; border: 1px solid var(--line); border-radius: 24px; background: linear-gradient(135deg, #fff, var(--green-soft)); }
+.patient-profile-avatar { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: white; font-size: 1.15rem; font-weight: 800; }
+.patient-profile-hero h1 { margin: 2px 0 6px; }.patient-profile-hero p { margin: 0; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.patient-history-panel .section-heading > div > p:last-child { max-width: 710px; color: var(--muted); font-size: .88rem; line-height: 1.5; }
+.patient-history-list { display: grid; gap: 14px; }.patient-history-card { padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+.patient-history-main { display: flex; align-items: center; justify-content: space-between; gap: 14px; }.patient-history-main strong, .patient-history-main span { display: block; }.patient-history-main strong { font-size: 1rem; }.patient-history-main span { margin-top: 4px; color: var(--muted); font-size: .8rem; }
+.patient-measurement-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 17px 0 13px; }.patient-measurement-summary div { padding: 13px; border-radius: 12px; background: var(--green-soft); }.patient-measurement-summary span, .patient-measurement-summary strong { display: block; }.patient-measurement-summary span { min-height: 31px; color: var(--muted); font-size: .69rem; line-height: 1.25; }.patient-measurement-summary strong { margin-top: 5px; color: var(--ink); font-size: 1.2rem; }.patient-measurement-summary small { color: var(--muted); font-size: .65rem; }.patient-history-empty { display: flex; align-items: center; gap: 8px; margin: 18px 0 2px; color: var(--muted); font-size: .83rem; }
+.raw-measurement-table { margin-top: 13px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; font-size: .76rem; }.raw-measurement-heading, .raw-measurement-row { display: grid; grid-template-columns: 1.6fr 1fr 1.1fr .8fr; gap: 10px; padding: 10px 12px; }.raw-measurement-heading { background: #f8faf8; color: var(--muted); font-weight: 750; }.raw-measurement-row { border-top: 1px solid var(--line); color: var(--ink); }
+@media (max-width: 720px) { .patient-profile-page { width: min(100% - 28px, 1120px); margin-top: 22px; }.patient-profile-hero { padding: 20px; }.patient-measurement-summary { grid-template-columns: repeat(2, 1fr); }.raw-measurement-heading, .raw-measurement-row { grid-template-columns: 1.35fr .9fr 1.05fr .65fr; font-size: .67rem; gap: 5px; padding: 9px 7px; }.patient-history-main { align-items: flex-start; flex-direction: column; }.patient-history-main .button { width: 100%; justify-content: center; } }
 .platform-note { background: var(--green-dark); border-color: var(--green-dark); color: white; }
 .platform-note .eyebrow { color: var(--mint); }
 .platform-note h2 { font-family: Georgia, serif; font-size: 1.8rem; font-weight: 500; line-height: 1.2; }

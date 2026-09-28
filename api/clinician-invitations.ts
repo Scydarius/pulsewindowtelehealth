@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 type RequestBody = { patientName?: string; patientEmail?: string; reason?: string; startsAt?: string };
+type DeliveryResult = { sent: boolean; warning?: string };
 
 const encoder = new TextEncoder();
 const database = () => {
@@ -14,6 +15,33 @@ const tokenHash = async (token: string) => {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 const newOpaqueToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character] ?? character));
+
+async function sendPatientAppointmentEmail(input: { to: string; patientName: string; reason: string; startsAt: Date; invitationUrl: string }): Promise<DeliveryResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { sent: false, warning: 'The secure link was created, but appointment email delivery has not been configured yet.' };
+  const formattedTime = input.startsAt.toLocaleString('en-AU', { dateStyle: 'full', timeStyle: 'short' });
+  const safeName = escapeHtml(input.patientName);
+  const safeReason = escapeHtml(input.reason);
+  const safeUrl = escapeHtml(input.invitationUrl);
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM_EMAIL ?? 'PulseWindow <no-reply@pulsewindow.me>',
+        to: [input.to],
+        subject: 'Your secure PulseWindow appointment link',
+        text: `Hello ${input.patientName},\n\nYour PulseWindow appointment (${input.reason}) is scheduled for ${formattedTime}.\n\nJoin securely: ${input.invitationUrl}\n\nThis is a research prototype and not for emergencies.`,
+        html: `<p>Hello ${safeName},</p><p>Your PulseWindow appointment for <strong>${safeReason}</strong> is scheduled for <strong>${formattedTime}</strong>.</p><p><a href="${safeUrl}">Join your secure appointment</a></p><p>This research prototype is not for emergencies.</p>`,
+      }),
+    });
+    if (!response.ok) return { sent: false, warning: 'The secure link was created, but the appointment email could not be delivered.' };
+    return { sent: true };
+  } catch {
+    return { sent: false, warning: 'The secure link was created, but the appointment email could not be delivered.' };
+  }
+}
 async function requireClinician(request: Request) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) throw new Error('Sign in is required.');
@@ -36,10 +64,20 @@ export default {
       const startsAt = new Date(body.startsAt);
       if (Number.isNaN(startsAt.valueOf())) return Response.json({ error: 'Appointment time is invalid.' }, { status: 400 });
       const { db, clinician } = await requireClinician(request);
-      const { data: patient, error: patientError } = await db.from('patients').insert({
-        clinician_id: clinician.id, display_name: body.patientName.trim(), email: body.patientEmail.trim().toLowerCase(),
-      }).select('id').single();
-      if (patientError || !patient) throw new Error('Could not save the patient record.');
+      const patientEmail = body.patientEmail.trim().toLowerCase();
+      const { data: existingPatients, error: patientLookupError } = await db.from('patients').select('id').eq('clinician_id', clinician.id).eq('email', patientEmail).order('created_at', { ascending: true }).limit(1);
+      if (patientLookupError) throw new Error('Could not look up the patient record.');
+      let patient = existingPatients?.[0];
+      if (patient) {
+        const { error: updatePatientError } = await db.from('patients').update({ display_name: body.patientName.trim() }).eq('id', patient.id);
+        if (updatePatientError) throw new Error('Could not update the patient record.');
+      } else {
+        const { data: createdPatient, error: patientError } = await db.from('patients').insert({
+          clinician_id: clinician.id, display_name: body.patientName.trim(), email: patientEmail,
+        }).select('id').single();
+        if (patientError || !createdPatient) throw new Error('Could not save the patient record.');
+        patient = createdPatient;
+      }
       const roomName = `pw-${newOpaqueToken().slice(0, 24)}`;
       const { data: appointment, error: appointmentError } = await db.from('appointments').insert({
         clinician_id: clinician.id, patient_id: patient.id, room_name: roomName, reason: body.reason.trim(), starts_at: startsAt.toISOString(),
@@ -51,7 +89,10 @@ export default {
         expires_at: new Date(startsAt.valueOf() + 24 * 60 * 60 * 1000).toISOString(),
       });
       if (inviteError) throw new Error('Could not create the patient link.');
-      return Response.json({ invitationUrl: `${new URL(request.url).origin}/join?token=${encodeURIComponent(token)}` }, { headers: { 'Cache-Control': 'no-store' } });
+      const baseUrl = (process.env.APP_URL ?? new URL(request.url).origin).replace(/\/$/, '');
+      const invitationUrl = `${baseUrl}/join?token=${encodeURIComponent(token)}`;
+      const delivery = await sendPatientAppointmentEmail({ to: patientEmail, patientName: body.patientName.trim(), reason: body.reason.trim(), startsAt, invitationUrl });
+      return Response.json({ invitationUrl, emailSent: delivery.sent, emailWarning: delivery.warning }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       return Response.json({ error: error instanceof Error ? error.message : 'Unable to create patient link.' }, { status: 400 });
     }

@@ -11,6 +11,7 @@ const ClinicianResetPasswordPage = lazy(() => import('./pages/ClinicianResetPass
 const ClinicianActivateAccountPage = lazy(() => import('./pages/ClinicianActivateAccountPage').then((module) => ({ default: module.ClinicianActivateAccountPage })));
 const PatientInvitePage = lazy(() => import('./pages/PatientInvitePage').then((module) => ({ default: module.PatientInvitePage })));
 const AdminCliniciansPage = lazy(() => import('./pages/AdminCliniciansPage').then((module) => ({ default: module.AdminCliniciansPage })));
+const PatientProfilePage = lazy(() => import('./pages/PatientProfilePage').then((module) => ({ default: module.PatientProfilePage })));
 
 const page = (element: React.ReactNode) => (
   <Suspense fallback={<div className="page-loading">Loading PulseWindow…</div>}>
@@ -29,6 +30,7 @@ export default function App() {
       <Route path="/join" element={page(<PatientInvitePage />)} />
       <Route element={<AppShell />}>
         <Route path="/clinician" element={page(<ClinicianSessionGate><ClinicianPage /></ClinicianSessionGate>)} />
+        <Route path="/clinician/patient" element={page(<ClinicianSessionGate><PatientProfilePage /></ClinicianSessionGate>)} />
         <Route path="/admin/clinicians" element={page(<ClinicianSessionGate><AdminCliniciansPage /></ClinicianSessionGate>)} />
         <Route path="/consultation/:appointmentId" element={page(<ConsultationPage />)} />
       </Route>
