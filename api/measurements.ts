@@ -25,6 +25,11 @@ const average = (values: Array<number | null>) => {
   const valid = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
   return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : null;
 };
+const qualityWeightedAverage = (samples: Array<{ value: number | null; quality: number | null }>) => {
+  const weighted = samples.filter((sample): sample is { value: number; quality: number } => typeof sample.value === 'number' && Number.isFinite(sample.value) && typeof sample.quality === 'number' && Number.isFinite(sample.quality));
+  const totalWeight = weighted.reduce((sum, sample) => sum + Math.max(0.01, Math.min(1, sample.quality)) ** 2, 0);
+  return totalWeight ? weighted.reduce((sum, sample) => sum + sample.value * Math.max(0.01, Math.min(1, sample.quality)) ** 2, 0) / totalWeight : null;
+};
 async function requireClinician(request: Request, appointmentId: string) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) throw new Error('Sign in is required.');
@@ -48,8 +53,8 @@ export default {
         const measurements = (data ?? []).reverse();
         const summary = measurements.length ? {
           sample_count: measurements.length,
-          average_heart_rate_bpm: average(measurements.map((measurement) => measurement.heart_rate_bpm)),
-          average_respiratory_rate_bpm: average(measurements.map((measurement) => measurement.respiratory_rate_bpm)),
+          average_heart_rate_bpm: qualityWeightedAverage(measurements.map((measurement) => ({ value: measurement.heart_rate_bpm, quality: measurement.signal_quality }))),
+          average_respiratory_rate_bpm: qualityWeightedAverage(measurements.map((measurement) => ({ value: measurement.respiratory_rate_bpm, quality: measurement.signal_quality }))),
           average_signal_quality: average(measurements.map((measurement) => measurement.signal_quality)),
           started_at: measurements[0]?.measured_at ?? null,
           ended_at: measurements.at(-1)?.measured_at ?? null,

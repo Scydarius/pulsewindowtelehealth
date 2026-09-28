@@ -13,6 +13,7 @@ export function PatientProfilePage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string>();
+  const [sort, setSort] = useState<'recent' | 'quality'>('recent');
 
   useEffect(() => {
     let active = true;
@@ -26,7 +27,11 @@ export function PatientProfilePage() {
 
   const completed = patient.appointments.filter((appointment) => appointment.summary).length;
   const allSummaries = patient.appointments.map((appointment) => appointment.summary).filter((summary): summary is NonNullable<typeof summary> => Boolean(summary));
-  const averageHeartRate = allSummaries.length ? allSummaries.reduce((sum, summary) => sum + (summary.average_heart_rate_bpm ?? 0), 0) / allSummaries.filter((summary) => summary.average_heart_rate_bpm !== null).length : null;
+  const summariesWithHeartRate = allSummaries.filter((summary) => summary.average_heart_rate_bpm !== null);
+  const averageHeartRate = summariesWithHeartRate.length ? summariesWithHeartRate.reduce((sum, summary) => sum + (summary.average_heart_rate_bpm ?? 0), 0) / summariesWithHeartRate.length : null;
+  const appointments = [...patient.appointments].sort((left, right) => sort === 'quality'
+    ? (right.summary?.average_signal_quality ?? -1) - (left.summary?.average_signal_quality ?? -1)
+    : new Date(right.starts_at).valueOf() - new Date(left.starts_at).valueOf());
 
   return <div className="patient-profile-page">
     <Link className="back-link" to="/clinician"><ArrowLeft size={18} /> Back to workspace</Link>
@@ -40,14 +45,14 @@ export function PatientProfilePage() {
       <article><div><ClipboardList /></div><span><strong>{number(averageHeartRate)}{averageHeartRate === null ? '' : ' BPM'}</strong>Mean across checks</span></article>
     </section>
     <section className="panel patient-history-panel">
-      <div className="section-heading"><div><p className="eyebrow">Longitudinal record</p><h2>Appointments and measurements</h2><p>Each completed camera-check summary is the average of its saved readings, normally captured during the 30-second session. Research data only; not diagnostic.</p></div></div>
+      <div className="section-heading patient-history-heading"><div><p className="eyebrow">Longitudinal record</p><h2>Appointments and measurements</h2><p>Pulse and breathing averages give stronger weight to higher-quality samples from the 30-second camera check. Research data only; not diagnostic.</p></div><label className="patient-history-sort">Sort appointments<select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}><option value="recent">Most recent</option><option value="quality">Highest signal quality</option></select></label></div>
       <div className="patient-history-list">
-        {patient.appointments.map((appointment) => <article className="patient-history-card" key={appointment.id}>
+        {appointments.map((appointment) => <article className="patient-history-card" key={appointment.id}>
           <div className="patient-history-main"><div><strong>{appointment.reason}</strong><span>{dateTime(appointment.starts_at)}</span></div><Link className="button button-secondary button-small" to={`/consultation/${appointment.id}?role=clinician`}>Open consultation</Link></div>
           {appointment.summary ? <>
             <div className="patient-measurement-summary">
-              <div><span>30-sec average pulse</span><strong>{number(appointment.summary.average_heart_rate_bpm)} <small>BPM</small></strong></div>
-              <div><span>30-sec average breathing</span><strong>{number(appointment.summary.average_respiratory_rate_bpm)} <small>breaths/min</small></strong></div>
+              <div><span>Quality-weighted pulse</span><strong>{number(appointment.summary.average_heart_rate_bpm)} <small>BPM</small></strong></div>
+              <div><span>Quality-weighted breathing</span><strong>{number(appointment.summary.average_respiratory_rate_bpm)} <small>breaths/min</small></strong></div>
               <div><span>Average signal quality</span><strong>{number(appointment.summary.average_signal_quality === null ? null : appointment.summary.average_signal_quality * 100)}<small>%</small></strong></div>
               <div><span>Saved samples</span><strong>{appointment.summary.sample_count}</strong></div>
             </div>

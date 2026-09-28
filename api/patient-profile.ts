@@ -10,6 +10,11 @@ const average = (values: Array<number | null>) => {
   const valid = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
   return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : null;
 };
+const qualityWeightedAverage = (samples: Array<{ value: number | null; quality: number | null }>) => {
+  const weighted = samples.filter((sample): sample is { value: number; quality: number } => typeof sample.value === 'number' && Number.isFinite(sample.value) && typeof sample.quality === 'number' && Number.isFinite(sample.quality));
+  const totalWeight = weighted.reduce((sum, sample) => sum + Math.max(0.01, Math.min(1, sample.quality)) ** 2, 0);
+  return totalWeight ? weighted.reduce((sum, sample) => sum + sample.value * Math.max(0.01, Math.min(1, sample.quality)) ** 2, 0) / totalWeight : null;
+};
 
 export default {
   async fetch(request: Request) {
@@ -46,8 +51,8 @@ export default {
           measurements: samples,
           summary: samples.length ? {
             sample_count: samples.length,
-            average_heart_rate_bpm: average(samples.map((sample) => sample.heart_rate_bpm)),
-            average_respiratory_rate_bpm: average(samples.map((sample) => sample.respiratory_rate_bpm)),
+            average_heart_rate_bpm: qualityWeightedAverage(samples.map((sample) => ({ value: sample.heart_rate_bpm, quality: sample.signal_quality }))),
+            average_respiratory_rate_bpm: qualityWeightedAverage(samples.map((sample) => ({ value: sample.respiratory_rate_bpm, quality: sample.signal_quality }))),
             average_signal_quality: average(samples.map((sample) => sample.signal_quality)),
             started_at: samples[0]?.measured_at ?? null,
             ended_at: samples.at(-1)?.measured_at ?? null,

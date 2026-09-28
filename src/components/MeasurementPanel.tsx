@@ -25,8 +25,9 @@ function HeartRateTrend({ samples }: { samples: SavedMeasurement[] }) {
   return <div className="trend-chart" role="img" aria-label="Heart rate over the current 30-second camera check"><div className="trend-scale"><span>{Math.round(max)}</span><span>{Math.round(min)}</span></div><svg viewBox="0 0 100 46" preserveAspectRatio="none"><polyline points={points} /></svg><div className="trend-axis"><span>Start</span><span>30 seconds</span></div></div>;
 }
 function averageReading(samples: SavedMeasurement[], key: 'heart_rate_bpm' | 'respiratory_rate_bpm' | 'signal_quality') {
-  const readings = samples.map((sample) => Number(sample[key])).filter(Number.isFinite);
-  return readings.length ? readings.reduce((sum, value) => sum + value, 0) / readings.length : null;
+  const readings = samples.map((sample) => ({ value: Number(sample[key]), quality: Math.max(.01, Math.min(1, Number(sample.signal_quality))) ** 2 })).filter((sample) => Number.isFinite(sample.value) && Number.isFinite(sample.quality));
+  const totalWeight = readings.reduce((sum, sample) => sum + sample.quality, 0);
+  return totalWeight ? readings.reduce((sum, sample) => sum + sample.value * sample.quality, 0) / totalWeight : null;
 }
 
 function values(value: unknown) { return Array.isArray(value) ? value.map(Number).filter(Number.isFinite) : []; }
@@ -199,13 +200,13 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
           <Activity />
           <span>Pulse</span>
           <strong>{hasAverage ? Math.round(averageHeartRate) : measurement.heartRateBpm ?? '— —'}</strong>
-          <small>{hasAverage ? 'BPM · 30-sec average' : 'BPM'}</small>
+          <small>{hasAverage ? 'BPM · quality-weighted' : 'BPM'}</small>
         </article>
         <article>
           <Wind />
           <span>Breathing</span>
           <strong>{hasAverage ? Math.round(averageRespiratoryRate) : measurement.respiratoryRate ?? '— —'}</strong>
-          <small>{hasAverage ? 'breaths/min · 30-sec average' : 'breaths/min'}</small>
+          <small>{hasAverage ? 'breaths/min · quality-weighted' : 'breaths/min'}</small>
         </article>
       </div>
 
