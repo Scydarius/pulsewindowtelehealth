@@ -18,6 +18,7 @@ export type MeasurementUpdate = {
 
 const CAPTURE_WINDOW_MS = 30_000;
 const SETUP_TIMEOUT_MS = 90_000;
+const ACTIVE_RPPG_ALGORITHM = 'FUSION';
 // The original validated browser stream ran at 15 FPS.  Keeping the browser,
 // pipeline timing and face-mesh motion model on the same cadence avoids
 // treating normal landmark jitter as continuous head movement.
@@ -151,7 +152,7 @@ class WebSocketRppgClient implements RppgClient {
         }, 1000 / CAPTURE_FPS);
       }
       if (eventData.type === 'telemetry') {
-        const cardiac = eventData.cardiac as { bpm?: number } | undefined;
+        const cardiac = eventData.cardiac as { bpm?: number; hrv_rmssd_ms?: number | null; hrv_sdnn_ms?: number | null; hrv_pnn50_pct?: number | null; hrv_lf_hf_ratio?: number | null; stress_index?: number | null; stress_score?: number | null; stress_level?: string } | undefined;
         const respiration = eventData.respiration as { brpm?: number | null } | undefined;
         const quality = Number(eventData.quality_score ?? 0);
         const state = String(eventData.tracking_state ?? 'CALIBRATING');
@@ -184,7 +185,18 @@ class WebSocketRppgClient implements RppgClient {
                 cardiac_spectrum_power: eventData.cardiac_spectrum_power ?? [],
                 respiration_spectrum_freq_hz: eventData.respiration_spectrum_freq_hz ?? [],
                 respiration_spectrum_power: eventData.respiration_spectrum_power ?? [],
-                engine: eventData.diagnostics ?? {},
+                ambient_canceling: eventData.ambient_canceling === true,
+                ambient_cancellation_db: Number(eventData.ambient_cancellation_db ?? 0),
+                cardiac_autonomic: {
+                  hrv_rmssd_ms: cardiac?.hrv_rmssd_ms ?? null,
+                  hrv_sdnn_ms: cardiac?.hrv_sdnn_ms ?? null,
+                  hrv_pnn50_pct: cardiac?.hrv_pnn50_pct ?? null,
+                  hrv_lf_hf_ratio: cardiac?.hrv_lf_hf_ratio ?? null,
+                  stress_index: cardiac?.stress_index ?? null,
+                  stress_score: cardiac?.stress_score ?? null,
+                  stress_level: cardiac?.stress_level ?? null,
+                },
+                engine: { ...(eventData.diagnostics as Record<string, unknown> ?? {}), algorithm: ACTIVE_RPPG_ALGORITHM },
               },
             }
           : undefined;
@@ -194,7 +206,7 @@ class WebSocketRppgClient implements RppgClient {
         const sample = candidateSample;
         const captureElapsed = recordingStartedAt ? Math.min(CAPTURE_WINDOW_MS, now - recordingStartedAt) : 0;
         const message = recordingStartedAt ? `Recording · ${Math.ceil((CAPTURE_WINDOW_MS - captureElapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : motionDetected || state === 'HOLDING' ? 'Movement detected — hold still' : 'Calibrating the rPPG engine…';
-        onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : 5, signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: 'railway-rppg-2.16', faceDetected: eventData.face_detected === true, trackingState: state, diagnostics: candidateSample?.diagnostics, sample });
+        onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : 5, signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: `${ACTIVE_RPPG_ALGORITHM.toLowerCase()}-rppg-2.16`, faceDetected: eventData.face_detected === true, trackingState: state, diagnostics: candidateSample?.diagnostics, sample });
       }
     });
     socket.addEventListener('error', () => {

@@ -37,6 +37,7 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
   if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live plethysmography and DSP</h3></div><span>Research use only</span></div><div className="trend-empty">The patient’s live waveforms, spectra, and processing telemetry will appear here as their camera check starts.</div></section>;
   const engine = (diagnostics.engine ?? {}) as Record<string, unknown>;
   const roi = (diagnostics.roi_weights ?? {}) as Record<string, unknown>;
+  const autonomic = (diagnostics.cardiac_autonomic ?? {}) as Record<string, unknown>;
   const snr = Number(diagnostics.snr_db ?? 0);
   const latency = Number(diagnostics.processing_latency_ms ?? 0);
   const cardiacFrequencies = values(diagnostics.cardiac_spectrum_freq_hz);
@@ -65,7 +66,8 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
     <div className="research-secondary-plots">
       {(Object.entries(plots) as [keyof typeof plots, typeof selected][]).map(([key, plot]) => <SignalPlot key={key} title={plot.title} values={plot.series} tone={plot.tone} detail={plot.detail} xAxis={plot.xAxis} yAxis={plot.yAxis} active={selectedPlot === key} onSelect={() => setSelectedPlot(key)} />)}
     </div>
-    <div className="engine-line">POS algorithm · motion {Number(engine.motion_velocity ?? 0).toFixed(2)} IOD/s · landmark displacement {Number(engine.motion_displacement_px ?? 0).toFixed(2)} px · spectral entropy {Number(engine.spectral_entropy ?? 0).toFixed(2)} · buffer {String(engine.buffer_samples ?? '—')}/{String(engine.buffer_capacity ?? '—')} samples</div>
+    <section className="advanced-telemetry"><div><p className="eyebrow">Expanded engine telemetry</p><h4>Autonomic and ambient-light diagnostics</h4></div><div className="advanced-telemetry-grid"><span><strong>{Number(autonomic.hrv_rmssd_ms ?? 0).toFixed(0)} ms</strong>HRV RMSSD</span><span><strong>{Number(autonomic.hrv_sdnn_ms ?? 0).toFixed(0)} ms</strong>HRV SDNN</span><span><strong>{Number(autonomic.hrv_pnn50_pct ?? 0).toFixed(0)}%</strong>pNN50</span><span><strong>{Number(autonomic.hrv_lf_hf_ratio ?? 0).toFixed(2)}</strong>LF/HF ratio</span><span><strong>{diagnostics.ambient_canceling === true ? `${Number(diagnostics.ambient_cancellation_db ?? 0).toFixed(1)} dB` : 'Inactive'}</strong>Ambient cancellation</span><span><strong>{String(autonomic.stress_level ?? '—')}</strong>Experimental stress label</span></div><p>Research telemetry only. It is not a diagnosis, assessment, or clinical decision tool.</p></section>
+    <div className="engine-line">{String(engine.algorithm ?? 'FUSION')} algorithm · motion {Number(engine.motion_velocity ?? 0).toFixed(2)} IOD/s · landmark displacement {Number(engine.motion_displacement_px ?? 0).toFixed(2)} px · spectral entropy {Number(engine.spectral_entropy ?? 0).toFixed(2)} · buffer {String(engine.buffer_samples ?? '—')}/{String(engine.buffer_capacity ?? '—')} samples</div>
   </section>;
 }
 
