@@ -5,18 +5,32 @@ import { requireClinician } from './clinic';
  * session is deliberately insufficient: the user must also have a record in
  * clinician_profiles, which is only created by an authorised administrator.
  */
-export default async function clinicianAccess(request: Request) {
-  if (request.method !== 'GET') return Response.json({ error: 'Method not allowed' }, { status: 405 });
+type VercelRequest = {
+  method?: string;
+  headers: Record<string, string | string[] | undefined>;
+};
+
+type VercelResponse = {
+  status: (code: number) => { json: (body: unknown) => void };
+};
+
+/** Vercel Node function: convert its request shape for the shared auth helper. */
+export default async function clinicianAccess(request: VercelRequest, response: VercelResponse) {
+  if (request.method !== 'GET') return response.status(405).json({ error: 'Method not allowed' });
   try {
-    const { db, clinician } = await requireClinician(request);
+    const authorization = request.headers.authorization;
+    const headers = new Headers();
+    if (authorization) headers.set('authorization', Array.isArray(authorization) ? authorization[0] : authorization);
+    const authRequest = new Request('https://ventricura.internal/api/clinician-access', { headers });
+    const { db, clinician } = await requireClinician(authRequest);
     const { data: profile, error } = await db
       .from('clinician_profiles')
       .select('display_name, is_admin')
       .eq('id', clinician.id)
       .single();
     if (error || !profile) throw new Error('This account is not an authorised clinician.');
-    return Response.json({ clinician: { id: clinician.id, displayName: profile.display_name, isAdmin: profile.is_admin === true } }, { headers: { 'Cache-Control': 'no-store' } });
+    return response.status(200).json({ clinician: { id: clinician.id, displayName: profile.display_name, isAdmin: profile.is_admin === true } });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Clinician access could not be verified.' }, { status: 403 });
+    return response.status(403).json({ error: error instanceof Error ? error.message : 'Clinician access could not be verified.' });
   }
 }
