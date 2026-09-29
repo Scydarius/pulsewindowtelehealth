@@ -1,5 +1,5 @@
 import { CalendarDays, LayoutDashboard, LogOut, Stethoscope, UserRound } from 'lucide-react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 
@@ -8,6 +8,8 @@ export function AppShell() {
   const isConsultation = location.pathname.startsWith('/consultation');
   const consultationRole = new URLSearchParams(location.search).get('role');
   const isClinician = location.pathname.startsWith('/clinician') || (isConsultation && consultationRole === 'clinician');
+  const clinicianView = new URLSearchParams(location.search).get('view') ?? 'overview';
+  const workspaceNavClass = (view: string) => clinicianView === view ? 'active' : undefined;
   const navigate = useNavigate();
   const [signedInEmail, setSignedInEmail] = useState('');
   const [signingOut, setSigningOut] = useState(false);
@@ -33,11 +35,12 @@ export function AppShell() {
 
         {!isConsultation && (
           <nav className="primary-nav" aria-label="Primary navigation">
-            <NavLink to="/clinician">
+            <Link to="/clinician" className={workspaceNavClass('overview')}>
               <LayoutDashboard size={18} /> Overview
-            </NavLink>
-            <a href="#appointments"><CalendarDays size={18} /> Appointments</a>
-            <a href="#measurements"><Stethoscope size={18} /> Measurements</a>
+            </Link>
+            <Link to="/clinician?view=patients" className={workspaceNavClass('patients')}><UserRound size={18} /> Patients</Link>
+            <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments')}><CalendarDays size={18} /> Appointments</Link>
+            <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}><Stethoscope size={18} /> Measurements</Link>
           </nav>
         )}
 

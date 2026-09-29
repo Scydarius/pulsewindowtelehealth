@@ -109,6 +109,17 @@ export async function createReplacementPatientInvitation(appointmentId: string) 
   return body.invitationUrl;
 }
 
+/** Revoke the current patient joining link without deleting the appointment or clinical record. */
+export async function revokePatientInvitation(appointmentId: string) {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/appointment-patient-link', {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ appointmentId }),
+  });
+  const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable.' })) as { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Unable to revoke patient access.');
+}
+
 export async function fetchPatientInvitation(token: string) {
   const response = await fetch(`/api/patient-invitations?token=${encodeURIComponent(token)}`);
   const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as {
