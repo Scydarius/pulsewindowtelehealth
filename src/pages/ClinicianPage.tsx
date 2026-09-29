@@ -3,11 +3,12 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
 import { InvitePatientForm } from '../components/InvitePatientForm';
+import { ClinicianAvailabilityPanel } from '../components/ClinicianAvailabilityPanel';
 import { type ClinicAppointment, type ClinicianProfile, loadClinicianWorkspace } from '../services/clinicianData';
 import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, revokePatientInvitation, verifyClinicianAccess } from '../services/clinicAccess';
 
-type WorkspaceView = 'overview' | 'patients' | 'appointments' | 'measurements';
-const workspaceView = (value: string | null): WorkspaceView => value === 'patients' || value === 'appointments' || value === 'measurements' ? value : 'overview';
+type WorkspaceView = 'overview' | 'patients' | 'appointments' | 'measurements' | 'availability';
+const workspaceView = (value: string | null): WorkspaceView => value === 'patients' || value === 'appointments' || value === 'measurements' || value === 'availability' ? value : 'overview';
 
 export function ClinicianPage() {
   const [params] = useSearchParams();
@@ -104,7 +105,7 @@ export function ClinicianPage() {
       {replacementLinks[appointment.id] && <div className="appointment-link"><span>New patient link created. The old link has been revoked.</span><input value={replacementLinks[appointment.id]} readOnly aria-label="Replacement patient invitation link" /><button className="button button-secondary button-small" onClick={() => void copyLink(appointment.id)}><Copy size={16} /> Copy link</button></div>}
     </article>;
   };
-  const title = view === 'patients' ? ['Patients', 'Active patients and their longitudinal records'] : view === 'appointments' ? ['Appointments', 'Schedule, call access, and secure links'] : view === 'measurements' ? ['Measurements', 'Readings received from patient sessions'] : ['Today’s consultations', 'Review your patients, appointments and readings in one secure workspace.'];
+  const title = view === 'patients' ? ['Patients', 'Active patients and their longitudinal records'] : view === 'appointments' ? ['Appointments', 'Schedule, call access, and secure links'] : view === 'measurements' ? ['Measurements', 'Readings received from patient sessions'] : view === 'availability' ? ['Booking availability', 'Publish a secure link so patients can choose from your available times.'] : ['Today’s consultations', 'Review your patients, appointments and readings in one secure workspace.'];
 
   return <div className="dashboard-page">
     <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search name, email, or reason" /></label>{isAdmin && <Link className="button button-secondary" to="/admin">Open admin portal</Link>}</div></section>
@@ -114,6 +115,7 @@ export function ClinicianPage() {
     {view === 'patients' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Patient directory</p><h2>Active patients</h2><p>Each person appears once. Open their profile for every appointment, saved measurement, and clinician-only record.</p></div><InvitePatientForm onCreated={() => void load()} /></div><div className="patient-directory">{patients.filter(matchesPatient).map((appointment) => <article key={appointment.patient?.id} className="patient-directory-card"><div className="patient-avatar">{(appointment.patient?.display_name ?? '?').split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><strong>{appointment.patient?.display_name ?? 'Patient'}</strong><span>{appointment.patient?.email}</span><small>Latest appointment: {new Date(appointment.starts_at).toLocaleDateString()}</small></div><Link className="button button-secondary button-small" to={`/clinician/patient?id=${encodeURIComponent(appointment.patient?.id ?? '')}`}>Open profile <ArrowRight size={15} /></Link></article>)}{patients.length === 0 && <EmptyAppointments />}</div></section>}
     {view === 'appointments' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Schedule and access</p><h2>All appointments</h2><p>Use the access controls to issue, replace or revoke a patient’s ability to join.</p></div><InvitePatientForm onCreated={() => void load()} /></div><div className="appointment-table">{visibleAppointments.map(appointmentRow)}{visibleAppointments.length === 0 && <EmptyAppointments />}</div></section>}
     {view === 'measurements' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Measurement record</p><h2>Readings to review</h2><p>Open the patient call to review live signal context, saved data and private notes.</p></div></div><MeasurementList appointments={readingsToReview.filter(matchesPatient)} /></section>}
+    {view === 'availability' && <ClinicianAvailabilityPanel />}
     {linkError && <p className="form-error">{linkError}</p>}
   </div>;
 }

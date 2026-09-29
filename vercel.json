@@ -18,6 +18,7 @@
     { "source": "/admin", "destination": "/index.html" },
     { "source": "/admin/clinicians", "destination": "/index.html" },
     { "source": "/join", "destination": "/index.html" },
+    { "source": "/book/:path*", "destination": "/index.html" },
     { "source": "/consultation/:path*", "destination": "/index.html" }
   ]
 }

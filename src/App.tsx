@@ -18,6 +18,7 @@ const LiveDemoPage = lazy(() => import('./pages/LiveDemoPage').then((module) => 
 const ContactPage = lazy(() => import('./pages/ContactPage').then((module) => ({ default: module.ContactPage })));
 const CliniciansPage = lazy(() => import('./pages/CliniciansPage').then((module) => ({ default: module.CliniciansPage })));
 const TrustPage = lazy(() => import('./pages/TrustPages').then((module) => ({ default: module.TrustPage })));
+const BookingPage = lazy(() => import('./pages/BookingPage').then((module) => ({ default: module.BookingPage })));
 
 const page = (element: React.ReactNode) => (
   <Suspense fallback={<div className="page-loading">Loading Ventricura…</div>}>
@@ -48,6 +49,7 @@ export default function App() {
       <Route path="/clinician/reset-password" element={page(<ClinicianResetPasswordPage />)} />
       <Route path="/clinician/activate" element={page(<ClinicianActivateAccountPage />)} />
       <Route path="/join" element={page(<PatientInvitePage />)} />
+      <Route path="/book/:bookingToken" element={page(<BookingPage />)} />
       <Route element={<AppShell />}>
         <Route path="/clinician" element={page(<ClinicianSessionGate><ClinicianPage /></ClinicianSessionGate>)} />
         <Route path="/clinician/patient" element={page(<ClinicianSessionGate><PatientProfilePage /></ClinicianSessionGate>)} />
