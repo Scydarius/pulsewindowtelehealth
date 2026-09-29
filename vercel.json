@@ -15,6 +15,9 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/google-calendar-callback", "destination": "/api/google-calendar?action=callback" },
+    { "source": "/api/claim-initial-admin", "destination": "/api/admin-clinicians?action=claim-initial-admin" },
+    { "source": "/api/patient-invitations", "destination": "/api/clinician-invitations?action=patient-invite" },
     { "source": "/patient", "destination": "/index.html" },
     { "source": "/clinician", "destination": "/index.html" },
     { "source": "/clinician/sign-in", "destination": "/index.html" },

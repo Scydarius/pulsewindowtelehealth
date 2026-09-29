@@ -1,7 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import {
+  exchangeGoogleCode,
+  fetchGoogleEmail,
   generateGoogleAuthUrl,
+  getCallbackUrl,
   isGoogleCalendarConfigured,
+  verifyOAuthState,
 } from '../lib/googleCalendar';
 
 function database() {
@@ -32,6 +36,66 @@ export default {
     try {
       if (request.method === 'GET') {
         const action = url.searchParams.get('action');
+
+        // Handle OAuth callback (redirect from Google)
+        if (
+          action === 'callback' ||
+          url.pathname.includes('callback') ||
+          (url.searchParams.has('code') && url.searchParams.has('state')) ||
+          url.searchParams.has('error')
+        ) {
+          const origin = process.env.APP_URL || url.origin;
+          const baseRedirect = `${origin.replace(/\/$/, '')}/clinician?view=availability`;
+          const code = url.searchParams.get('code');
+          const state = url.searchParams.get('state');
+          const googleError = url.searchParams.get('error');
+
+          if (googleError) {
+            return Response.redirect(`${baseRedirect}&calendar_error=${encodeURIComponent(googleError)}`, 302);
+          }
+
+          if (!code || !state) {
+            return Response.redirect(`${baseRedirect}&calendar_error=MissingAuthorizationCode`, 302);
+          }
+
+          try {
+            const verified = await verifyOAuthState(state);
+            if (!verified) {
+              return Response.redirect(`${baseRedirect}&calendar_error=SessionExpiredOrInvalid`, 302);
+            }
+
+            const redirectUri = getCallbackUrl(origin);
+            const tokens = await exchangeGoogleCode(code, redirectUri);
+            const email = await fetchGoogleEmail(tokens.accessToken);
+
+            const db = database();
+            const expiresAt = new Date(Date.now() + tokens.expiresIn * 1000).toISOString();
+
+            const { error: upsertError } = await db.from('clinician_calendar_integrations').upsert(
+              {
+                clinician_id: verified.clinicianId,
+                provider: 'google',
+                refresh_token: tokens.refreshToken,
+                access_token: tokens.accessToken,
+                access_token_expires_at: expiresAt,
+                calendar_email: email,
+                calendar_id: 'primary',
+                sync_enabled: true,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'clinician_id' }
+            );
+
+            if (upsertError) {
+              throw new Error('Failed to save calendar integration.');
+            }
+
+            return Response.redirect(`${baseRedirect}&calendar=connected`, 302);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'UnknownError';
+            return Response.redirect(`${baseRedirect}&calendar_error=${encodeURIComponent(message)}`, 302);
+          }
+        }
 
         if (action === 'status') {
           const configured = isGoogleCalendarConfigured();

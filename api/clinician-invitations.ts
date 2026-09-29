@@ -110,6 +110,17 @@ export default { async fetch(request: Request) {
   try {
     if (request.method === 'GET') {
       const action = url.searchParams.get('action');
+      const token = url.searchParams.get('token');
+      if (action === 'patient-invite' || (!action && token)) {
+        if (!token || token.length < 32) return Response.json({ error: 'Invalid patient link.' }, { status: 400 });
+        const db = database();
+        const { data: invite } = await db.from('patient_invites').select('appointment_id, expires_at, revoked_at').eq('token_hash', await tokenHash(token)).maybeSingle();
+        if (!invite || invite.revoked_at || new Date(invite.expires_at) <= new Date()) return Response.json({ error: 'This patient link has expired or was revoked.' }, { status: 410 });
+        const { data: appointment } = await db.from('appointments').select('id, reason, starts_at, clinician:clinician_profiles(display_name)').eq('id', invite.appointment_id).single();
+        if (!appointment) return Response.json({ error: 'Appointment not found.' }, { status: 404 });
+        const clinician = appointment.clinician as unknown as { display_name: string } | null;
+        return Response.json({ appointmentId: appointment.id, reason: appointment.reason, startsAt: appointment.starts_at, clinicianName: clinician?.display_name ?? 'Your clinician' }, { headers: { 'Cache-Control': 'no-store' } });
+      }
       if (action === 'availability') { const { db, clinician } = await requireClinician(request); const { data, error } = await db.from('clinician_booking_profiles').select('booking_token, timezone, duration_minutes, weekly_availability, booking_enabled, booking_reason').eq('clinician_id', clinician.id).maybeSingle(); if (error) throw new Error('Could not load booking availability.'); const profile = data ?? { booking_token: newOpaqueToken().slice(0, 20), timezone: 'Australia/Adelaide', duration_minutes: 30, weekly_availability: defaultAvailability, booking_enabled: false, booking_reason: 'Telehealth consultation' }; return Response.json({ ...profile, weekly_availability: normaliseAvailability(profile.weekly_availability), bookingUrl: `${(process.env.APP_URL ?? url.origin).replace(/\/$/, '')}/book/${profile.booking_token}` }, { headers: { 'Cache-Control': 'no-store' } }); }
       const bookingToken = url.searchParams.get('bookingToken') ?? '';
       if (action === 'public-profile') { const db = database(); const profile = await getBookingProfile(db, bookingToken); const { data: clinician } = await db.from('clinician_profiles').select('display_name').eq('id', profile.clinician_id).single(); return Response.json({ clinicianName: clinician?.display_name ?? 'Your clinician', timezone: profile.timezone, durationMinutes: profile.duration_minutes, bookingReason: profile.booking_reason }); }
