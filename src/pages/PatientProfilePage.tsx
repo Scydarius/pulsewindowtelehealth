@@ -8,7 +8,7 @@ const dateTime = (value: string) => new Date(value).toLocaleString('en-AU', { da
 
 export function PatientProfilePage() {
   const [searchParams] = useSearchParams();
-  const email = searchParams.get('email') ?? '';
+  const patientId = searchParams.get('id') ?? '';
   const [patient, setPatient] = useState<PatientProfile>();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -16,10 +16,10 @@ export function PatientProfilePage() {
 
   useEffect(() => {
     let active = true;
-    if (!email) { setError('Choose a patient from the clinician workspace first.'); setLoading(false); return undefined; }
-    void loadPatientProfile(email).then((profile) => { if (active) setPatient(profile); }).catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Unable to load the patient profile.'); }).finally(() => { if (active) setLoading(false); });
+    if (!patientId) { setError('Choose a patient from the clinician workspace first.'); setLoading(false); return undefined; }
+    void loadPatientProfile(patientId).then((profile) => { if (active) setPatient(profile); }).catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Unable to load the patient profile.'); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [email]);
+  }, [patientId]);
 
   if (loading) return <div className="workspace-state"><LoaderCircle className="spin" /><strong>Loading patient history…</strong></div>;
   if (error || !patient) return <div className="workspace-state"><strong>Patient profile unavailable</strong><span>{error || 'This patient could not be found.'}</span><Link className="button button-primary" to="/clinician">Back to workspace</Link></div>;

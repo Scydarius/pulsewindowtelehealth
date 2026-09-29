@@ -20,7 +20,9 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => (
 async function sendPatientAppointmentEmail(input: { to: string; patientName: string; reason: string; startsAt: Date; invitationUrl: string }): Promise<DeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { sent: false, warning: 'The secure link was created, but appointment email delivery has not been configured yet.' };
-  const formattedTime = input.startsAt.toLocaleString('en-AU', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Australia/Adelaide', timeZoneName: 'short' });
+  // Use granular options instead of mixing `dateStyle`/`timeStyle` with
+  // `timeZoneName`, which the server runtime rejects as an invalid option.
+  const formattedTime = new Intl.DateTimeFormat('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Adelaide', timeZoneName: 'short' }).format(input.startsAt);
   const safeName = escapeHtml(input.patientName);
   const safeReason = escapeHtml(input.reason);
   const safeUrl = escapeHtml(input.invitationUrl);

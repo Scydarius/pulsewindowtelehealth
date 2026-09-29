@@ -6,7 +6,7 @@ export type ClinicAppointment = {
   room_name: string;
   reason: string;
   starts_at: string;
-  patient: { display_name: string; email: string } | null;
+  patient: { id: string; display_name: string; email: string } | null;
   latestMeasurement: { measured_at: string; heart_rate_bpm: number; respiratory_rate_bpm: number; signal_quality: number } | null;
 };
 
@@ -24,7 +24,7 @@ export async function loadClinicianWorkspace() {
 
   const { data: appointments, error: appointmentError } = await supabase
     .from('appointments')
-    .select('id, room_name, reason, starts_at, patient:patients(display_name, email)')
+    .select('id, room_name, reason, starts_at, patient:patients(id, display_name, email)')
     .eq('clinician_id', user.id)
     .order('starts_at', { ascending: true });
   if (appointmentError) throw new Error('Unable to load appointments.');

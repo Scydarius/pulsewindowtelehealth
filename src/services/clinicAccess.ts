@@ -59,9 +59,9 @@ export async function loadPatientMeasurementTrend(appointmentId: string) {
   return body.measurements ?? [];
 }
 
-export async function loadPatientProfile(patientEmail: string) {
+export async function loadPatientProfile(patientId: string) {
   const token = await getClinicianAccessToken();
-  const response = await fetch(`/api/patient-profile?email=${encodeURIComponent(patientEmail)}`, { headers: { Authorization: `Bearer ${token}` } });
+  const response = await fetch(`/api/patient-profile?patientId=${encodeURIComponent(patientId)}`, { headers: { Authorization: `Bearer ${token}` } });
   const body = await response.json().catch(() => ({ error: 'The patient profile could not be loaded.' })) as { patient?: PatientProfile; error?: string };
   if (!response.ok || !body.patient) throw new Error(body.error ?? 'The patient profile could not be loaded.');
   return body.patient;
