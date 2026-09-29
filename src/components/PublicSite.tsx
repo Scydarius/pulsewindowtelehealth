@@ -1,0 +1,56 @@
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
+
+type SeoProps = { title: string; description: string; path: string; jsonLd?: Record<string, unknown> };
+
+function setMeta(selector: string, attribute: 'name' | 'property', key: string, value: string) {
+  let element = document.head.querySelector<HTMLMetaElement>(selector);
+  if (!element) {
+    element = document.createElement('meta');
+    element.setAttribute(attribute, key);
+    document.head.appendChild(element);
+  }
+  element.content = value;
+}
+
+/** Public-page metadata is kept close to each route so crawlers and shares get useful context. */
+export function Seo({ title, description, path, jsonLd }: SeoProps) {
+  useEffect(() => {
+    const url = `https://www.ventricura.com${path}`;
+    document.title = title;
+    setMeta('meta[name="description"]', 'name', 'description', description);
+    setMeta('meta[property="og:title"]', 'property', 'og:title', title);
+    setMeta('meta[property="og:description"]', 'property', 'og:description', description);
+    setMeta('meta[property="og:url"]', 'property', 'og:url', url);
+    setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
+    setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', description);
+    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical); }
+    canonical.href = url;
+    const existing = document.head.querySelector<HTMLScriptElement>('script[data-ventricura-schema]');
+    if (jsonLd) {
+      const script = existing ?? document.createElement('script');
+      script.type = 'application/ld+json'; script.dataset.ventricuraSchema = 'true'; script.text = JSON.stringify(jsonLd);
+      if (!existing) document.head.appendChild(script);
+    } else existing?.remove();
+  }, [description, jsonLd, path, title]);
+  return null;
+}
+
+export function PublicFooter() {
+  return <footer className="public-footer public-footer-expanded">
+    <div><img src="/ventricura-logo-centred.png" alt="Ventricura" /><span>Contactless telehealth research technology.</span></div>
+    <nav aria-label="Footer navigation"><Link to="/clinicians">For clinicians</Link><Link to="/technology">Technology</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/security">Security</Link></nav>
+  </footer>;
+}
+
+export const organizationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Ventricura',
+  url: 'https://www.ventricura.com/',
+  logo: 'https://www.ventricura.com/ventricura-logo-centred.png',
+  email: 'admin@ventricura.com',
+  description: 'Contactless rPPG research technology for telehealth and remote care.',
+  contactPoint: [{ '@type': 'ContactPoint', contactType: 'business enquiries', email: 'admin@ventricura.com', url: 'https://www.ventricura.com/contact' }],
+};

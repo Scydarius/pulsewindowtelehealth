@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /clinician/
+Disallow: /admin/
+Disallow: /consultation/
+Disallow: /join
+
+Sitemap: https://www.ventricura.com/sitemap.xml

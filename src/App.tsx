@@ -15,6 +15,8 @@ const PatientProfilePage = lazy(() => import('./pages/PatientProfilePage').then(
 const TechnologyPage = lazy(() => import('./pages/TechnologyPage').then((module) => ({ default: module.TechnologyPage })));
 const LiveDemoPage = lazy(() => import('./pages/LiveDemoPage').then((module) => ({ default: module.LiveDemoPage })));
 const ContactPage = lazy(() => import('./pages/ContactPage').then((module) => ({ default: module.ContactPage })));
+const CliniciansPage = lazy(() => import('./pages/CliniciansPage').then((module) => ({ default: module.CliniciansPage })));
+const TrustPage = lazy(() => import('./pages/TrustPages').then((module) => ({ default: module.TrustPage })));
 
 const page = (element: React.ReactNode) => (
   <Suspense fallback={<div className="page-loading">Loading Ventricura…</div>}>
@@ -36,6 +38,10 @@ export default function App() {
       <Route path="/technology" element={page(<TechnologyPage />)} />
       <Route path="/demo" element={page(<LiveDemoPage />)} />
       <Route path="/contact" element={page(<ContactPage />)} />
+      <Route path="/clinicians" element={page(<CliniciansPage />)} />
+      <Route path="/privacy" element={page(<TrustPage kind="privacy" />)} />
+      <Route path="/terms" element={page(<TrustPage kind="terms" />)} />
+      <Route path="/security" element={page(<TrustPage kind="security" />)} />
       <Route path="/clinician/sign-in" element={page(<ClinicianSignInPage />)} />
       <Route path="/clinician/forgot-password" element={page(<ClinicianResetPasswordPage />)} />
       <Route path="/clinician/reset-password" element={page(<ClinicianResetPasswordPage />)} />

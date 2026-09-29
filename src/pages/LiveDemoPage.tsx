@@ -1,6 +1,7 @@
 import { Camera, CircleStop, LoaderCircle, Play, ScanFace, ShieldCheck, Waves } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PublicHeader } from './TechnologyPage';
+import { PublicFooter, Seo } from '../components/PublicSite';
 
 type Stage = 'idle' | 'permission' | 'connecting' | 'positioning' | 'measuring' | 'error';
 type Reading = { bpm: number | null; respiratoryRate: number | null; quality: number; snr: number | null; latency: number | null; faceDetected: boolean; motionDetected: boolean; valid: boolean; state: string; waveform: number[]; spectrum: number[] };
@@ -68,14 +69,14 @@ export function LiveDemoPage() {
   const progress = Math.min(100, (seconds / 30) * 100); const waveform = chartPath(reading.waveform); const spectrum = chartPath(reading.spectrum);
   const stageLabel = stage === 'idle' ? 'OFF' : stage === 'permission' || stage === 'connecting' ? 'CONNECTING' : stage === 'measuring' ? 'LIVE' : stage === 'error' ? 'NEEDS ATTENTION' : 'POSITIONING';
 
-  return <main className="ventricura-public demo-page-v2"><PublicHeader />
+  return <main className="ventricura-public demo-page-v2"><Seo title="Live rPPG demo | Ventricura" description="Try Ventricura’s contactless rPPG research telemetry demo using a guided camera session." path="/demo" /><PublicHeader />
     <section className="demo-intro"><div><p className="mono-kicker">VENTRICURA LIVE SIGNAL DEMO</p><h1>See the signal in motion.</h1><p>This public demo opens a short-lived session to the rPPG signal service. It is a technology demonstration, not a medical assessment.</p></div><div className={`demo-state state-${stage.toLowerCase()}`}><i /><span>{stageLabel}</span><strong>{status}</strong></div></section>
     <section className="demo-console">
       <div className="demo-camera-stage"><video ref={videoRef} autoPlay muted playsInline />{!running && <div className="demo-face-guide"><ScanFace /><strong>Position your face here</strong><span>Keep your forehead and cheeks inside the frame.</span></div>}{running && <div className="demo-live-overlay"><span className={reading.faceDetected ? 'face-found' : ''} /><small>{reading.faceDetected ? 'FACE TRACKED' : 'FINDING FACE'}</small></div>}<canvas ref={canvasRef} hidden /></div>
       <aside className="demo-sidepanel"><div className="demo-cta">{running ? <button type="button" onClick={() => stop()}><CircleStop size={17} /> End live demo</button> : <button type="button" onClick={() => void start()}><Play size={17} /> {stage === 'error' ? 'Try again' : 'Start live demo'}</button>}<span><Camera size={14} /> Browser camera required</span></div><div className="demo-progress"><div><span>STABLE SESSION</span><strong>{seconds}/30 s</strong></div><i><b style={{ width: `${progress}%` }} /></i><small>The timer begins only once the live engine reports a usable readout.</small></div><div className="demo-readings"><article><span>HEART RATE</span><strong>{metric(reading.valid ? reading.bpm : null)}<em>BPM</em></strong></article><article><span>RESPIRATORY RATE</span><strong>{metric(reading.valid ? reading.respiratoryRate : null)}<em>BR/MIN</em></strong></article></div><dl><div><dt>Tracking</dt><dd>{reading.state}</dd></div><div><dt>Signal quality</dt><dd>{Math.round(Math.max(0, reading.quality) * 100)}%</dd></div><div><dt>SNR</dt><dd>{reading.snr === null ? '—' : `${reading.snr.toFixed(1)} dB`}</dd></div><div><dt>Latency</dt><dd>{reading.latency === null ? '—' : `${Math.round(reading.latency)} ms`}</dd></div></dl></aside>
       <section className="demo-plots"><SignalPlot title="OPTICAL PLETHYSMOGRAM" unit="Normalised amplitude (a.u.)" path={waveform} status={reading.waveform.length ? 'Live trace' : 'Awaiting signal'} /><SignalPlot title="CARDIAC POWER SPECTRUM" unit="Normalised power" path={spectrum} status={reading.spectrum.length ? 'Live spectrum' : 'Awaiting signal'} tone="spectrum" /></section>
     </section>
-    <section className="demo-security"><ShieldCheck /><span>Camera frames are sent during this active session only. The browser receives a short-lived ticket; no permanent rPPG key is exposed here.</span><Waves /></section>
+    <section className="demo-security"><ShieldCheck /><span>Camera frames are sent during this active session only. The browser receives a short-lived ticket; no permanent rPPG key is exposed here.</span><Waves /></section><PublicFooter />
   </main>;
 }
 

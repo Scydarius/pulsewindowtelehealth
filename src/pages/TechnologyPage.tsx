@@ -1,8 +1,9 @@
 import { ArrowRight, Binary, Camera, ChartNoAxesCombined, LockKeyhole, ScanFace, ShieldCheck, Waves } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PublicFooter, Seo } from '../components/PublicSite';
 
 export function TechnologyPage() {
-  return <main className="ventricura-public technology-page">
+  return <main className="ventricura-public technology-page"><Seo title="Contactless rPPG technology | Ventricura" description="How Ventricura connects guided camera checks, rPPG research telemetry, and clinician review in a telehealth workflow." path="/technology" />
     <PublicHeader />
     <section className="technology-hero">
       <div>
@@ -30,13 +31,13 @@ export function TechnologyPage() {
     </section>
 
     <section className="public-trust-strip"><ShieldCheck /><div><strong>Purpose-built for a secure appointment flow</strong><span>Short-lived signal sessions, clinician-controlled access, and patient links designed for a single consultation.</span></div><LockKeyhole /></section>
-    <footer className="public-footer"><img src="/ventricura-logo-centred.png" alt="Ventricura" /><span>Research technology. Not a diagnostic device or emergency service.</span></footer>
+    <PublicFooter />
   </main>;
 }
 
 export function PublicHeader() {
   return <header className="public-header">
     <Link to="/" className="public-brand" aria-label="Ventricura home"><img src="/ventricura-logo-centred.png" alt="Ventricura" /></Link>
-    <nav aria-label="Public navigation"><Link to="/technology">Technology</Link><Link to="/demo">Live demo</Link><Link to="/contact">Contact</Link><Link to="/clinician/sign-in" className="header-access">Clinician access <ArrowRight size={15} /></Link></nav>
+    <nav aria-label="Public navigation"><Link to="/technology">Technology</Link><Link to="/clinicians">For clinicians</Link><Link to="/demo">Live demo</Link><Link to="/contact">Contact</Link><Link to="/clinician/sign-in" className="header-access">Clinician access <ArrowRight size={15} /></Link></nav>
   </header>;
 }
