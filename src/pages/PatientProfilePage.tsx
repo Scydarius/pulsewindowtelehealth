@@ -43,7 +43,7 @@ export function PatientProfilePage() {
       <div className="section-heading patient-history-heading"><div><p className="eyebrow">Longitudinal record</p><h2>Appointments and measurements</h2><p>Each saved sample is shown exactly as returned by the rPPG API. No portal-side averaging or quality weighting is applied. Research data only; not diagnostic.</p></div></div>
       <div className="patient-history-list">
         {appointments.map((appointment) => <article className="patient-history-card" key={appointment.id}>
-          <div className="patient-history-main"><div><strong>{appointment.reason}</strong><span>{dateTime(appointment.starts_at)}</span></div><Link className="button button-secondary button-small" to={`/consultation/${appointment.id}?role=clinician`}>Open consultation</Link></div>
+          <div className="patient-history-main"><div><strong>{appointment.reason}</strong><span>{dateTime(appointment.starts_at)}</span></div><Link className="button button-secondary button-small" to={`/clinician/review?appointment=${encodeURIComponent(appointment.id)}&patient=${encodeURIComponent(patientId)}`}>Review record</Link></div>
           {appointment.measurements.length ? <>
             {(() => { const latest = appointment.measurements.at(-1)!; return <div className="patient-measurement-summary">
               <div><span>Latest API pulse</span><strong>{number(latest.heart_rate_bpm)} <small>BPM</small></strong></div>

@@ -19,6 +19,7 @@ const ContactPage = lazy(() => import('./pages/ContactPage').then((module) => ({
 const CliniciansPage = lazy(() => import('./pages/CliniciansPage').then((module) => ({ default: module.CliniciansPage })));
 const TrustPage = lazy(() => import('./pages/TrustPages').then((module) => ({ default: module.TrustPage })));
 const BookingPage = lazy(() => import('./pages/BookingPage').then((module) => ({ default: module.BookingPage })));
+const ConsultationReviewPage = lazy(() => import('./pages/ConsultationReviewPage').then((module) => ({ default: module.ConsultationReviewPage })));
 
 const page = (element: React.ReactNode) => (
   <Suspense fallback={<div className="page-loading">Loading Ventricura…</div>}>
@@ -53,6 +54,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/clinician" element={page(<ClinicianSessionGate><ClinicianPage /></ClinicianSessionGate>)} />
         <Route path="/clinician/patient" element={page(<ClinicianSessionGate><PatientProfilePage /></ClinicianSessionGate>)} />
+        <Route path="/clinician/review" element={page(<ClinicianSessionGate><ConsultationReviewPage /></ClinicianSessionGate>)} />
         <Route path="/admin" element={page(<ClinicianSessionGate><AdminSessionGate><AdminCliniciansPage /></AdminSessionGate></ClinicianSessionGate>)} />
         <Route path="/admin/clinicians" element={<Navigate to="/admin" replace />} />
         <Route path="/consultation/:appointmentId" element={<ConsultationRoute />} />

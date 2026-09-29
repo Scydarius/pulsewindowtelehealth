@@ -8,6 +8,8 @@
     { "source": "/clinician/forgot-password", "destination": "/index.html" },
     { "source": "/clinician/reset-password", "destination": "/index.html" },
     { "source": "/clinician/activate", "destination": "/index.html" },
+    { "source": "/clinician/patient", "destination": "/index.html" },
+    { "source": "/clinician/review", "destination": "/index.html" },
     { "source": "/technology", "destination": "/index.html" },
     { "source": "/clinicians", "destination": "/index.html" },
     { "source": "/demo", "destination": "/index.html" },
