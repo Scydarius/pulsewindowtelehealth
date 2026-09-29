@@ -14,11 +14,11 @@ const SCOPES = [
 const encoder = new TextEncoder();
 
 function getGoogleClientId(): string {
-  return (process.env.GOOGLE_CLIENT_ID ?? '').trim().replace(/^["']|["']$/g, '');
+  return (process.env.GOOGLE_CLIENT_ID ?? '').replace(/\s+/g, '').replace(/^["']|["']$/g, '');
 }
 
 function getGoogleClientSecret(): string {
-  return (process.env.GOOGLE_CLIENT_SECRET ?? '').trim().replace(/^["']|["']$/g, '');
+  return (process.env.GOOGLE_CLIENT_SECRET ?? '').replace(/\s+/g, '').replace(/^["']|["']$/g, '');
 }
 
 function getGoogleRedirectUri(): string {
