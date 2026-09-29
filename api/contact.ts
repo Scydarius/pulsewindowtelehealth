@@ -18,12 +18,14 @@ export default async function contact(request: VercelRequest, response: VercelRe
     const apiKey = process.env.RESEND_API_KEY;
     const recipient = process.env.CONTACT_RECIPIENT_EMAIL;
     if (!apiKey || !recipient) throw new Error('Contact delivery has not been configured yet.');
+    const configuredSender = process.env.VENTRICURA_FROM_EMAIL?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
+    const from = configuredSender && /@ventricura\.com>?$/i.test(configuredSender) ? configuredSender : 'Ventricura <admin@ventricura.com>';
     const organisation = body.organisation?.trim() || 'Not provided';
     const result = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? 'Ventricura <no-reply@ventricura.com>',
+        from,
         to: [recipient], reply_to: email,
         subject: `New Ventricura enquiry from ${name}`,
         text: `Name: ${name}\nEmail: ${email}\nOrganisation: ${organisation}\n\nMessage:\n${message}`,

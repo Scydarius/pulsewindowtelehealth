@@ -1,4 +1,4 @@
-import { Activity, CheckCircle2, CircleAlert, Download, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind } from 'lucide-react';
+import { Activity, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Download, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
 import { loadPatientMeasurementTrend, loadPrivateClinicalNote, savePatientMeasurement, savePrivateClinicalNote, type SavedMeasurement } from '../services/clinicAccess';
@@ -33,7 +33,8 @@ function SignalPlot({ title, values: series, tone = 'green', primary = false, de
 }
 function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unknown> | null }) {
   const [selectedPlot, setSelectedPlot] = useState<'ppg' | 'respiratory' | 'cardiacSpectrum' | 'respiratorySpectrum'>('ppg');
-  if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live plethysmography and DSP</h3></div><span>Research use only</span></div><div className="trend-empty">The patient’s live waveforms, spectra, and processing telemetry will appear here as their camera check starts.</div></section>;
+  const [expanded, setExpanded] = useState(false);
+  if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live waveform analysis</h3></div><span>Research use only</span></div><div className="trend-empty">The patient’s live waveforms, spectra, and processing telemetry will appear here as their camera check starts.</div></section>;
   const engine = (diagnostics.diagnostics ?? {}) as Record<string, unknown>;
   const roi = (diagnostics.roi_weights ?? {}) as Record<string, unknown>;
   const cardiac = (diagnostics.cardiac ?? {}) as Record<string, unknown>;
@@ -51,7 +52,7 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
   };
   const selected = plots[selectedPlot];
   return <section className="research-diagnostics">
-    <div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live plethysmography and DSP</h3></div><span>Research use only</span></div>
+    <div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live waveform analysis</h3></div><span>Research use only</span></div>
     <div className="diagnostics-grid diagnostics-grid-wide">
       <span><strong>{Number.isFinite(snr) ? `${snr.toFixed(1)} dB` : '—'}</strong>SNR</span>
       <span><strong>{Number(diagnostics.quality_score ?? 0).toFixed(2)}</strong>Signal quality</span>
@@ -61,13 +62,16 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
       <span><strong>±{Number(engine.confidence_interval_bpm ?? 0).toFixed(1)} BPM</strong>95% interval</span>
     </div>
     <div className="roi-grid"><strong>Regions of interest</strong><span>Forehead {Math.round(Number(roi.Forehead ?? 0) * 100)}%</span><span>Left cheek {Math.round(Number(roi['Left Cheek'] ?? 0) * 100)}%</span><span>Right cheek {Math.round(Number(roi['Right Cheek'] ?? 0) * 100)}%</span><span>Face mesh {String(engine.landmarks_detected ?? '—')} points</span><span>Skin {String(engine.skin_pixels ?? '—')} px</span></div>
-    <div className="featured-plot-label"><span>Selected trace</span><strong>Click any chart below to expand it</strong></div>
-    <SignalPlot title={selected.title} values={selected.series} tone={selected.tone} primary detail={selected.detail} xAxis={selected.xAxis} yAxis={selected.yAxis} active />
-    <div className="research-secondary-plots">
-      {(Object.entries(plots) as [keyof typeof plots, typeof selected][]).map(([key, plot]) => <SignalPlot key={key} title={plot.title} values={plot.series} tone={plot.tone} detail={plot.detail} xAxis={plot.xAxis} yAxis={plot.yAxis} active={selectedPlot === key} onSelect={() => setSelectedPlot(key)} />)}
-    </div>
-    <section className="advanced-telemetry"><div><p className="eyebrow">Expanded engine telemetry</p><h4>Raw API diagnostics</h4></div><div className="advanced-telemetry-grid"><span><strong>{Number(cardiac.hrv_rmssd_ms ?? 0).toFixed(0)} ms</strong>HRV RMSSD</span><span><strong>{Number(cardiac.hrv_sdnn_ms ?? 0).toFixed(0)} ms</strong>HRV SDNN</span><span><strong>{Number(cardiac.hrv_pnn50_pct ?? 0).toFixed(0)}%</strong>pNN50</span><span><strong>{Number(cardiac.hrv_lf_hf_ratio ?? 0).toFixed(2)}</strong>LF/HF ratio</span><span><strong>{Number(respiration.rqi_pct ?? 0).toFixed(0)}%</strong>Respiratory quality</span><span><strong>{String(respiration.phase ?? '—')}</strong>Breathing phase</span></div><p>Values are rendered directly from the rPPG API. Research telemetry only; not a diagnosis, assessment, or clinical decision tool.</p></section>
-    <div className="engine-line">{String(engine.algorithm ?? 'FUSION')} algorithm · motion {Number(engine.motion_velocity ?? 0).toFixed(2)} IOD/s · landmark displacement {Number(engine.motion_displacement_px ?? 0).toFixed(2)} px · spectral entropy {Number(engine.spectral_entropy ?? 0).toFixed(2)} · buffer {String(engine.buffer_samples ?? '—')}/{String(engine.buffer_capacity ?? '—')} samples</div>
+    <button type="button" className="diagnostics-toggle" onClick={() => setExpanded((isExpanded) => !isExpanded)} aria-expanded={expanded}>{expanded ? <><ChevronUp size={16} /> Hide waveform details</> : <><ChevronDown size={16} /> View waveforms and raw DSP</>}</button>
+    {expanded && <div className="diagnostics-expanded-content">
+      <div className="featured-plot-label"><span>Selected trace</span><strong>Choose any trace to bring it forward</strong></div>
+      <SignalPlot title={selected.title} values={selected.series} tone={selected.tone} primary detail={selected.detail} xAxis={selected.xAxis} yAxis={selected.yAxis} active />
+      <div className="research-secondary-plots">
+        {(Object.entries(plots) as [keyof typeof plots, typeof selected][]).map(([key, plot]) => <SignalPlot key={key} title={plot.title} values={plot.series} tone={plot.tone} detail={plot.detail} xAxis={plot.xAxis} yAxis={plot.yAxis} active={selectedPlot === key} onSelect={() => setSelectedPlot(key)} />)}
+      </div>
+      <section className="advanced-telemetry"><div><p className="eyebrow">Expanded engine telemetry</p><h4>Raw API diagnostics</h4></div><div className="advanced-telemetry-grid"><span><strong>{Number(cardiac.hrv_rmssd_ms ?? 0).toFixed(0)} ms</strong>HRV RMSSD</span><span><strong>{Number(cardiac.hrv_sdnn_ms ?? 0).toFixed(0)} ms</strong>HRV SDNN</span><span><strong>{Number(cardiac.hrv_pnn50_pct ?? 0).toFixed(0)}%</strong>pNN50</span><span><strong>{Number(cardiac.hrv_lf_hf_ratio ?? 0).toFixed(2)}</strong>LF/HF ratio</span><span><strong>{Number(respiration.rqi_pct ?? 0).toFixed(0)}%</strong>Respiratory quality</span><span><strong>{String(respiration.phase ?? '—')}</strong>Breathing phase</span></div><p>Values are rendered directly from the rPPG API. Research telemetry only; not a diagnosis, assessment, or clinical decision tool.</p></section>
+      <div className="engine-line">{String(engine.algorithm ?? 'FUSION')} algorithm · motion {Number(engine.motion_velocity ?? 0).toFixed(2)} IOD/s · landmark displacement {Number(engine.motion_displacement_px ?? 0).toFixed(2)} px · spectral entropy {Number(engine.spectral_entropy ?? 0).toFixed(2)} · buffer {String(engine.buffer_samples ?? '—')}/{String(engine.buffer_capacity ?? '—')} samples</div>
+    </div>}
   </section>;
 }
 

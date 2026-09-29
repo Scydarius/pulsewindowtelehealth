@@ -20,6 +20,9 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => (
 async function sendPatientAppointmentEmail(input: { to: string; patientName: string; reason: string; startsAt: Date; invitationUrl: string }): Promise<DeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { sent: false, warning: 'The secure link was created, but appointment email delivery has not been configured yet.' };
+  const configuredSender = process.env.VENTRICURA_FROM_EMAIL?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
+  const from = configuredSender && /@ventricura\.com>?$/i.test(configuredSender) ? configuredSender : 'Ventricura <admin@ventricura.com>';
+  const replyTo = process.env.VENTRICURA_REPLY_TO?.trim() || 'admin@ventricura.com';
   // Use granular options instead of mixing `dateStyle`/`timeStyle` with
   // `timeZoneName`, which the server runtime rejects as an invalid option.
   const formattedTime = new Intl.DateTimeFormat('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Adelaide', timeZoneName: 'short' }).format(input.startsAt);
@@ -31,17 +34,22 @@ async function sendPatientAppointmentEmail(input: { to: string; patientName: str
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? 'Ventricura <no-reply@ventricura.com>',
+        from,
+        reply_to: replyTo,
         to: [input.to],
         subject: 'Your secure Ventricura appointment link',
         text: `Hello ${input.patientName},\n\nYour Ventricura appointment (${input.reason}) is scheduled for ${formattedTime}.\n\nJoin securely: ${input.invitationUrl}\n\nThis service is not for emergencies.`,
         html: `<p>Hello ${safeName},</p><p>Your Ventricura appointment for <strong>${safeReason}</strong> is scheduled for <strong>${formattedTime}</strong>.</p><p><a href="${safeUrl}">Join your secure appointment</a></p><p>This service is not for emergencies.</p>`,
       }),
     });
-    if (!response.ok) return { sent: false, warning: 'The secure link was created, but the appointment email could not be delivered.' };
+    if (!response.ok) {
+      const body = await response.json().catch(() => null) as { message?: unknown } | null;
+      const detail = typeof body?.message === 'string' ? ` (${body.message})` : '';
+      return { sent: false, warning: `The appointment was created, but the email could not be delivered${detail}` };
+    }
     return { sent: true };
-  } catch {
-    return { sent: false, warning: 'The secure link was created, but the appointment email could not be delivered.' };
+  } catch (error) {
+    return { sent: false, warning: `The appointment was created, but the email could not be delivered${error instanceof Error ? ` (${error.message})` : ''}` };
   }
 }
 async function requireClinician(request: Request) {
