@@ -37,6 +37,6 @@ export function TechnologyPage() {
 export function PublicHeader() {
   return <header className="public-header">
     <Link to="/" className="public-brand" aria-label="Ventricura home"><img src="/ventricura-logo-centred.png" alt="Ventricura" /></Link>
-    <nav aria-label="Public navigation"><Link to="/technology">Technology</Link><Link to="/demo">Live demo</Link><Link to="/clinician/sign-in" className="header-access">Clinician access <ArrowRight size={15} /></Link></nav>
+    <nav aria-label="Public navigation"><Link to="/technology">Technology</Link><Link to="/demo">Live demo</Link><Link to="/contact">Contact</Link><Link to="/clinician/sign-in" className="header-access">Clinician access <ArrowRight size={15} /></Link></nav>
   </header>;
 }
