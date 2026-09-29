@@ -550,3 +550,51 @@ h1, h2, h3, p { margin-top: 0; }
 .diagnostics-expanded-content { display:grid; gap:16px; margin-top:17px; padding-top:17px; border-top:1px solid #d1d2cd; animation:diagnosticsReveal .2s ease both; }
 @keyframes diagnosticsReveal { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:translateY(0); } }
 @media(max-width:760px){.consultation-toolbar{grid-template-columns:1fr auto}.consultation-toolbar .consultation-person{display:none}.consultation-video-panel{padding:14px;box-shadow:7px 7px 0 #d9dad5}.consultation-video-heading{align-items:flex-start;flex-direction:column;gap:12px}.consultation-video-panel .video-stage,.consultation-video-panel .livekit-frame{min-height:62vw}.consultation-measurements-panel>.measurement-panel{box-shadow:7px 7px 0 #d9dad5}}
+
+/* Deliberately isolate the session UI from the former green product palette. */
+.ventricura-consultation { --green:#171817; --green-dark:#111211; --green-soft:#e8e8e4; --mint:#bfc1bb; --line:#cbcdc7; --muted:#6c6e69; --ink:#171817; }
+.ventricura-consultation .consultation-video-panel { padding:0; overflow:hidden; border-color:#242624; background:#171817; box-shadow:18px 18px 0 #cfd0ca; }
+.ventricura-consultation .consultation-video-heading { min-height:62px; padding:0 20px; border:0; background:#171817; color:#f6f6f2; }
+.ventricura-consultation .consultation-video-heading .eyebrow { color:#b9bbb5; }
+.ventricura-consultation .consultation-video-heading h1 { color:#f7f7f3; font-size:1.45rem; }
+.ventricura-consultation .consultation-video-heading>span { background:#30322f; color:#e3e4df; }
+.ventricura-consultation .consultation-video-panel .video-stage,.ventricura-consultation .consultation-video-panel .livekit-frame { min-height:min(64vw,680px); border:0; border-top:1px solid #3c3e3b; background:#101110; border-radius:0; }
+.ventricura-consultation .local-call-stage .remote-video { background:#101110; }
+.ventricura-consultation .video-loading { background:#101110; color:#e4e5df; }
+.ventricura-consultation .privacy-chip,.ventricura-consultation .connection-chip { border:1px solid rgba(255,255,255,.18); background:rgba(12,13,12,.88); color:#f0f0eb; }
+.ventricura-consultation .local-video-tile,.ventricura-consultation .remote-participant { border:1px solid rgba(255,255,255,.32); background:#2a2c29; border-radius:0; }
+.ventricura-consultation .remote-avatar { border-radius:0; background:#f1f1ec; color:#191a18; }
+.ventricura-consultation .call-controls { border-top:1px solid #3a3c38; background:#171817; }
+.ventricura-consultation .call-controls button,.ventricura-consultation .call-controls button.hang-up { border:1px solid #555752; border-radius:0; background:#292b28; color:#f5f5ef; box-shadow:none; }
+.ventricura-consultation .call-controls button:hover,.ventricura-consultation .call-controls button.hang-up:hover { background:#f2f2ed; color:#171817; transform:none; }
+.ventricura-consultation .medication-context { padding:15px 20px; border:0; border-top:1px solid #3c3e3a; background:#171817; color:#d6d7d1; }
+.ventricura-consultation .medication-context>div { background:#30322f; color:#e2e3de; }
+.ventricura-consultation .medication-context strong { color:#f4f4ef; }
+.ventricura-consultation .measurement-panel { padding:30px; border:1px solid #c6c8c1; background:#f9f9f6; box-shadow:18px 18px 0 #d2d3cd; }
+.ventricura-consultation .measurement-panel .section-heading { align-items:end; padding-bottom:23px; margin-bottom:22px; border-color:#cfd0ca; }
+.ventricura-consultation .measurement-panel .section-heading .eyebrow,.ventricura-consultation .private-notes .eyebrow,.ventricura-consultation .diagnostics-heading .eyebrow { color:#62645f; }
+.ventricura-consultation .measurement-panel .section-heading h2 { font-size:clamp(2rem,3.4vw,3.35rem); color:#171817; }
+.ventricura-consultation .instruction-card,.ventricura-consultation .progress-block,.ventricura-consultation .measurement-trend,.ventricura-consultation .private-notes { border:1px solid #d2d3cd; background:#f0f0ec; border-radius:0; }
+.ventricura-consultation .live-metrics article { padding:18px; border:1px solid #cfd0ca; background:#fff; border-radius:0; }
+.ventricura-consultation .live-metrics article svg,.ventricura-consultation .live-metrics article strong { color:#191a18; }
+.ventricura-consultation .live-metrics article strong { font-size:clamp(2.1rem,3.2vw,3rem); }
+.ventricura-consultation .trend-chart svg { border-color:#caccc5; background:repeating-linear-gradient(to bottom,transparent 0,transparent 22px,#e0e1db 23px); }
+.ventricura-consultation .trend-chart polyline { stroke:#171817; }
+.ventricura-consultation .research-diagnostics { padding:22px; border:1px solid #c4c6bf; background:#e7e8e2; border-radius:0; }
+.ventricura-consultation .research-diagnostics h3,.ventricura-consultation .advanced-telemetry h4 { color:#171817; }
+.ventricura-consultation .diagnostics-heading>span,.ventricura-consultation .roi-grid span { border:1px solid #c6c8c1; border-radius:0; background:#f7f7f3; color:#363835; }
+.ventricura-consultation .diagnostics-grid span,.ventricura-consultation .advanced-telemetry-grid span { border:1px solid #cfd0ca; border-radius:0; background:#f8f8f4; }
+.ventricura-consultation .diagnostics-toggle { border-color:#1c1e1c; background:#1b1d1b; color:#f4f4ef; text-transform:uppercase; letter-spacing:.07em; font-size:.62rem; }
+.ventricura-consultation .diagnostics-toggle:hover { background:#383a37; transform:none; }
+.ventricura-consultation .diagnostics-expanded-content { border-color:#c9cac4; }
+.ventricura-consultation .research-plot,.ventricura-consultation .advanced-telemetry { border:1px solid #c6c8c1; border-radius:0; background:#f9f9f5; box-shadow:none; }
+.ventricura-consultation .research-plot:hover,.ventricura-consultation .research-plot-active { border-color:#171817; box-shadow:4px 4px 0 #c7c8c2; }
+.ventricura-consultation .research-plot svg { border-color:#d1d2cc; background:repeating-linear-gradient(to bottom,transparent 0,transparent 29px,#e5e5e0 30px); }
+.ventricura-consultation .research-green polyline,.ventricura-consultation .research-blue polyline,.ventricura-consultation .research-amber polyline { stroke:#1d1f1d; }
+.ventricura-consultation .featured-plot-label span { color:#343633; }
+.ventricura-consultation .engine-line { border-radius:0; background:#dadbd5; color:#4b4e49; }
+.ventricura-consultation .private-notes textarea { border-radius:0; border-color:#bfc1bb; background:#fff; outline-color:#1b1d1b; }
+.ventricura-consultation .private-notes .button-secondary,.ventricura-consultation .patient-camera-button { border:1px solid #1b1d1b; border-radius:0; background:#1b1d1b; color:#f5f5f0; }
+.ventricura-consultation .private-notes .button-secondary:hover,.ventricura-consultation .patient-camera-button:hover { background:#3a3c38; }
+.ventricura-consultation .clinician-measurement-note { border-radius:0; background:#e1e2dc; color:#3e413d; }
+@media(max-width:760px){.ventricura-consultation .consultation-video-panel,.ventricura-consultation .measurement-panel{box-shadow:8px 8px 0 #d2d3cd}.ventricura-consultation .consultation-video-heading{padding:15px}.ventricura-consultation .measurement-panel{padding:18px}.ventricura-consultation .measurement-panel .section-heading h2{font-size:2rem}}

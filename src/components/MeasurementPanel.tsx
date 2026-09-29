@@ -34,7 +34,7 @@ function SignalPlot({ title, values: series, tone = 'green', primary = false, de
 function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unknown> | null }) {
   const [selectedPlot, setSelectedPlot] = useState<'ppg' | 'respiratory' | 'cardiacSpectrum' | 'respiratorySpectrum'>('ppg');
   const [expanded, setExpanded] = useState(false);
-  if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live waveform analysis</h3></div><span>Research use only</span></div><div className="trend-empty">The patient’s live waveforms, spectra, and processing telemetry will appear here as their camera check starts.</div></section>;
+  if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Signal detail</p><h3>Waveform analysis</h3></div><span>Research use only</span></div><button type="button" className="diagnostics-toggle" onClick={() => setExpanded((isExpanded) => !isExpanded)} aria-expanded={expanded}>{expanded ? <><ChevronUp size={16} /> Hide waveform drawer</> : <><ChevronDown size={16} /> Open waveform drawer</>}</button>{expanded && <div className="diagnostics-expanded-content"><div className="trend-empty">Waveforms, spectra, and engine telemetry will appear here as soon as a patient camera check is underway.</div></div>}</section>;
   const engine = (diagnostics.diagnostics ?? {}) as Record<string, unknown>;
   const roi = (diagnostics.roi_weights ?? {}) as Record<string, unknown>;
   const cardiac = (diagnostics.cardiac ?? {}) as Record<string, unknown>;
@@ -52,7 +52,7 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
   };
   const selected = plots[selectedPlot];
   return <section className="research-diagnostics">
-    <div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live waveform analysis</h3></div><span>Research use only</span></div>
+    <div className="diagnostics-heading"><div><p className="eyebrow">Signal detail</p><h3>Waveform analysis</h3></div><span>Research use only</span></div>
     <div className="diagnostics-grid diagnostics-grid-wide">
       <span><strong>{Number.isFinite(snr) ? `${snr.toFixed(1)} dB` : '—'}</strong>SNR</span>
       <span><strong>{Number(diagnostics.quality_score ?? 0).toFixed(2)}</strong>Signal quality</span>
@@ -62,7 +62,7 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
       <span><strong>±{Number(engine.confidence_interval_bpm ?? 0).toFixed(1)} BPM</strong>95% interval</span>
     </div>
     <div className="roi-grid"><strong>Regions of interest</strong><span>Forehead {Math.round(Number(roi.Forehead ?? 0) * 100)}%</span><span>Left cheek {Math.round(Number(roi['Left Cheek'] ?? 0) * 100)}%</span><span>Right cheek {Math.round(Number(roi['Right Cheek'] ?? 0) * 100)}%</span><span>Face mesh {String(engine.landmarks_detected ?? '—')} points</span><span>Skin {String(engine.skin_pixels ?? '—')} px</span></div>
-    <button type="button" className="diagnostics-toggle" onClick={() => setExpanded((isExpanded) => !isExpanded)} aria-expanded={expanded}>{expanded ? <><ChevronUp size={16} /> Hide waveform details</> : <><ChevronDown size={16} /> View waveforms and raw DSP</>}</button>
+    <button type="button" className="diagnostics-toggle" onClick={() => setExpanded((isExpanded) => !isExpanded)} aria-expanded={expanded}>{expanded ? <><ChevronUp size={16} /> Hide waveform drawer</> : <><ChevronDown size={16} /> Open waveforms and raw DSP</>}</button>
     {expanded && <div className="diagnostics-expanded-content">
       <div className="featured-plot-label"><span>Selected trace</span><strong>Choose any trace to bring it forward</strong></div>
       <SignalPlot title={selected.title} values={selected.series} tone={selected.tone} primary detail={selected.detail} xAxis={selected.xAxis} yAxis={selected.yAxis} active />
@@ -180,8 +180,8 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
     <aside className="measurement-panel">
       <div className="section-heading compact">
         <div>
-          <p className="eyebrow">Contactless check</p>
-          <h2>Vitals measurement</h2>
+          <p className="eyebrow">Session telemetry</p>
+          <h2>Patient readings</h2>
         </div>
         <span className={`status-dot ${isRunning ? 'active' : ''}`} aria-hidden="true" />
       </div>
