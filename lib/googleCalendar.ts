@@ -6,8 +6,8 @@ const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
 const GOOGLE_USERINFO_API = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
 const SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/calendar.freebusy',
   'https://www.googleapis.com/auth/userinfo.email',
 ].join(' ');
 
@@ -218,7 +218,24 @@ export async function getGoogleFreeBusy(
 ): Promise<Array<{ start: number; end: number }>> {
   try {
     const accessToken = await getValidGoogleAccessToken(db, clinicianId);
-    if (!accessToken) return [];
+    if (!accessToken) {
+      console.warn('Google FreeBusy: No access token for clinician', clinicianId);
+      return [];
+    }
+
+    const { data: integration } = await db
+      .from('clinician_calendar_integrations')
+      .select('calendar_email, calendar_id')
+      .eq('clinician_id', clinicianId)
+      .maybeSingle();
+
+    const calendarId = integration?.calendar_id || 'primary';
+    const calendarEmail = integration?.calendar_email;
+
+    const items: Array<{ id: string }> = [{ id: calendarId }];
+    if (calendarEmail && calendarEmail !== calendarId) {
+      items.push({ id: calendarEmail });
+    }
 
     const response = await fetch(`${GOOGLE_CALENDAR_API}/freeBusy`, {
       method: 'POST',
@@ -230,22 +247,40 @@ export async function getGoogleFreeBusy(
         timeMin,
         timeMax,
         timeZone,
-        items: [{ id: 'primary' }],
+        items,
       }),
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.error('Google Calendar freeBusy failed:', response.status, errText);
+      return [];
+    }
 
     const data = await response.json() as {
       calendars?: Record<string, { busy?: Array<{ start: string; end: string }> }>;
     };
 
-    const busyList = data.calendars?.primary?.busy ?? [];
-    return busyList.map((item) => ({
-      start: new Date(item.start).valueOf(),
-      end: new Date(item.end).valueOf(),
-    }));
-  } catch {
+    const calendars = data.calendars ?? {};
+    const busyList: Array<{ start: number; end: number }> = [];
+
+    // Google returns calendars keyed by email address OR 'primary'.
+    // Extract busy intervals from all calendars returned in the response.
+    for (const cal of Object.values(calendars)) {
+      if (Array.isArray(cal.busy)) {
+        for (const item of cal.busy) {
+          const startMs = new Date(item.start).valueOf();
+          const endMs = new Date(item.end).valueOf();
+          if (!Number.isNaN(startMs) && !Number.isNaN(endMs)) {
+            busyList.push({ start: startMs, end: endMs });
+          }
+        }
+      }
+    }
+
+    return busyList;
+  } catch (error) {
+    console.error('Google FreeBusy error:', error);
     return [];
   }
 }
@@ -264,34 +299,78 @@ export async function createGoogleCalendarEvent(
 ): Promise<string | null> {
   try {
     const accessToken = await getValidGoogleAccessToken(db, clinicianId);
-    if (!accessToken) return null;
+    if (!accessToken) {
+      console.error('Google Calendar: no valid access token found for clinician', clinicianId);
+      return null;
+    }
 
-    const response = await fetch(`${GOOGLE_CALENDAR_API}/calendars/primary/events?sendUpdates=all`, {
+    const { data: integration } = await db
+      .from('clinician_calendar_integrations')
+      .select('calendar_email, calendar_id')
+      .eq('clinician_id', clinicianId)
+      .maybeSingle();
+
+    const calendarId = integration?.calendar_id || 'primary';
+    const calendarEmail = integration?.calendar_email?.toLowerCase();
+    const patientEmail = input.patientEmail?.trim().toLowerCase();
+
+    // Do not add attendee if patient email matches clinician calendar email (organizer cannot be attendee)
+    const isSelf = Boolean(patientEmail && calendarEmail && patientEmail === calendarEmail);
+    const attendees = (patientEmail && !isSelf) ? [{ email: patientEmail }] : [];
+
+    const eventPayload: Record<string, unknown> = {
+      summary: input.summary,
+      description: input.description,
+      start: { dateTime: input.startIso, timeZone: input.timeZone },
+      end: { dateTime: input.endIso, timeZone: input.timeZone },
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: 'popup', minutes: 15 },
+          { method: 'email', minutes: 60 },
+        ],
+      },
+    };
+
+    if (attendees.length > 0) {
+      eventPayload.attendees = attendees;
+    }
+
+    // Try creating event with attendees first
+    let response = await fetch(`${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        summary: input.summary,
-        description: input.description,
-        start: { dateTime: input.startIso, timeZone: input.timeZone },
-        end: { dateTime: input.endIso, timeZone: input.timeZone },
-        attendees: input.patientEmail ? [{ email: input.patientEmail }] : [],
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'popup', minutes: 15 },
-            { method: 'email', minutes: 60 },
-          ],
-        },
-      }),
+      body: JSON.stringify(eventPayload),
     });
 
-    if (!response.ok) return null;
+    // If failed (e.g. attendee invite permissions / workspace policy), retry without attendees
+    if (!response.ok && eventPayload.attendees) {
+      const errBody = await response.text().catch(() => '');
+      console.warn('Google Calendar create event with attendees failed, retrying without attendees:', response.status, errBody);
+      delete eventPayload.attendees;
+      response = await fetch(`${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventPayload),
+      });
+    }
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      console.error('Google Calendar create event failed:', response.status, errBody);
+      return null;
+    }
+
     const created = await response.json() as { id?: string };
     return created.id ?? null;
-  } catch {
+  } catch (error) {
+    console.error('Google Calendar createGoogleCalendarEvent error:', error);
     return null;
   }
 }
@@ -305,13 +384,14 @@ export async function deleteGoogleCalendarEvent(
     const accessToken = await getValidGoogleAccessToken(db, clinicianId);
     if (!accessToken || !eventId) return false;
 
-    const response = await fetch(`${GOOGLE_CALENDAR_API}/calendars/primary/events/${encodeURIComponent(eventId)}?sendUpdates=all`, {
+    const response = await fetch(`${GOOGLE_CALENDAR_API}/calendars/primary/events/${encodeURIComponent(eventId)}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     return response.ok || response.status === 404;
-  } catch {
+  } catch (error) {
+    console.error('Google Calendar deleteGoogleCalendarEvent error:', error);
     return false;
   }
 }
