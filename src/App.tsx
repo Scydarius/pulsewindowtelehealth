@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { AdminSessionGate } from './components/AdminSessionGate';
 import { ClinicianSessionGate } from './components/ClinicianSessionGate';
 import { LandingPage } from './pages/LandingPage';
 
@@ -50,7 +51,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/clinician" element={page(<ClinicianSessionGate><ClinicianPage /></ClinicianSessionGate>)} />
         <Route path="/clinician/patient" element={page(<ClinicianSessionGate><PatientProfilePage /></ClinicianSessionGate>)} />
-        <Route path="/admin/clinicians" element={page(<ClinicianSessionGate><AdminCliniciansPage /></ClinicianSessionGate>)} />
+        <Route path="/admin/clinicians" element={page(<ClinicianSessionGate><AdminSessionGate><AdminCliniciansPage /></AdminSessionGate></ClinicianSessionGate>)} />
         <Route path="/consultation/:appointmentId" element={<ConsultationRoute />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
