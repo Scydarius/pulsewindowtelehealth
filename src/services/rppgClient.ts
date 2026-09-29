@@ -18,7 +18,7 @@ export type MeasurementUpdate = {
 
 const CAPTURE_WINDOW_MS = 30_000;
 const SETUP_TIMEOUT_MS = 90_000;
-const ACTIVE_RPPG_ALGORITHM = 'FUSION';
+const ACTIVE_RPPG_ALGORITHM = 'POS';
 // Keep capture in lockstep with the API session. The engine, rather than the
 // browser, owns all temporal signal processing.
 const CAPTURE_FPS = 30;
