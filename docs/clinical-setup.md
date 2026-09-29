@@ -16,8 +16,10 @@ values ('AUTH_USER_UUID_HERE', 'Dr Example Name');
 4. In Authentication URL settings, add these redirect URLs:
 
 ```text
-https://pulsewindowtelehealth.vercel.app/clinician
+https://www.ventricura.com/clinician
+https://www.ventricura.com/api/google-calendar-callback
 http://localhost:5173/clinician
+http://localhost:5173/api/google-calendar-callback
 ```
 
 ## 2. Configure Vercel

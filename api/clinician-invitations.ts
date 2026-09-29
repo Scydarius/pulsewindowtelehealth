@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createGoogleCalendarEvent, getGoogleFreeBusy } from '../lib/googleCalendar';
 
 type AvailabilityDay = { day: number; enabled: boolean; start: string; end: string };
 type RequestBody = { action?: 'save-availability' | 'public-book'; patientName?: string; patientEmail?: string; reason?: string; startsAt?: string; bookingToken?: string; timezone?: string; durationMinutes?: number; weeklyAvailability?: AvailabilityDay[]; bookingEnabled?: boolean; bookingReason?: string };
@@ -68,7 +69,13 @@ async function slotsForDate(db: SupabaseClient, profile: BookingProfile, date: s
   const start = zonedTime(date, day.start, profile.timezone); const end = zonedTime(date, day.end, profile.timezone); const duration = profile.duration_minutes * 60_000;
   const { data: appointments, error } = await db.from('appointments').select('starts_at').eq('clinician_id', profile.clinician_id).gte('starts_at', new Date(start.valueOf() - duration).toISOString()).lt('starts_at', new Date(end.valueOf() + duration).toISOString());
   if (error) throw new Error('Could not load availability.'); const result: string[] = [];
-  for (let cursor = start.valueOf(); cursor + duration <= end.valueOf(); cursor += duration) { if (cursor < Date.now() + 15 * 60_000) continue; if (!(appointments ?? []).some((appointment) => { const other = new Date(appointment.starts_at).valueOf(); return other < cursor + duration && other + duration > cursor; })) result.push(new Date(cursor).toISOString()); }
+  const googleBusy = await getGoogleFreeBusy(db, profile.clinician_id, start.toISOString(), end.toISOString(), profile.timezone);
+  for (let cursor = start.valueOf(); cursor + duration <= end.valueOf(); cursor += duration) {
+    if (cursor < Date.now() + 15 * 60_000) continue;
+    if ((appointments ?? []).some((appointment) => { const other = new Date(appointment.starts_at).valueOf(); return other < cursor + duration && other + duration > cursor; })) continue;
+    if (googleBusy.some((item) => item.start < cursor + duration && item.end > cursor)) continue;
+    result.push(new Date(cursor).toISOString());
+  }
   return result;
 }
 async function createAppointment(input: { db: SupabaseClient; clinicianId: string; patientName: string; patientEmail: string; reason: string; startsAt: Date; request: Request }) {
@@ -76,7 +83,26 @@ async function createAppointment(input: { db: SupabaseClient; clinicianId: strin
   if (patient) { const { error } = await input.db.from('patients').update({ display_name: input.patientName.trim() }).eq('id', patient.id); if (error) throw new Error('Could not update the patient record.'); } else { const { data, error } = await input.db.from('patients').insert({ clinician_id: input.clinicianId, display_name: input.patientName.trim(), email: patientEmail }).select('id').single(); if (error || !data) throw new Error('Could not save the patient record.'); patient = data; }
   const { data: appointment, error: appointmentError } = await input.db.from('appointments').insert({ clinician_id: input.clinicianId, patient_id: patient.id, room_name: `vent-${newOpaqueToken().slice(0, 24)}`, reason: input.reason.trim(), starts_at: input.startsAt.toISOString() }).select('id').single(); if (appointmentError || !appointment) throw new Error('Could not create the appointment.');
   const invitationToken = newOpaqueToken(); const { error: inviteError } = await input.db.from('patient_invites').insert({ appointment_id: appointment.id, token_hash: await tokenHash(invitationToken), expires_at: new Date(input.startsAt.valueOf() + 24 * 60 * 60 * 1000).toISOString() }); if (inviteError) throw new Error('Could not create the patient link.');
-  const baseUrl = (process.env.APP_URL ?? new URL(input.request.url).origin).replace(/\/$/, ''); const invitationUrl = `${baseUrl}/join?token=${encodeURIComponent(invitationToken)}`; const delivery = await sendPatientAppointmentEmail({ to: patientEmail, patientName: input.patientName.trim(), reason: input.reason.trim(), startsAt: input.startsAt, invitationUrl }); return { invitationUrl, emailSent: delivery.sent, emailWarning: delivery.warning };
+  const baseUrl = (process.env.APP_URL ?? new URL(input.request.url).origin).replace(/\/$/, ''); const invitationUrl = `${baseUrl}/join?token=${encodeURIComponent(invitationToken)}`; const delivery = await sendPatientAppointmentEmail({ to: patientEmail, patientName: input.patientName.trim(), reason: input.reason.trim(), startsAt: input.startsAt, invitationUrl });
+  try {
+    const { data: bookingProfile } = await input.db.from('clinician_booking_profiles').select('duration_minutes, timezone').eq('clinician_id', input.clinicianId).maybeSingle();
+    const duration = (bookingProfile?.duration_minutes ?? 30) * 60_000;
+    const endIso = new Date(input.startsAt.valueOf() + duration).toISOString();
+    const googleEventId = await createGoogleCalendarEvent(input.db, input.clinicianId, {
+      summary: `Ventricura: ${input.patientName.trim()} (${input.reason.trim()})`,
+      description: `Ventricura Telehealth Consultation\n\nPatient: ${input.patientName.trim()}\nEmail: ${patientEmail}\nReason: ${input.reason.trim()}\n\nClinician Call Link: ${baseUrl}/consultation/${appointment.id}?role=clinician\nPatient Secure Link: ${invitationUrl}\n\nPrivate and encrypted consultation.`,
+      startIso: input.startsAt.toISOString(),
+      endIso,
+      timeZone: bookingProfile?.timezone ?? 'Australia/Adelaide',
+      patientEmail,
+    });
+    if (googleEventId) {
+      await input.db.from('appointments').update({ google_event_id: googleEventId }).eq('id', appointment.id);
+    }
+  } catch {
+    // Non-blocking: calendar sync failure should not prevent appointment creation
+  }
+  return { invitationUrl, emailSent: delivery.sent, emailWarning: delivery.warning };
 }
 
 export default { async fetch(request: Request) {

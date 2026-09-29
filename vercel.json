@@ -1,6 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["syd1"],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "pulsewindowtelehealth.vercel.app"
+        }
+      ],
+      "destination": "https://www.ventricura.com/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/patient", "destination": "/index.html" },
     { "source": "/clinician", "destination": "/index.html" },

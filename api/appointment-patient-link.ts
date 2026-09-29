@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { deleteGoogleCalendarEvent } from '../lib/googleCalendar';
 
 type VercelRequest = {
   method?: string;
@@ -32,10 +33,14 @@ export default async function patientLink(request: VercelRequest, response: Verc
     if (userError || !userData.user) throw new Error('Your sign-in session is invalid.');
     const { data: clinician, error: clinicianError } = await db.from('clinician_profiles').select('id').eq('id', userData.user.id).maybeSingle();
     if (clinicianError || !clinician) throw new Error('This account is not an authorised clinician.');
-    const { data: appointment } = await db.from('appointments').select('id, starts_at').eq('id', body.appointmentId).eq('clinician_id', clinician.id).maybeSingle();
+    const { data: appointment } = await db.from('appointments').select('id, starts_at, google_event_id').eq('id', body.appointmentId).eq('clinician_id', clinician.id).maybeSingle();
     if (!appointment) return response.status(403).json({ error: 'You are not authorised for this appointment.' });
 
     if (request.method === 'DELETE' && body.deleteAppointment) {
+      if (appointment.google_event_id) {
+        try { await deleteGoogleCalendarEvent(db, clinician.id, appointment.google_event_id); }
+        catch { /* best-effort */ }
+      }
       // A clinician can remove only their own appointment. The patient record
       // deliberately remains available for future appointments.
       const [{ error: noteError }, { error: measurementError }, { error: inviteError }] = await Promise.all([

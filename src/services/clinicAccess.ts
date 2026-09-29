@@ -163,3 +163,54 @@ export async function fetchPatientInvitation(token: string) {
   if (!response.ok || !body.appointmentId) throw new Error(body.error ?? 'This patient link is no longer available.');
   return body as Required<Omit<typeof body, 'error'>>;
 }
+
+export type GoogleCalendarStatus = {
+  configured: boolean;
+  connected: boolean;
+  email: string | null;
+  syncEnabled: boolean;
+};
+
+export async function loadGoogleCalendarStatus(): Promise<GoogleCalendarStatus> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/google-calendar?action=status', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = (await response.json().catch(() => ({}))) as GoogleCalendarStatus & { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Could not check Google Calendar status.');
+  return body;
+}
+
+export async function getGoogleCalendarAuthUrl(): Promise<string> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/google-calendar?action=auth-url', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = (await response.json().catch(() => ({}))) as { authUrl?: string; error?: string };
+  if (!response.ok || !body.authUrl) throw new Error(body.error ?? 'Could not initiate Google Calendar connection.');
+  return body.authUrl;
+}
+
+export async function disconnectGoogleCalendar(): Promise<void> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/google-calendar', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'disconnect' }),
+  });
+  const body = (await response.json().catch(() => ({}))) as { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Could not disconnect Google Calendar.');
+}
+
+export async function toggleGoogleCalendarSync(enabled: boolean): Promise<boolean> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/google-calendar', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'toggle-sync', enabled }),
+  });
+  const body = (await response.json().catch(() => ({}))) as { syncEnabled?: boolean; error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Could not update calendar sync setting.');
+  return body.syncEnabled ?? enabled;
+}
+
