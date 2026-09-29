@@ -1,4 +1,5 @@
-import { requireClinician } from './clinic';
+// Vercel runs the compiled API as native ESM, which requires the output extension.
+import { requireClinician } from './clinic.js';
 
 /**
  * Authoritative server-side check for the clinician UI. A Supabase password
