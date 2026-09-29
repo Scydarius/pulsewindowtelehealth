@@ -3,7 +3,16 @@ import { FormEvent, useState } from 'react';
 import { createPatientInvitation } from '../services/clinicAccess';
 import { hasClinicalDatabaseConfiguration } from '../services/supabase';
 
-const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+const localDateTime = (date: Date) => {
+  const local = new Date(date.valueOf() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+};
+
+const currentLocalTime = () => {
+  const now = new Date();
+  now.setMinutes(Math.ceil(now.getMinutes() / 5) * 5, 0, 0);
+  return localDateTime(now);
+};
 
 type InvitePatientFormProps = { onCreated?: () => void };
 
@@ -12,7 +21,7 @@ export function InvitePatientForm({ onCreated }: InvitePatientFormProps) {
   const [patientName, setPatientName] = useState('');
   const [patientEmail, setPatientEmail] = useState('');
   const [reason, setReason] = useState('');
-  const [startsAt, setStartsAt] = useState(tomorrow);
+  const [startsAt, setStartsAt] = useState(currentLocalTime);
   const [link, setLink] = useState('');
   const [emailStatus, setEmailStatus] = useState('');
   const [error, setError] = useState('');
@@ -42,7 +51,7 @@ export function InvitePatientForm({ onCreated }: InvitePatientFormProps) {
       <label>Patient name<input value={patientName} onChange={(event) => setPatientName(event.target.value)} required /></label>
       <label>Patient email<input type="email" value={patientEmail} onChange={(event) => setPatientEmail(event.target.value)} required /></label>
       <label>Appointment reason<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Scheduled consultation" required /></label>
-      <label>Start time<input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} required /></label>
+      <label>Start time<input type="datetime-local" value={startsAt} min={currentLocalTime()} onChange={(event) => setStartsAt(event.target.value)} required /><small>Shown in your local timezone.</small></label>
       <button className="button button-primary" disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Link2 size={17} />}{saving ? 'Creating…' : 'Create secure link'}</button>
     </form>}
     {error && <p className="form-error" role="alert">{error}</p>}

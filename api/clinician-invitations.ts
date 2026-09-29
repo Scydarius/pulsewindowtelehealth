@@ -20,7 +20,7 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => (
 async function sendPatientAppointmentEmail(input: { to: string; patientName: string; reason: string; startsAt: Date; invitationUrl: string }): Promise<DeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { sent: false, warning: 'The secure link was created, but appointment email delivery has not been configured yet.' };
-  const formattedTime = input.startsAt.toLocaleString('en-AU', { dateStyle: 'full', timeStyle: 'short' });
+  const formattedTime = input.startsAt.toLocaleString('en-AU', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Australia/Adelaide', timeZoneName: 'short' });
   const safeName = escapeHtml(input.patientName);
   const safeReason = escapeHtml(input.reason);
   const safeUrl = escapeHtml(input.invitationUrl);
