@@ -24,14 +24,6 @@ function HeartRateTrend({ samples }: { samples: SavedMeasurement[] }) {
   const points = values.map((value, index) => `${(index / (values.length - 1)) * 100},${42 - ((value - min) / range) * 34}`).join(' ');
   return <div className="trend-chart" role="img" aria-label="Heart rate over the current 30-second camera check"><div className="trend-scale"><span>{Math.round(max)}</span><span>{Math.round(min)}</span></div><svg viewBox="0 0 100 46" preserveAspectRatio="none"><polyline points={points} /></svg><div className="trend-axis"><span>Start</span><span>30 seconds</span></div></div>;
 }
-function averageReading(samples: SavedMeasurement[], key: 'heart_rate_bpm' | 'respiratory_rate_bpm' | 'signal_quality') {
-  const readings = samples.map((sample) => Number(sample[key])).filter(Number.isFinite).sort((left, right) => left - right);
-  if (!readings.length) return null;
-  const trim = readings.length >= 7 ? Math.max(1, Math.floor(readings.length * .1)) : 0;
-  const retained = readings.slice(trim, readings.length - trim);
-  return retained.reduce((sum, value) => sum + value, 0) / retained.length;
-}
-
 function values(value: unknown) { return Array.isArray(value) ? value.map(Number).filter(Number.isFinite) : []; }
 function SignalPlot({ title, values: series, tone = 'green', primary = false, detail, xAxis = 'Time (recent samples)', yAxis = 'Normalised amplitude (a.u.)', active = false, onSelect }: { title: string; values: number[]; tone?: 'green' | 'blue' | 'amber'; primary?: boolean; detail?: string; xAxis?: string; yAxis?: string; active?: boolean; onSelect?: () => void }) {
   if (series.length < 2) return <div className="research-plot-empty">Waiting for live engine telemetry…</div>;
@@ -42,17 +34,18 @@ function SignalPlot({ title, values: series, tone = 'green', primary = false, de
 function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unknown> | null }) {
   const [selectedPlot, setSelectedPlot] = useState<'ppg' | 'respiratory' | 'cardiacSpectrum' | 'respiratorySpectrum'>('ppg');
   if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Clinician monitoring workspace</p><h3>Live plethysmography and DSP</h3></div><span>Research use only</span></div><div className="trend-empty">The patient’s live waveforms, spectra, and processing telemetry will appear here as their camera check starts.</div></section>;
-  const engine = (diagnostics.engine ?? {}) as Record<string, unknown>;
+  const engine = (diagnostics.diagnostics ?? {}) as Record<string, unknown>;
   const roi = (diagnostics.roi_weights ?? {}) as Record<string, unknown>;
-  const autonomic = (diagnostics.cardiac_autonomic ?? {}) as Record<string, unknown>;
+  const cardiac = (diagnostics.cardiac ?? {}) as Record<string, unknown>;
+  const respiration = (diagnostics.respiration ?? {}) as Record<string, unknown>;
   const snr = Number(diagnostics.snr_db ?? 0);
   const latency = Number(diagnostics.processing_latency_ms ?? 0);
   const cardiacFrequencies = values(diagnostics.cardiac_spectrum_freq_hz);
   const respirationFrequencies = values(diagnostics.respiration_spectrum_freq_hz);
   const frequencyLabel = (frequencies: number[]) => frequencies.length > 1 ? `${Math.min(...frequencies).toFixed(2)}–${Math.max(...frequencies).toFixed(2)} Hz` : 'Frequency spectrum';
   const plots = {
-    ppg: { title: 'Photoplethysmogram (PPG) waveform', series: values(diagnostics.cardiac_waveform), tone: 'green' as const, detail: 'Filtered optical pulse signal', xAxis: 'Time (recent samples)', yAxis: 'Normalised PPG amplitude (a.u.)' },
-    respiratory: { title: 'Respiratory modulation waveform', series: values(diagnostics.respiratory_waveform), tone: 'blue' as const, detail: 'Live respiratory signal', xAxis: 'Time (recent samples)', yAxis: 'Normalised modulation (a.u.)' },
+    ppg: { title: 'Photoplethysmogram (PPG) waveform', series: values(cardiac.waveform), tone: 'green' as const, detail: 'API optical pulse signal', xAxis: 'Time (API samples)', yAxis: 'Normalised PPG amplitude (a.u.)' },
+    respiratory: { title: 'Respiratory modulation waveform', series: values(respiration.waveform), tone: 'blue' as const, detail: 'API respiratory signal', xAxis: 'Time (API samples)', yAxis: 'Normalised modulation (a.u.)' },
     cardiacSpectrum: { title: 'Cardiac power spectrum', series: values(diagnostics.cardiac_spectrum_power), tone: 'amber' as const, detail: frequencyLabel(cardiacFrequencies), xAxis: 'Frequency (Hz)', yAxis: 'Normalised power' },
     respiratorySpectrum: { title: 'Respiratory power spectrum', series: values(diagnostics.respiration_spectrum_power), tone: 'blue' as const, detail: frequencyLabel(respirationFrequencies), xAxis: 'Frequency (Hz)', yAxis: 'Normalised power' },
   };
@@ -73,7 +66,7 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
     <div className="research-secondary-plots">
       {(Object.entries(plots) as [keyof typeof plots, typeof selected][]).map(([key, plot]) => <SignalPlot key={key} title={plot.title} values={plot.series} tone={plot.tone} detail={plot.detail} xAxis={plot.xAxis} yAxis={plot.yAxis} active={selectedPlot === key} onSelect={() => setSelectedPlot(key)} />)}
     </div>
-    <section className="advanced-telemetry"><div><p className="eyebrow">Expanded engine telemetry</p><h4>Autonomic and ambient-light diagnostics</h4></div><div className="advanced-telemetry-grid"><span><strong>{Number(autonomic.hrv_rmssd_ms ?? 0).toFixed(0)} ms</strong>HRV RMSSD</span><span><strong>{Number(autonomic.hrv_sdnn_ms ?? 0).toFixed(0)} ms</strong>HRV SDNN</span><span><strong>{Number(autonomic.hrv_pnn50_pct ?? 0).toFixed(0)}%</strong>pNN50</span><span><strong>{Number(autonomic.hrv_lf_hf_ratio ?? 0).toFixed(2)}</strong>LF/HF ratio</span><span><strong>{diagnostics.ambient_canceling === true ? `${Number(diagnostics.ambient_cancellation_db ?? 0).toFixed(1)} dB` : 'Inactive'}</strong>Ambient cancellation</span><span><strong>{String(autonomic.stress_level ?? '—')}</strong>Experimental stress label</span></div><p>Research telemetry only. It is not a diagnosis, assessment, or clinical decision tool.</p></section>
+    <section className="advanced-telemetry"><div><p className="eyebrow">Expanded engine telemetry</p><h4>Raw API diagnostics</h4></div><div className="advanced-telemetry-grid"><span><strong>{Number(cardiac.hrv_rmssd_ms ?? 0).toFixed(0)} ms</strong>HRV RMSSD</span><span><strong>{Number(cardiac.hrv_sdnn_ms ?? 0).toFixed(0)} ms</strong>HRV SDNN</span><span><strong>{Number(cardiac.hrv_pnn50_pct ?? 0).toFixed(0)}%</strong>pNN50</span><span><strong>{Number(cardiac.hrv_lf_hf_ratio ?? 0).toFixed(2)}</strong>LF/HF ratio</span><span><strong>{Number(respiration.rqi_pct ?? 0).toFixed(0)}%</strong>Respiratory quality</span><span><strong>{String(respiration.phase ?? '—')}</strong>Breathing phase</span></div><p>Values are rendered directly from the rPPG API. Research telemetry only; not a diagnosis, assessment, or clinical decision tool.</p></section>
     <div className="engine-line">{String(engine.algorithm ?? 'FUSION')} algorithm · motion {Number(engine.motion_velocity ?? 0).toFixed(2)} IOD/s · landmark displacement {Number(engine.motion_displacement_px ?? 0).toFixed(2)} px · spectral entropy {Number(engine.spectral_entropy ?? 0).toFixed(2)} · buffer {String(engine.buffer_samples ?? '—')}/{String(engine.buffer_capacity ?? '—')} samples</div>
   </section>;
 }
@@ -166,9 +159,6 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
   const isRunning = measurement.status === 'preparing' || measurement.status === 'measuring';
   const isComplete = measurement.status === 'complete';
   const isPatient = role === 'patient';
-  const averageHeartRate = averageReading(trend, 'heart_rate_bpm');
-  const averageRespiratoryRate = averageReading(trend, 'respiratory_rate_bpm');
-  const hasAverage = trend.length > 1 && averageHeartRate !== null && averageRespiratoryRate !== null;
 
   if (isPatient) return (
     <aside className={`patient-camera-check ${isRunning ? 'patient-camera-check-active' : ''}`}>
@@ -201,14 +191,14 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         <article>
           <Activity />
           <span>Pulse</span>
-          <strong>{hasAverage ? Math.round(averageHeartRate) : measurement.heartRateBpm ?? '— —'}</strong>
-          <small>{hasAverage ? 'BPM · 30-sec robust average' : 'BPM'}</small>
+          <strong>{measurement.heartRateBpm ?? '— —'}</strong>
+          <small>BPM · current API readout</small>
         </article>
         <article>
           <Wind />
           <span>Breathing</span>
-          <strong>{hasAverage ? Math.round(averageRespiratoryRate) : measurement.respiratoryRate ?? '— —'}</strong>
-          <small>{hasAverage ? 'breaths/min · 30-sec robust average' : 'breaths/min'}</small>
+          <strong>{measurement.respiratoryRate ?? '— —'}</strong>
+          <small>breaths/min · current API readout</small>
         </article>
       </div>
 

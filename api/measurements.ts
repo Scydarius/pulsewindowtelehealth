@@ -21,17 +21,6 @@ const tokenHash = async (token: string) => {
   const digest = await crypto.subtle.digest('SHA-256', encoder.encode(token));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
-const average = (values: Array<number | null>) => {
-  const valid = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-  return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : null;
-};
-const robustAverage = (values: Array<number | null>) => {
-  const valid = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value)).sort((left, right) => left - right);
-  if (!valid.length) return null;
-  const trim = valid.length >= 7 ? Math.max(1, Math.floor(valid.length * 0.1)) : 0;
-  const retained = valid.slice(trim, valid.length - trim);
-  return retained.reduce((sum, value) => sum + value, 0) / retained.length;
-};
 async function requireClinician(request: Request, appointmentId: string) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) throw new Error('Sign in is required.');
@@ -50,25 +39,16 @@ export default {
         const appointmentId = new URL(request.url).searchParams.get('appointmentId');
         if (!appointmentId) return Response.json({ error: 'Appointment is required.' }, { status: 400 });
         const db = await requireClinician(request, appointmentId);
-        const { data, error } = await db.from('measurements').select('measured_at, heart_rate_bpm, respiratory_rate_bpm, signal_quality, algorithm_version, diagnostics').eq('appointment_id', appointmentId).order('measured_at', { ascending: false }).limit(30);
+        const { data, error } = await db.from('measurements').select('measured_at, heart_rate_bpm, respiratory_rate_bpm, signal_quality, algorithm_version, diagnostics').eq('appointment_id', appointmentId).order('measured_at', { ascending: false });
         if (error) throw new Error('Unable to load the patient measurement.');
         const measurements = (data ?? []).reverse();
-        const summary = measurements.length ? {
-          sample_count: measurements.length,
-          average_heart_rate_bpm: robustAverage(measurements.map((measurement) => measurement.heart_rate_bpm)),
-          average_respiratory_rate_bpm: robustAverage(measurements.map((measurement) => measurement.respiratory_rate_bpm)),
-          average_signal_quality: average(measurements.map((measurement) => measurement.signal_quality)),
-          started_at: measurements[0]?.measured_at ?? null,
-          ended_at: measurements.at(-1)?.measured_at ?? null,
-        } : null;
-        return Response.json({ measurement: measurements.at(-1) ?? null, measurements, summary }, { headers: { 'Cache-Control': 'no-store' } });
+        return Response.json({ measurement: measurements.at(-1) ?? null, measurements }, { headers: { 'Cache-Control': 'no-store' } });
       }
       if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 });
       const body = await request.json() as MeasurementBody;
       const { appointmentId, invitationToken, heartRateBpm, respiratoryRateBpm, signalQuality, algorithmVersion, diagnostics } = body;
       if (!appointmentId || !invitationToken || invitationToken.length < 32) throw new Error('A valid patient link is required to save a measurement.');
       if (![heartRateBpm, respiratoryRateBpm, signalQuality].every(Number.isFinite)) throw new Error('A valid measurement is required.');
-      if (heartRateBpm! < 25 || heartRateBpm! > 240 || respiratoryRateBpm! < 2 || respiratoryRateBpm! > 80 || signalQuality! < 0 || signalQuality! > 1) throw new Error('Measurement values were outside the permitted prototype range.');
       const db = database();
       const { data: invite } = await db.from('patient_invites').select('appointment_id, expires_at, revoked_at').eq('token_hash', await tokenHash(invitationToken)).maybeSingle();
       if (!invite || invite.appointment_id !== appointmentId || invite.revoked_at || new Date(invite.expires_at) <= new Date()) throw new Error('This patient link is not authorised to save a measurement.');

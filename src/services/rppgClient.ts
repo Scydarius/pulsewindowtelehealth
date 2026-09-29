@@ -19,10 +19,9 @@ export type MeasurementUpdate = {
 const CAPTURE_WINDOW_MS = 30_000;
 const SETUP_TIMEOUT_MS = 90_000;
 const ACTIVE_RPPG_ALGORITHM = 'FUSION';
-// The original validated browser stream ran at 15 FPS.  Keeping the browser,
-// pipeline timing and face-mesh motion model on the same cadence avoids
-// treating normal landmark jitter as continuous head movement.
-const CAPTURE_FPS = 15;
+// Keep capture in lockstep with the API session. The engine, rather than the
+// browser, owns all temporal signal processing.
+const CAPTURE_FPS = 30;
 
 export interface RppgClient {
   startMeasurement(context: MeasurementContext, onUpdate: (update: MeasurementUpdate) => void): Promise<() => void>;
@@ -104,7 +103,6 @@ class WebSocketRppgClient implements RppgClient {
     let stopped = false;
     let receivedReady = false;
     let serverFailureMessage = '';
-    let lastUpdateAt = 0;
     let latestSample: MeasurementUpdate['sample'];
     let completed = false;
     let recordingStartedAt: number | undefined;
@@ -118,7 +116,7 @@ class WebSocketRppgClient implements RppgClient {
       video.srcObject = null;
       context.onCameraStream?.(null);
       if (latestSample) {
-        onUpdate({ status: 'complete', progress: 100, signalQuality: latestSample.signalQuality, heartRateBpm: latestSample.heartRateBpm, respiratoryRate: latestSample.respiratoryRate, message: '30-second camera check complete', algorithmVersion: 'railway-rppg-2.16', faceDetected: true, trackingState: 'LOCKED', sample: latestSample });
+        onUpdate({ status: 'complete', progress: 100, signalQuality: latestSample.signalQuality, heartRateBpm: latestSample.heartRateBpm, respiratoryRate: latestSample.respiratoryRate, message: '30-second camera check complete', algorithmVersion: 'railway-rppg-2.16', faceDetected: true, trackingState: 'LOCKED', diagnostics: latestSample.diagnostics, sample: latestSample });
       } else {
         onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'No stable reading was received during the 30-second camera check.' });
       }
@@ -171,42 +169,16 @@ class WebSocketRppgClient implements RppgClient {
         const candidateSample = acceptedByEngine && recordingStartedAt
           ? {
               capturedAt: new Date().toISOString(), heartRateBpm: bpm, respiratoryRate: brpm, signalQuality: quality,
-              diagnostics: {
-                snr_db: Number(eventData.snr_db ?? 0),
-                quality_score: quality,
-                tracking_state: state,
-                face_detected: eventData.face_detected === true,
-                motion_detected: motionDetected,
-                processing_latency_ms: Number(eventData.processing_latency_ms ?? 0),
-                roi_weights: eventData.roi_weights ?? {},
-                cardiac_waveform: (eventData.cardiac as { waveform?: unknown[] } | undefined)?.waveform ?? [],
-                respiratory_waveform: (eventData.respiration as { waveform?: unknown[] } | undefined)?.waveform ?? [],
-                cardiac_spectrum_freq_hz: eventData.cardiac_spectrum_freq_hz ?? [],
-                cardiac_spectrum_power: eventData.cardiac_spectrum_power ?? [],
-                respiration_spectrum_freq_hz: eventData.respiration_spectrum_freq_hz ?? [],
-                respiration_spectrum_power: eventData.respiration_spectrum_power ?? [],
-                ambient_canceling: eventData.ambient_canceling === true,
-                ambient_cancellation_db: Number(eventData.ambient_cancellation_db ?? 0),
-                cardiac_autonomic: {
-                  hrv_rmssd_ms: cardiac?.hrv_rmssd_ms ?? null,
-                  hrv_sdnn_ms: cardiac?.hrv_sdnn_ms ?? null,
-                  hrv_pnn50_pct: cardiac?.hrv_pnn50_pct ?? null,
-                  hrv_lf_hf_ratio: cardiac?.hrv_lf_hf_ratio ?? null,
-                  stress_index: cardiac?.stress_index ?? null,
-                  stress_score: cardiac?.stress_score ?? null,
-                  stress_level: cardiac?.stress_level ?? null,
-                },
-                engine: { ...(eventData.diagnostics as Record<string, unknown> ?? {}), algorithm: ACTIVE_RPPG_ALGORITHM },
-              },
+              // Save the complete telemetry message verbatim. Rendering is a
+              // view of the API response, not a second signal-processing pass.
+              diagnostics: eventData,
             }
           : undefined;
         if (candidateSample) latestSample = candidateSample;
-        if (now - lastUpdateAt < 900) return;
-        lastUpdateAt = now;
         const sample = candidateSample;
         const captureElapsed = recordingStartedAt ? Math.min(CAPTURE_WINDOW_MS, now - recordingStartedAt) : 0;
         const message = recordingStartedAt ? `Recording · ${Math.ceil((CAPTURE_WINDOW_MS - captureElapsed) / 1000)}s remaining` : state === 'SEARCHING' ? 'Face not found — centre your face in the camera' : motionDetected || state === 'HOLDING' ? 'Movement detected — hold still' : 'Calibrating the rPPG engine…';
-        onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : 5, signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: `${ACTIVE_RPPG_ALGORITHM.toLowerCase()}-rppg-2.16`, faceDetected: eventData.face_detected === true, trackingState: state, diagnostics: candidateSample?.diagnostics, sample });
+        onUpdate({ status: recordingStartedAt ? 'measuring' : 'preparing', progress: recordingStartedAt ? Math.min(99, Math.round((captureElapsed / CAPTURE_WINDOW_MS) * 100)) : 5, signalQuality: quality, heartRateBpm: latestSample?.heartRateBpm ?? null, respiratoryRate: latestSample?.respiratoryRate ?? null, message, algorithmVersion: `${ACTIVE_RPPG_ALGORITHM.toLowerCase()}-rppg-2.16`, faceDetected: eventData.face_detected === true, trackingState: state, diagnostics: eventData, sample });
       }
     });
     socket.addEventListener('error', () => {

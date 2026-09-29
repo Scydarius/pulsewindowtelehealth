@@ -13,7 +13,6 @@ export function PatientProfilePage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string>();
-  const [sort, setSort] = useState<'recent' | 'quality'>('recent');
 
   useEffect(() => {
     let active = true;
@@ -25,13 +24,9 @@ export function PatientProfilePage() {
   if (loading) return <div className="workspace-state"><LoaderCircle className="spin" /><strong>Loading patient history…</strong></div>;
   if (error || !patient) return <div className="workspace-state"><strong>Patient profile unavailable</strong><span>{error || 'This patient could not be found.'}</span><Link className="button button-primary" to="/clinician">Back to workspace</Link></div>;
 
-  const completed = patient.appointments.filter((appointment) => appointment.summary).length;
-  const allSummaries = patient.appointments.map((appointment) => appointment.summary).filter((summary): summary is NonNullable<typeof summary> => Boolean(summary));
-  const summariesWithHeartRate = allSummaries.filter((summary) => summary.average_heart_rate_bpm !== null);
-  const averageHeartRate = summariesWithHeartRate.length ? summariesWithHeartRate.reduce((sum, summary) => sum + (summary.average_heart_rate_bpm ?? 0), 0) / summariesWithHeartRate.length : null;
-  const appointments = [...patient.appointments].sort((left, right) => sort === 'quality'
-    ? (right.summary?.average_signal_quality ?? -1) - (left.summary?.average_signal_quality ?? -1)
-    : new Date(right.starts_at).valueOf() - new Date(left.starts_at).valueOf());
+  const completed = patient.appointments.filter((appointment) => appointment.measurements.length > 0).length;
+  const sampleCount = patient.appointments.reduce((total, appointment) => total + appointment.measurements.length, 0);
+  const appointments = [...patient.appointments].sort((left, right) => new Date(right.starts_at).valueOf() - new Date(left.starts_at).valueOf());
 
   return <div className="patient-profile-page">
     <Link className="back-link" to="/clinician"><ArrowLeft size={18} /> Back to workspace</Link>
@@ -42,20 +37,20 @@ export function PatientProfilePage() {
     <section className="summary-strip patient-history-summary">
       <article><div><CalendarClock /></div><span><strong>{patient.appointments.length}</strong>Appointments</span></article>
       <article><div><Activity /></div><span><strong>{completed}</strong>Completed checks</span></article>
-      <article><div><ClipboardList /></div><span><strong>{number(averageHeartRate)}{averageHeartRate === null ? '' : ' BPM'}</strong>Mean across checks</span></article>
+      <article><div><ClipboardList /></div><span><strong>{sampleCount}</strong>Saved API samples</span></article>
     </section>
     <section className="panel patient-history-panel">
-      <div className="section-heading patient-history-heading"><div><p className="eyebrow">Longitudinal record</p><h2>Appointments and measurements</h2><p>Pulse and breathing use a robust 30-second average, excluding only extreme readings. Signal quality is displayed separately and can be used to sort the record. Research data only; not diagnostic.</p></div><label className="patient-history-sort">Sort appointments<select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}><option value="recent">Most recent</option><option value="quality">Highest signal quality</option></select></label></div>
+      <div className="section-heading patient-history-heading"><div><p className="eyebrow">Longitudinal record</p><h2>Appointments and measurements</h2><p>Each saved sample is shown exactly as returned by the rPPG API. No portal-side averaging or quality weighting is applied. Research data only; not diagnostic.</p></div></div>
       <div className="patient-history-list">
         {appointments.map((appointment) => <article className="patient-history-card" key={appointment.id}>
           <div className="patient-history-main"><div><strong>{appointment.reason}</strong><span>{dateTime(appointment.starts_at)}</span></div><Link className="button button-secondary button-small" to={`/consultation/${appointment.id}?role=clinician`}>Open consultation</Link></div>
-          {appointment.summary ? <>
-            <div className="patient-measurement-summary">
-              <div><span>30-sec robust pulse</span><strong>{number(appointment.summary.average_heart_rate_bpm)} <small>BPM</small></strong></div>
-              <div><span>30-sec robust breathing</span><strong>{number(appointment.summary.average_respiratory_rate_bpm)} <small>breaths/min</small></strong></div>
-              <div><span>Average signal quality</span><strong>{number(appointment.summary.average_signal_quality === null ? null : appointment.summary.average_signal_quality * 100)}<small>%</small></strong></div>
-              <div><span>Saved samples</span><strong>{appointment.summary.sample_count}</strong></div>
-            </div>
+          {appointment.measurements.length ? <>
+            {(() => { const latest = appointment.measurements.at(-1)!; return <div className="patient-measurement-summary">
+              <div><span>Latest API pulse</span><strong>{number(latest.heart_rate_bpm)} <small>BPM</small></strong></div>
+              <div><span>Latest API breathing</span><strong>{number(latest.respiratory_rate_bpm)} <small>breaths/min</small></strong></div>
+              <div><span>Latest API signal quality</span><strong>{number(latest.signal_quality * 100)}<small>%</small></strong></div>
+              <div><span>Saved API samples</span><strong>{appointment.measurements.length}</strong></div>
+            </div>; })()}
             <button className="text-button" onClick={() => setExpanded(expanded === appointment.id ? undefined : appointment.id)}>{expanded === appointment.id ? 'Hide raw samples' : `View all ${appointment.measurements.length} samples`}</button>
             {expanded === appointment.id && <div className="raw-measurement-table" aria-label="All saved measurement samples"><div className="raw-measurement-heading"><span>Captured</span><span>Pulse</span><span>Breathing</span><span>Quality</span></div>{appointment.measurements.map((measurement) => <div key={measurement.measured_at} className="raw-measurement-row"><span>{dateTime(measurement.measured_at)}</span><span>{number(measurement.heart_rate_bpm)} BPM</span><span>{number(measurement.respiratory_rate_bpm)} /min</span><span>{number(measurement.signal_quality * 100)}%</span></div>)}</div>}
           </> : <p className="patient-history-empty"><UserRound size={17} /> No saved camera-check readings for this appointment.</p>}

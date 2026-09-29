@@ -6,18 +6,6 @@ const database = () => {
   if (!url || !serviceRoleKey) throw new Error('The clinical database is not configured.');
   return createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
 };
-const average = (values: Array<number | null>) => {
-  const valid = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-  return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : null;
-};
-const robustAverage = (values: Array<number | null>) => {
-  const valid = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value)).sort((left, right) => left - right);
-  if (!valid.length) return null;
-  const trim = valid.length >= 7 ? Math.max(1, Math.floor(valid.length * 0.1)) : 0;
-  const retained = valid.slice(trim, valid.length - trim);
-  return retained.reduce((sum, value) => sum + value, 0) / retained.length;
-};
-
 export default {
   async fetch(request: Request) {
     if (request.method !== 'GET') return Response.json({ error: 'Method not allowed' }, { status: 405 });
@@ -48,18 +36,7 @@ export default {
       }
       const history = (appointments ?? []).map((appointment) => {
         const samples = samplesByAppointment.get(appointment.id) ?? [];
-        return {
-          id: appointment.id, reason: appointment.reason, starts_at: appointment.starts_at, created_at: appointment.created_at,
-          measurements: samples,
-          summary: samples.length ? {
-            sample_count: samples.length,
-            average_heart_rate_bpm: robustAverage(samples.map((sample) => sample.heart_rate_bpm)),
-            average_respiratory_rate_bpm: robustAverage(samples.map((sample) => sample.respiratory_rate_bpm)),
-            average_signal_quality: average(samples.map((sample) => sample.signal_quality)),
-            started_at: samples[0]?.measured_at ?? null,
-            ended_at: samples.at(-1)?.measured_at ?? null,
-          } : null,
-        };
+        return { id: appointment.id, reason: appointment.reason, starts_at: appointment.starts_at, created_at: appointment.created_at, measurements: samples };
       });
       return Response.json({ patient: { email, display_name: patients.at(-1)?.display_name ?? 'Patient', appointments: history } }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {

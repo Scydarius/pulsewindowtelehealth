@@ -35,8 +35,7 @@ export async function claimInitialAdministratorAccess() {
 }
 
 export type SavedMeasurement = { measured_at: string; heart_rate_bpm: number; respiratory_rate_bpm: number; signal_quality: number; algorithm_version: string | null; diagnostics?: Record<string, unknown> | null };
-export type MeasurementSummary = { sample_count: number; average_heart_rate_bpm: number | null; average_respiratory_rate_bpm: number | null; average_signal_quality: number | null; started_at: string | null; ended_at: string | null };
-export type PatientProfile = { email: string; display_name: string; appointments: Array<{ id: string; reason: string; starts_at: string; created_at: string; summary: MeasurementSummary | null; measurements: SavedMeasurement[] }> };
+export type PatientProfile = { email: string; display_name: string; appointments: Array<{ id: string; reason: string; starts_at: string; created_at: string; measurements: SavedMeasurement[] }> };
 
 export async function savePatientMeasurement(input: { appointmentId: string; invitationToken: string; heartRateBpm: number; respiratoryRateBpm: number; signalQuality: number; algorithmVersion?: string; diagnostics?: Record<string, unknown> }) {
   const response = await fetch('/api/measurements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
