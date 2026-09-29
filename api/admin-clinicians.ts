@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 
 type CreateBody = { email?: string; displayName?: string };
 type ManageBody = { action?: 'update' | 'reset_password' | 'repair'; clinicianId?: string; displayName?: string; isAdmin?: boolean };
+type VercelRequest = { method?: string; body?: unknown; headers: Record<string, string | string[] | undefined> };
+type VercelResponse = { status: (code: number) => { json: (body: unknown) => void } };
 
 const appUrl = (request: Request, path: string) => `${(process.env.APP_URL || new URL(request.url).origin).replace(/\/$/, '')}${path}`;
 function database() {
@@ -26,8 +28,7 @@ async function findUser(db: ReturnType<typeof database>, clinicianId: string) {
   return data.users.find((user) => user.id === clinicianId);
 }
 
-export default {
-  async fetch(request: Request) {
+async function handle(request: Request) {
     try {
       const { db, administratorId } = await requireAdministrator(request);
       if (request.method === 'GET') {
@@ -92,5 +93,16 @@ export default {
     } catch (error) {
       return Response.json({ error: error instanceof Error ? error.message : 'Unable to manage clinician.' }, { status: 400 });
     }
-  },
-};
+}
+
+export default async function adminClinicians(request: VercelRequest, response: VercelResponse) {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(request.headers)) if (value) headers.set(name, Array.isArray(value) ? value[0] : value);
+  const host = Array.isArray(request.headers.host) ? request.headers.host[0] : request.headers.host;
+  const method = request.method ?? 'GET';
+  const body = method === 'GET' ? undefined : JSON.stringify(request.body ?? {});
+  const webRequest = new Request(`https://${host ?? 'www.ventricura.com'}/api/admin-clinicians`, { method, headers, body });
+  const result = await handle(webRequest);
+  const payload = await result.json().catch(() => ({ error: 'The clinician administration service is unavailable.' }));
+  return response.status(result.status).json(payload);
+}
