@@ -4,6 +4,7 @@ import {
   fetchGoogleEmail,
   generateGoogleAuthUrl,
   getCallbackUrl,
+  getValidGoogleAccessToken,
   isGoogleCalendarConfigured,
   verifyOAuthState,
 } from '../lib/googleCalendar.js';
@@ -71,18 +72,22 @@ export default {
             const db = database();
             const expiresAt = new Date(Date.now() + tokens.expiresIn * 1000).toISOString();
 
+            const upsertPayload: Record<string, unknown> = {
+              clinician_id: verified.clinicianId,
+              provider: 'google',
+              access_token: tokens.accessToken,
+              access_token_expires_at: expiresAt,
+              calendar_email: email,
+              calendar_id: 'primary',
+              sync_enabled: true,
+              updated_at: new Date().toISOString(),
+            };
+            if (tokens.refreshToken) {
+              upsertPayload.refresh_token = tokens.refreshToken;
+            }
+
             const { error: upsertError } = await db.from('clinician_calendar_integrations').upsert(
-              {
-                clinician_id: verified.clinicianId,
-                provider: 'google',
-                refresh_token: tokens.refreshToken,
-                access_token: tokens.accessToken,
-                access_token_expires_at: expiresAt,
-                calendar_email: email,
-                calendar_id: 'primary',
-                sync_enabled: true,
-                updated_at: new Date().toISOString(),
-              },
+              upsertPayload,
               { onConflict: 'clinician_id' }
             );
 
@@ -122,6 +127,95 @@ export default {
           const origin = process.env.APP_URL || url.origin;
           const authUrl = await generateGoogleAuthUrl(origin, clinician.id);
           return Response.json({ authUrl }, { headers: { 'Cache-Control': 'no-store' } });
+        }
+
+        if (action === 'test-sync') {
+          const { db, clinician } = await requireClinician(request);
+          const { data: integration, error: intError } = await db
+            .from('clinician_calendar_integrations')
+            .select('*')
+            .eq('clinician_id', clinician.id)
+            .maybeSingle();
+
+          if (!integration) {
+            return Response.json({
+              success: false,
+              step: 'database',
+              message: 'No calendar integration record found in database for your clinician account.',
+              error: intError?.message,
+            });
+          }
+
+          const accessToken = await getValidGoogleAccessToken(db, clinician.id);
+          if (!accessToken) {
+            return Response.json({
+              success: false,
+              step: 'token_refresh',
+              message: 'Could not obtain or refresh Google access token. Please disconnect and reconnect.',
+              hasRefreshToken: Boolean(integration.refresh_token),
+            });
+          }
+
+          // Test CalendarList API to check available calendars
+          const calListRes = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          const calListStatus = calListRes.status;
+          const calListBody = await calListRes.json().catch(() => null);
+
+          // Test Google FreeBusy API
+          const now = new Date();
+          const timeMin = now.toISOString();
+          const timeMax = new Date(now.getTime() + 7 * 24 * 3600 * 1000).toISOString();
+          const freeBusyRes = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              timeMin,
+              timeMax,
+              items: [{ id: 'primary' }],
+            }),
+          });
+          const freeBusyStatus = freeBusyRes.status;
+          const freeBusyBody = await freeBusyRes.json().catch(() => null);
+
+          // Test Google Create Event API
+          const testStart = new Date(now.getTime() + 3600 * 1000).toISOString();
+          const testEnd = new Date(now.getTime() + 5400 * 1000).toISOString();
+          const createRes = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              summary: 'Ventricura Sync Test (Safe to delete)',
+              description: 'Ventricura verified write permissions to your Google Calendar.',
+              start: { dateTime: testStart },
+              end: { dateTime: testEnd },
+            }),
+          });
+          const createStatus = createRes.status;
+          const createBody = await createRes.json().catch(() => null);
+
+          // Clean up the test event immediately if created
+          if (createStatus === 200 && createBody?.id) {
+            await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(createBody.id)}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${accessToken}` },
+            }).catch(() => {});
+          }
+
+          return Response.json({
+            success: freeBusyStatus === 200 && createStatus === 200,
+            email: integration.calendar_email,
+            calendarList: { status: calListStatus, count: calListBody?.items?.length, error: calListBody?.error },
+            freeBusy: { status: freeBusyStatus, details: freeBusyBody },
+            createEvent: { status: createStatus, details: createBody },
+          }, { headers: { 'Cache-Control': 'no-store' } });
         }
 
         return Response.json({ error: 'Unknown calendar action.' }, { status: 400 });

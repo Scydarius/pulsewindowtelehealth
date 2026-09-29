@@ -214,3 +214,23 @@ export async function toggleGoogleCalendarSync(enabled: boolean): Promise<boolea
   return body.syncEnabled ?? enabled;
 }
 
+export type GoogleSyncDiagnostic = {
+  success: boolean;
+  step?: string;
+  message?: string;
+  email?: string;
+  calendarList?: { status: number; count?: number; error?: unknown };
+  freeBusy?: { status: number; details?: unknown };
+  createEvent?: { status: number; details?: unknown };
+  error?: string;
+};
+
+export async function testGoogleCalendarSync(): Promise<GoogleSyncDiagnostic> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/google-calendar?action=test-sync', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return response.json();
+}
+
+

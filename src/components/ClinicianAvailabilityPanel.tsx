@@ -9,6 +9,7 @@ import {
   Link2,
   LoaderCircle,
   Power,
+  RefreshCw,
   Save,
   Unlink,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ import {
   loadClinicianBookingSettings,
   loadGoogleCalendarStatus,
   saveClinicianBookingSettings,
+  testGoogleCalendarSync,
   toggleGoogleCalendarSync,
 } from '../services/clinicAccess';
 
@@ -40,6 +42,8 @@ export function ClinicianAvailabilityPanel() {
   const [schedule, setSchedule] = useState<BookingAvailabilityDay[]>(fallbackSchedule);
   const [calendarStatus, setCalendarStatus] = useState<GoogleCalendarStatus>();
   const [connectingCalendar, setConnectingCalendar] = useState(false);
+  const [testingSync, setTestingSync] = useState(false);
+  const [diagnosticDetail, setDiagnosticDetail] = useState<string | null>(null);
   const [calendarNotice, setCalendarNotice] = useState<{ tone: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -162,6 +166,62 @@ export function ClinicianAvailabilityPanel() {
         tone: 'error',
         text: error instanceof Error ? error.message : 'Could not update calendar sync setting.',
       });
+    }
+  };
+
+  const handleTestSync = async () => {
+    setTestingSync(true);
+    setCalendarNotice(null);
+    setDiagnosticDetail(null);
+    try {
+      const res = await testGoogleCalendarSync();
+      if (res.success) {
+        setCalendarNotice({
+          tone: 'success',
+          text: `Google Calendar test passed! Verified Free/Busy access (${res.calendarList?.count ?? 1} calendar(s) monitored) and appointment event creation.`,
+        });
+      } else {
+        const calErr =
+          (res.calendarList?.error as { message?: string })?.message ||
+          (res.freeBusy?.details as { error?: { message?: string } })?.error?.message ||
+          (res.createEvent?.details as { error?: { message?: string } })?.error?.message ||
+          res.message ||
+          res.error ||
+          'Google returned an error.';
+
+        const isApiDisabled =
+          typeof calErr === 'string' &&
+          (calErr.includes('Google Calendar API has not been used') || calErr.includes('disabled'));
+        const isPermission =
+          typeof calErr === 'string' &&
+          (calErr.includes('insufficient') || calErr.includes('Permission') || res.freeBusy?.status === 401);
+
+        if (isApiDisabled) {
+          setCalendarNotice({
+            tone: 'error',
+            text: 'Google Calendar API is not yet enabled in your Google Cloud Console project (587139304907). It must be enabled for Ventricura to check conflicts and create events.',
+          });
+          setDiagnosticDetail('https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=587139304907');
+        } else if (isPermission) {
+          setCalendarNotice({
+            tone: 'error',
+            text: 'Google permission scope missing or revoked. Please disconnect and reconnect Google Calendar.',
+          });
+        } else {
+          setCalendarNotice({
+            tone: 'error',
+            text: `Calendar test issue: ${calErr}`,
+          });
+          setDiagnosticDetail(JSON.stringify(res, null, 2));
+        }
+      }
+    } catch (err) {
+      setCalendarNotice({
+        tone: 'error',
+        text: err instanceof Error ? err.message : 'Could not test Google Calendar sync.',
+      });
+    } finally {
+      setTestingSync(false);
     }
   };
 
@@ -312,6 +372,16 @@ export function ClinicianAvailabilityPanel() {
                 </label>
                 <button
                   type="button"
+                  className="calendar-sync-btn-test"
+                  onClick={() => void handleTestSync()}
+                  disabled={testingSync}
+                  title="Test that Google Calendar API is enabled and active"
+                >
+                  {testingSync ? <LoaderCircle className="spin" size={13} /> : <RefreshCw size={13} />}
+                  {testingSync ? 'Testing…' : 'Test Sync'}
+                </button>
+                <button
+                  type="button"
                   className="calendar-sync-btn-disconnect"
                   onClick={() => void handleDisconnectCalendar()}
                 >
@@ -335,7 +405,37 @@ export function ClinicianAvailabilityPanel() {
         {calendarNotice && (
           <div className={`calendar-notice-box ${calendarNotice.tone}`}>
             {calendarNotice.tone === 'error' ? <CircleAlert size={16} /> : <Check size={16} />}
-            <span>{calendarNotice.text}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span>{calendarNotice.text}</span>
+              {diagnosticDetail && diagnosticDetail.startsWith('https://') && (
+                <div>
+                  <a
+                    href={diagnosticDetail}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#1b1d1b',
+                      color: '#f6f6f1',
+                      padding: '7px 12px',
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.72rem',
+                      marginTop: '4px',
+                    }}
+                  >
+                    <ExternalLink size={13} /> 1-Click: Enable Google Calendar API in Google Cloud
+                  </a>
+                </div>
+              )}
+              {diagnosticDetail && !diagnosticDetail.startsWith('https://') && (
+                <pre style={{ margin: '6px 0 0', padding: '8px', background: '#fff', border: '1px solid #dcded7', fontSize: '0.68rem', overflowX: 'auto', maxHeight: '160px' }}>
+                  {diagnosticDetail}
+                </pre>
+              )}
+            </div>
           </div>
         )}
       </section>

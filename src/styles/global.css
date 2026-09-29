@@ -637,6 +637,9 @@ h1, h2, h3, p { margin-top: 0; }
 .calendar-sync-btn-connect:hover { background: #343733; }
 .calendar-sync-btn-disconnect { display: inline-flex; align-items: center; gap: 6px; background: transparent; color: #842323; border: 1px solid #d4a6a6; padding: 7px 12px; font-size: .72rem; font-weight: 600; cursor: pointer; }
 .calendar-sync-btn-disconnect:hover { background: #fbebeb; border-color: #b84343; }
+.calendar-sync-btn-test { display: inline-flex; align-items: center; gap: 6px; background: #fff; color: #1c1e1b; border: 1px solid #c7c9c2; padding: 7px 12px; font-size: .72rem; font-weight: 600; cursor: pointer; transition: background .15s ease; }
+.calendar-sync-btn-test:hover:not(:disabled) { background: #e6e8e2; }
+.calendar-sync-btn-test:disabled { opacity: 0.6; cursor: not-allowed; }
 .calendar-notice-box { margin-top: 14px; padding: 11px 14px; font-size: .74rem; display: flex; align-items: center; gap: 9px; }
 .calendar-notice-box.success { background: #eaf5eb; border: 1px solid #c2e2c5; color: #1e5c26; }
 .calendar-notice-box.error { background: #fbeeee; border: 1px solid #eecaca; color: #7f2222; }

@@ -233,9 +233,32 @@ export async function getGoogleFreeBusy(
     const calendarEmail = integration?.calendar_email;
 
     const items: Array<{ id: string }> = [{ id: calendarId }];
-    if (calendarEmail && calendarEmail !== calendarId) {
+    if (calendarEmail && calendarEmail.toLowerCase() !== calendarId.toLowerCase()) {
       items.push({ id: calendarEmail });
     }
+
+    // Discover and include all user's calendars (work, personal, shared)
+    try {
+      const calListRes = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (calListRes.ok) {
+        const calListData = await calListRes.json() as { items?: Array<{ id: string; selected?: boolean }> };
+        if (Array.isArray(calListData.items)) {
+          for (const cal of calListData.items) {
+            if (cal.id && !items.some((i) => i.id.toLowerCase() === cal.id.toLowerCase())) {
+              items.push({ id: cal.id });
+            }
+          }
+        }
+      }
+    } catch {
+      // Continue with default items
+    }
+
+    // Expand query range by 2 hours on each side to ensure all boundary events are captured
+    const expandedMin = new Date(new Date(timeMin).valueOf() - 2 * 3600_000).toISOString();
+    const expandedMax = new Date(new Date(timeMax).valueOf() + 2 * 3600_000).toISOString();
 
     const response = await fetch(`${GOOGLE_CALENDAR_API}/freeBusy`, {
       method: 'POST',
@@ -244,8 +267,8 @@ export async function getGoogleFreeBusy(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        timeMin,
-        timeMax,
+        timeMin: expandedMin,
+        timeMax: expandedMax,
         timeZone,
         items,
       }),
@@ -352,6 +375,19 @@ export async function createGoogleCalendarEvent(
       console.warn('Google Calendar create event with attendees failed, retrying without attendees:', response.status, errBody);
       delete eventPayload.attendees;
       response = await fetch(`${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventPayload),
+      });
+    }
+
+    if (!response.ok && calendarId !== 'primary') {
+      const errBody = await response.text().catch(() => '');
+      console.warn('Google Calendar create event on custom calendar failed, falling back to primary:', response.status, errBody);
+      response = await fetch(`${GOOGLE_CALENDAR_API}/calendars/primary/events`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
