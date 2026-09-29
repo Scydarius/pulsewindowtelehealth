@@ -83,7 +83,10 @@ export async function verifyOAuthState(state: string): Promise<{ clinicianId: st
 export function getCallbackUrl(origin: string): string {
   const configured = getGoogleRedirectUri();
   if (configured) return configured;
-  return `${origin.replace(/\/$/, '')}/api/google-calendar-callback`;
+  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    return `${origin.replace(/\/$/, '')}/api/google-calendar-callback`;
+  }
+  return 'https://www.ventricura.com/api/google-calendar-callback';
 }
 
 export async function generateGoogleAuthUrl(origin: string, clinicianId: string): Promise<string> {
