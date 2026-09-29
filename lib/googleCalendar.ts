@@ -13,8 +13,20 @@ const SCOPES = [
 
 const encoder = new TextEncoder();
 
+function getGoogleClientId(): string {
+  return (process.env.GOOGLE_CLIENT_ID ?? '').trim().replace(/^["']|["']$/g, '');
+}
+
+function getGoogleClientSecret(): string {
+  return (process.env.GOOGLE_CLIENT_SECRET ?? '').trim().replace(/^["']|["']$/g, '');
+}
+
+function getGoogleRedirectUri(): string {
+  return (process.env.GOOGLE_REDIRECT_URI ?? '').trim().replace(/^["']|["']$/g, '');
+}
+
 export function isGoogleCalendarConfigured(): boolean {
-  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  return Boolean(getGoogleClientId() && getGoogleClientSecret());
 }
 
 function base64Url(value: Uint8Array | string) {
@@ -69,12 +81,13 @@ export async function verifyOAuthState(state: string): Promise<{ clinicianId: st
 }
 
 export function getCallbackUrl(origin: string): string {
-  if (process.env.GOOGLE_REDIRECT_URI) return process.env.GOOGLE_REDIRECT_URI;
+  const configured = getGoogleRedirectUri();
+  if (configured) return configured;
   return `${origin.replace(/\/$/, '')}/api/google-calendar-callback`;
 }
 
 export async function generateGoogleAuthUrl(origin: string, clinicianId: string): Promise<string> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId = getGoogleClientId();
   if (!clientId) throw new Error('Google Calendar integration is not configured. Missing GOOGLE_CLIENT_ID.');
   const redirectUri = getCallbackUrl(origin);
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.RPPG_TICKET_SECRET || 'ventricura-calendar-secret';
@@ -95,8 +108,8 @@ export async function generateGoogleAuthUrl(origin: string, clinicianId: string)
 }
 
 export async function exchangeGoogleCode(code: string, redirectUri: string) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId = getGoogleClientId();
+  const clientSecret = getGoogleClientSecret();
   if (!clientId || !clientSecret) throw new Error('Google credentials are not configured.');
 
   const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
@@ -162,8 +175,8 @@ export async function getValidGoogleAccessToken(db: SupabaseClient, clinicianId:
   }
 
   // Need refresh
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId = getGoogleClientId();
+  const clientSecret = getGoogleClientSecret();
   if (!clientId || !clientSecret || !integration.refresh_token) return null;
 
   try {
