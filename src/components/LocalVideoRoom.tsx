@@ -118,7 +118,7 @@ export default function LocalVideoRoom({ appointmentId, displayName, role }: Loc
 
   useEffect(() => {
     let active = true;
-    const roomName = `pulsewindow-local-${appointmentId}`;
+    const roomName = `ventricura-local-${appointmentId}`;
     const channel = new BroadcastChannel(roomName);
     channelRef.current = channel;
 

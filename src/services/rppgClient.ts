@@ -99,6 +99,7 @@ class WebSocketRppgClient implements RppgClient {
     const drawingContext = canvas.getContext('2d');
     const socket = new WebSocket(ticket.websocketUrl);
     let interval: number | undefined;
+    let encodingFrame = false;
 
     let stopped = false;
     let receivedReady = false;
@@ -144,9 +145,16 @@ class WebSocketRppgClient implements RppgClient {
         receivedReady = true;
         onUpdate({ status: 'preparing', progress: 5, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'Checking lighting and face position…' });
         interval = window.setInterval(() => {
-          if (socket.readyState !== WebSocket.OPEN || !drawingContext) return;
+          // Mirror the live demo transport: do not pile JPEG encodes or frames
+          // onto a slow connection. The rPPG engine receives one raw camera
+          // frame at a time, at up to 30 FPS, with no browser-side averaging.
+          if (socket.readyState !== WebSocket.OPEN || !drawingContext || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || encodingFrame || socket.bufferedAmount > 128_000) return;
           drawingContext.drawImage(video, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((blob) => { if (blob && socket.readyState === WebSocket.OPEN) socket.send(blob); }, 'image/jpeg', 0.75);
+          encodingFrame = true;
+          canvas.toBlob((blob) => {
+            encodingFrame = false;
+            if (blob && socket.readyState === WebSocket.OPEN) socket.send(blob);
+          }, 'image/jpeg', 0.75);
         }, 1000 / CAPTURE_FPS);
       }
       if (eventData.type === 'telemetry') {
@@ -201,6 +209,8 @@ class WebSocketRppgClient implements RppgClient {
   }
 }
 
-export const rppgClient: RppgClient = import.meta.env.VITE_USE_MOCK_RPPG === 'false'
-  ? new WebSocketRppgClient()
-  : new MockRppgClient();
+// Production should use the Railway signal service unless mock mode is
+// explicitly requested for local interface development.
+export const rppgClient: RppgClient = import.meta.env.VITE_USE_MOCK_RPPG === 'true'
+  ? new MockRppgClient()
+  : new WebSocketRppgClient();
