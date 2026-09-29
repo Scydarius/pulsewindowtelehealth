@@ -119,6 +119,17 @@ export async function revokePatientInvitation(appointmentId: string) {
   if (!response.ok) throw new Error(body.error ?? 'Unable to revoke patient access.');
 }
 
+/** Remove a clinician's appointment and its linked call/measurement data, while retaining the patient record. */
+export async function deleteAppointment(appointmentId: string) {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/appointment-patient-link', {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ appointmentId, deleteAppointment: true }),
+  });
+  const body = await response.json().catch(() => ({ error: 'The appointment service is temporarily unavailable.' })) as { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Unable to remove the appointment.');
+}
+
 export async function fetchPatientInvitation(token: string) {
   const response = await fetch(`/api/patient-invitations?token=${encodeURIComponent(token)}`);
   const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as {

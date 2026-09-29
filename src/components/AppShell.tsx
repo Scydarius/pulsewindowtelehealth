@@ -1,18 +1,22 @@
-import { CalendarDays, LayoutDashboard, LogOut, Stethoscope, UserRound } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, Stethoscope, UserRound } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
+import { verifyClinicianAccess } from '../services/clinicAccess';
 
 export function AppShell() {
   const location = useLocation();
   const isConsultation = location.pathname.startsWith('/consultation');
   const consultationRole = new URLSearchParams(location.search).get('role');
-  const isClinician = location.pathname.startsWith('/clinician') || (isConsultation && consultationRole === 'clinician');
+  const isAdminPage = location.pathname.startsWith('/admin');
+  const isClinicianPage = location.pathname.startsWith('/clinician');
+  const isClinician = location.pathname.startsWith('/clinician') || isAdminPage || (isConsultation && consultationRole === 'clinician');
   const clinicianView = new URLSearchParams(location.search).get('view') ?? 'overview';
-  const workspaceNavClass = (view: string) => clinicianView === view ? 'active' : undefined;
+  const workspaceNavClass = (view: string) => isClinicianPage && clinicianView === view ? 'active' : undefined;
   const navigate = useNavigate();
   const [signedInEmail, setSignedInEmail] = useState('');
   const [signingOut, setSigningOut] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const signOut = async () => {
     setSigningOut(true);
     await supabase?.auth.signOut({ scope: 'local' });
@@ -25,6 +29,7 @@ export function AppShell() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setEmail(session));
     return () => subscription.unsubscribe();
   }, []);
+  useEffect(() => { let active = true; if (!isClinician) return; void verifyClinicianAccess().then((clinician) => { if (active) setIsAdmin(clinician.isAdmin); }).catch(() => { if (active) setIsAdmin(false); }); return () => { active = false; }; }, [isClinician]);
 
   return (
     <div className="app-shell">
@@ -41,13 +46,14 @@ export function AppShell() {
             <Link to="/clinician?view=patients" className={workspaceNavClass('patients')}><UserRound size={18} /> Patients</Link>
             <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments')}><CalendarDays size={18} /> Appointments</Link>
             <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}><Stethoscope size={18} /> Measurements</Link>
+            {isAdmin && <Link to="/admin" className={isAdminPage ? 'active' : undefined}><ShieldCheck size={18} /> Admin</Link>}
           </nav>
         )}
 
         <div className="header-user">
           <div className="avatar"><UserRound size={19} /></div>
           <div className="header-user-copy">
-            <strong>{isClinician ? 'Clinician workspace' : 'Secure appointment'}</strong>
+            <strong>{isAdminPage ? 'Administrator portal' : isClinician ? 'Clinician workspace' : 'Secure appointment'}</strong>
             <span>{isClinician ? (signedInEmail || 'Restoring sign-in…') : 'Patient access'}</span>
           </div>
           {isClinician && <button className="header-sign-out" onClick={() => void signOut()} disabled={signingOut}><LogOut size={16} /> {signingOut ? 'Signing out…' : 'Sign out'}</button>}

@@ -25,7 +25,7 @@ export default async function patientLink(request: VercelRequest, response: Verc
     const rawAuthorization = request.headers.authorization;
     const token = (Array.isArray(rawAuthorization) ? rawAuthorization[0] : rawAuthorization)?.replace(/^Bearer\s+/i, '');
     if (!token) throw new Error('Sign in is required.');
-    const body = (typeof request.body === 'string' ? JSON.parse(request.body) : request.body ?? {}) as { appointmentId?: string };
+    const body = (typeof request.body === 'string' ? JSON.parse(request.body) : request.body ?? {}) as { appointmentId?: string; deleteAppointment?: boolean };
     if (!body.appointmentId) return response.status(400).json({ error: 'Appointment is required.' });
     const db = database();
     const { data: userData, error: userError } = await db.auth.getUser(token);
@@ -34,6 +34,20 @@ export default async function patientLink(request: VercelRequest, response: Verc
     if (clinicianError || !clinician) throw new Error('This account is not an authorised clinician.');
     const { data: appointment } = await db.from('appointments').select('id, starts_at').eq('id', body.appointmentId).eq('clinician_id', clinician.id).maybeSingle();
     if (!appointment) return response.status(403).json({ error: 'You are not authorised for this appointment.' });
+
+    if (request.method === 'DELETE' && body.deleteAppointment) {
+      // A clinician can remove only their own appointment. The patient record
+      // deliberately remains available for future appointments.
+      const [{ error: noteError }, { error: measurementError }, { error: inviteError }] = await Promise.all([
+        db.from('clinician_private_notes').delete().eq('appointment_id', appointment.id),
+        db.from('measurements').delete().eq('appointment_id', appointment.id),
+        db.from('patient_invites').delete().eq('appointment_id', appointment.id),
+      ]);
+      if (noteError || measurementError || inviteError) throw new Error('Unable to remove the appointment data.');
+      const { error: appointmentError } = await db.from('appointments').delete().eq('id', appointment.id);
+      if (appointmentError) throw new Error('Unable to remove the appointment.');
+      return response.status(200).json({ deleted: true });
+    }
 
     const { error: revokeError } = await db.from('patient_invites').update({ revoked_at: new Date().toISOString() }).eq('appointment_id', appointment.id).is('revoked_at', null);
     if (revokeError) throw new Error('Unable to revoke the current patient link.');

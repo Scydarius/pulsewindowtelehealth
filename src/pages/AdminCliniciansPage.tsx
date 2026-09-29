@@ -62,8 +62,8 @@ export function AdminCliniciansPage() {
   };
 
   return <div className="admin-page admin-page-wide">
-    <Link to="/clinician" className="back-link"><ArrowLeft size={18} /> Back to workspace</Link>
-    <section className="admin-card"><p className="eyebrow">Clinic administration</p><h1>Clinician access</h1><p>Manage clinician workspaces and account recovery. Passwords are never visible or set by administrators—send a secure reset link instead.</p>
+    <Link to="/clinician" className="back-link"><ArrowLeft size={18} /> Back to clinician workspace</Link>
+    <section className="admin-card"><p className="eyebrow">Administrator portal</p><h1>Clinic administration</h1><p>Manage clinician workspaces, account recovery, and patient records. Passwords are never visible or set by administrators—send a secure reset link instead.</p>
       <form onSubmit={(event) => void submit(event)} className="access-form admin-add-form"><label>Clinician name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Dr Taylor Morgan" required /></label><label>Work email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@clinic.com" required /></label><button className="button button-primary" disabled={saving}>{saving ? <LoaderCircle className="spin" size={18} /> : <UserPlus size={18} />}{saving ? 'Sending…' : 'Add clinician'}</button></form>
       {message && <p className="access-message">{message}</p>}{error && <p className="form-error"><CircleAlert size={16} /> {error}</p>}
     </section>

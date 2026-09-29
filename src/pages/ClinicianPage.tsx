@@ -1,10 +1,10 @@
-import { Activity, ArrowRight, CalendarClock, CircleAlert, Copy, LoaderCircle, RotateCcw, Search, ShieldOff, UsersRound, Video } from 'lucide-react';
+import { Activity, ArrowRight, CalendarClock, CircleAlert, Copy, LoaderCircle, RotateCcw, Search, ShieldOff, Trash2, UsersRound, Video } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
 import { InvitePatientForm } from '../components/InvitePatientForm';
 import { type ClinicAppointment, type ClinicianProfile, loadClinicianWorkspace } from '../services/clinicianData';
-import { claimInitialAdministratorAccess, createReplacementPatientInvitation, revokePatientInvitation } from '../services/clinicAccess';
+import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, revokePatientInvitation, verifyClinicianAccess } from '../services/clinicAccess';
 
 type WorkspaceView = 'overview' | 'patients' | 'appointments' | 'measurements';
 const workspaceView = (value: string | null): WorkspaceView => value === 'patients' || value === 'appointments' || value === 'measurements' ? value : 'overview';
@@ -20,7 +20,9 @@ export function ClinicianPage() {
   const [linkError, setLinkError] = useState('');
   const [creatingLink, setCreatingLink] = useState<string>();
   const [revokingLink, setRevokingLink] = useState<string>();
+  const [deletingAppointment, setDeletingAppointment] = useState<string>();
   const [revokedLinks, setRevokedLinks] = useState<Record<string, true>>({});
+  const [isAdmin, setIsAdmin] = useState(false);
   const [claimingAccess, setClaimingAccess] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -31,6 +33,7 @@ export function ClinicianPage() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => { let active = true; void verifyClinicianAccess().then((clinician) => { if (active) setIsAdmin(clinician.isAdmin); }).catch(() => { if (active) setIsAdmin(false); }); return () => { active = false; }; }, []);
 
   const now = new Date();
   const scheduled = appointments.filter((appointment) => new Date(appointment.starts_at) >= now);
@@ -63,6 +66,13 @@ export function ClinicianPage() {
     finally { setRevokingLink(undefined); }
   };
   const copyLink = async (appointmentId: string) => { await navigator.clipboard.writeText(replacementLinks[appointmentId]); };
+  const removeAppointment = async (appointmentId: string) => {
+    if (!window.confirm('Delete this appointment? Its call link, private notes, and saved measurement data will be removed. The patient record will be kept.')) return;
+    setDeletingAppointment(appointmentId); setLinkError('');
+    try { await deleteAppointment(appointmentId); await load(); }
+    catch (reason) { setLinkError(reason instanceof Error ? reason.message : 'Unable to remove the appointment.'); }
+    finally { setDeletingAppointment(undefined); }
+  };
   const claimAccess = async () => {
     setClaimingAccess(true); setError('');
     try { await claimInitialAdministratorAccess(); await load(); }
@@ -86,6 +96,7 @@ export function ClinicianPage() {
         <Link className="text-button" to={`/clinician/patient?email=${encodeURIComponent(patientEmail)}`}>Profile</Link>
         <button className="text-button" onClick={() => void createReplacementLink(appointment.id)} disabled={creatingLink === appointment.id}>{creatingLink === appointment.id ? <LoaderCircle className="spin" size={16} /> : <RotateCcw size={16} />}{replacementLinks[appointment.id] ? 'Regenerate again' : 'Regenerate link'}</button>
         <button className="text-button danger-action" onClick={() => void revokeLink(appointment.id)} disabled={revokingLink === appointment.id || Boolean(revokedLinks[appointment.id])}>{revokingLink === appointment.id ? <LoaderCircle className="spin" size={16} /> : <ShieldOff size={16} />}{revokedLinks[appointment.id] ? 'Access revoked' : 'Revoke access'}</button>
+        <button className="text-button danger-action" onClick={() => void removeAppointment(appointment.id)} disabled={deletingAppointment === appointment.id}>{deletingAppointment === appointment.id ? <LoaderCircle className="spin" size={16} /> : <Trash2 size={16} />}Delete appointment</button>
       </div>
       {replacementLinks[appointment.id] && <div className="appointment-link"><span>New patient link created. The old link has been revoked.</span><input value={replacementLinks[appointment.id]} readOnly aria-label="Replacement patient invitation link" /><button className="button button-secondary button-small" onClick={() => void copyLink(appointment.id)}><Copy size={16} /> Copy link</button></div>}
     </article>;
@@ -93,7 +104,7 @@ export function ClinicianPage() {
   const title = view === 'patients' ? ['Patients', 'Active patients and their longitudinal records'] : view === 'appointments' ? ['Appointments', 'Schedule, call access, and secure links'] : view === 'measurements' ? ['Measurements', 'Readings received from patient sessions'] : ['Today’s consultations', 'Review your patients, appointments and readings in one secure workspace.'];
 
   return <div className="dashboard-page">
-    <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search name, email, or reason" /></label><Link className="button button-secondary" to="/admin/clinicians">Manage clinicians</Link></div></section>
+    <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search name, email, or reason" /></label>{isAdmin && <Link className="button button-secondary" to="/admin">Open admin portal</Link>}</div></section>
     <section className="summary-strip workspace-summary"><Link to="/clinician?view=appointments"><div><CalendarClock /></div><span><strong>{todayAppointments.length}</strong>Appointments today</span><ArrowRight size={16} /></Link><Link to="/clinician?view=patients"><div><UsersRound /></div><span><strong>{patients.length}</strong>Active patients</span><ArrowRight size={16} /></Link><Link to="/clinician?view=measurements"><div><Activity /></div><span><strong>{readingsToReview.length}</strong>Readings received</span><ArrowRight size={16} /></Link></section>
 
     {view === 'overview' && <><section className="panel"><div className="section-heading"><div><p className="eyebrow">Next actions</p><h2>Upcoming appointments</h2><p>Open the clinician call, review the patient record, or manage their secure joining link.</p></div><InvitePatientForm onCreated={() => void load()} /></div><div className="appointment-table">{scheduled.slice(0, 5).map(appointmentRow)}{scheduled.length === 0 && <EmptyAppointments />}</div><Link to="/clinician?view=appointments" className="panel-footer-link">View all appointments <ArrowRight size={16} /></Link></section><section className="clinician-lower-grid"><article className="panel"><div className="section-heading"><div><p className="eyebrow">Follow-up</p><h2>Measurements to review</h2></div><Link className="text-button" to="/clinician?view=measurements">Open readings <ArrowRight size={16} /></Link></div><MeasurementList appointments={readingsToReview.slice(0, 4)} /></article><article className="panel platform-note"><p className="eyebrow">Patient access</p><h2>You control every joining link.</h2><p>Regenerating a link immediately invalidates the prior one. Revoke access to prevent a patient entering a call until you issue a new secure link.</p></article></section></>}

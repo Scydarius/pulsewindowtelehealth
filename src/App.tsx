@@ -51,7 +51,8 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/clinician" element={page(<ClinicianSessionGate><ClinicianPage /></ClinicianSessionGate>)} />
         <Route path="/clinician/patient" element={page(<ClinicianSessionGate><PatientProfilePage /></ClinicianSessionGate>)} />
-        <Route path="/admin/clinicians" element={page(<ClinicianSessionGate><AdminSessionGate><AdminCliniciansPage /></AdminSessionGate></ClinicianSessionGate>)} />
+        <Route path="/admin" element={page(<ClinicianSessionGate><AdminSessionGate><AdminCliniciansPage /></AdminSessionGate></ClinicianSessionGate>)} />
+        <Route path="/admin/clinicians" element={<Navigate to="/admin" replace />} />
         <Route path="/consultation/:appointmentId" element={<ConsultationRoute />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
