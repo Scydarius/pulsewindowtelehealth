@@ -35,9 +35,9 @@ export function ClinicianSignInPage() {
         await verifyClinicianAccess(data.session.access_token);
         const next = (location.state as { from?: string } | null)?.from ?? '/clinician';
         navigate(next, { replace: true });
-      } catch {
+      } catch (accessError) {
         await supabase.auth.signOut({ scope: 'local' });
-        setMessage('This email has an account, but it is not approved for the Ventricura clinician workspace. Ask an administrator to grant access.');
+        setMessage(accessError instanceof Error ? accessError.message : 'Clinician access could not be verified. Please try again.');
       }
     } catch {
       setMessage('Unable to sign in. Please try again.');
