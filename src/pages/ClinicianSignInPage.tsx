@@ -1,7 +1,8 @@
 import { ArrowLeft, LockKeyhole, LogIn } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { hasClinicalDatabaseConfiguration, supabase } from '../services/supabase';
+import { verifyClinicianAccess } from '../services/clinicAccess';
 
 export function ClinicianSignInPage() {
   const [email, setEmail] = useState('');
@@ -10,12 +11,15 @@ export function ClinicianSignInPage() {
   const [submitting, setSubmitting] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    if (!supabase) { setRestoring(false); return; }
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate('/clinician', { replace: true });
-      else setRestoring(false);
+    const client = supabase;
+    if (!client) { setRestoring(false); return; }
+    void client.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) { setRestoring(false); return; }
+      try { await verifyClinicianAccess(session.access_token); navigate('/clinician', { replace: true }); }
+      catch { await client.auth.signOut({ scope: 'local' }); setRestoring(false); }
     });
   }, [navigate]);
 
@@ -27,7 +31,14 @@ export function ClinicianSignInPage() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) { setMessage(error.message); return; }
       if (!data.session) { setMessage('Your sign-in could not be completed. Please try again.'); return; }
-      navigate('/clinician', { replace: true });
+      try {
+        await verifyClinicianAccess(data.session.access_token);
+        const next = (location.state as { from?: string } | null)?.from ?? '/clinician';
+        navigate(next, { replace: true });
+      } catch {
+        await supabase.auth.signOut({ scope: 'local' });
+        setMessage('This email has an account, but it is not approved for the Ventricura clinician workspace. Ask an administrator to grant access.');
+      }
     } catch {
       setMessage('Unable to sign in. Please try again.');
     } finally { setSubmitting(false); }
@@ -37,18 +48,18 @@ export function ClinicianSignInPage() {
 
   return <main className="access-page">
     <section className="access-card">
-      <Link to="/" className="back-link"><ArrowLeft size={18} /> Back to PulseWindow</Link>
+      <Link to="/" className="back-link"><ArrowLeft size={18} /> Back to Ventricura</Link>
       <div className="access-icon"><LockKeyhole /></div>
       <p className="eyebrow">Clinician access</p>
       <h1>Sign in to your workspace</h1>
-      <p>Use your clinician work email as your username, then enter the password you set up for that email.</p>
+      <p>Use your approved clinician work email as your username, then enter the password you set up for that email.</p>
       {!hasClinicalDatabaseConfiguration ? <p className="access-warning">Clinical access is not configured yet. Add the Supabase environment settings before inviting real patients.</p> : <form onSubmit={(event) => void signIn(event)} className="access-form">
         <label>Work email <span className="field-hint">(username)</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@clinic.com" autoComplete="email" required /></label>
         <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
         <button className="button button-primary button-full" disabled={submitting}><LogIn size={18} /> {submitting ? 'Signing in…' : 'Sign in'}</button>
       </form>}
       <Link className="password-help-link" to="/clinician/forgot-password">Forgot password?</Link>
-      <p className="account-help">Need a clinician account? Ask your PulseWindow administrator to add your work email.</p>
+      <p className="account-help">This workspace is restricted to administrator-approved clinicians. Need access? Ask a Ventricura administrator to add your work email.</p>
       {message && <p className="access-message" role="status">{message}</p>}
     </section>
   </main>;

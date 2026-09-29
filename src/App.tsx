@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ClinicianSessionGate } from './components/ClinicianSessionGate';
 import { LandingPage } from './pages/LandingPage';
@@ -12,17 +12,28 @@ const ClinicianActivateAccountPage = lazy(() => import('./pages/ClinicianActivat
 const PatientInvitePage = lazy(() => import('./pages/PatientInvitePage').then((module) => ({ default: module.PatientInvitePage })));
 const AdminCliniciansPage = lazy(() => import('./pages/AdminCliniciansPage').then((module) => ({ default: module.AdminCliniciansPage })));
 const PatientProfilePage = lazy(() => import('./pages/PatientProfilePage').then((module) => ({ default: module.PatientProfilePage })));
+const TechnologyPage = lazy(() => import('./pages/TechnologyPage').then((module) => ({ default: module.TechnologyPage })));
+const LiveDemoPage = lazy(() => import('./pages/LiveDemoPage').then((module) => ({ default: module.LiveDemoPage })));
 
 const page = (element: React.ReactNode) => (
-  <Suspense fallback={<div className="page-loading">Loading PulseWindow…</div>}>
+  <Suspense fallback={<div className="page-loading">Loading Ventricura…</div>}>
     {element}
   </Suspense>
 );
+
+/** The same URL hosts patient and clinician calls; only the clinician view needs sign-in. */
+function ConsultationRoute() {
+  const [params] = useSearchParams();
+  const consultation = page(<ConsultationPage />);
+  return params.get('role') === 'clinician' ? <ClinicianSessionGate>{consultation}</ClinicianSessionGate> : consultation;
+}
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/technology" element={page(<TechnologyPage />)} />
+      <Route path="/demo" element={page(<LiveDemoPage />)} />
       <Route path="/clinician/sign-in" element={page(<ClinicianSignInPage />)} />
       <Route path="/clinician/forgot-password" element={page(<ClinicianResetPasswordPage />)} />
       <Route path="/clinician/reset-password" element={page(<ClinicianResetPasswordPage />)} />
@@ -32,7 +43,7 @@ export default function App() {
         <Route path="/clinician" element={page(<ClinicianSessionGate><ClinicianPage /></ClinicianSessionGate>)} />
         <Route path="/clinician/patient" element={page(<ClinicianSessionGate><PatientProfilePage /></ClinicianSessionGate>)} />
         <Route path="/admin/clinicians" element={page(<ClinicianSessionGate><AdminCliniciansPage /></ClinicianSessionGate>)} />
-        <Route path="/consultation/:appointmentId" element={page(<ConsultationPage />)} />
+        <Route path="/consultation/:appointmentId" element={<ConsultationRoute />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

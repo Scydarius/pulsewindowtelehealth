@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-type RequestBody = { appointmentId?: string; role?: 'patient' | 'clinician'; invitationToken?: string };
+type RequestBody = { appointmentId?: string; role?: 'patient' | 'clinician' | 'showcase'; invitationToken?: string };
 
 const encoder = new TextEncoder();
 
@@ -50,26 +50,25 @@ export default {
       const { appointmentId, role, invitationToken } = await request.json() as RequestBody;
       const secret = process.env.RPPG_TICKET_SECRET;
       const apiUrl = process.env.RPPG_API_URL;
-      if (!appointmentId || !secret || !apiUrl || (role !== 'patient' && role !== 'clinician')) throw new Error('rPPG access is not configured.');
-      if (!process.env.VITE_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('The clinical database is not configured yet.');
+      if (!secret || !apiUrl || (role !== 'patient' && role !== 'clinician' && role !== 'showcase')) throw new Error('rPPG access is not configured.');
+      if (role !== 'showcase' && (!appointmentId || !process.env.VITE_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY)) throw new Error('The clinical database is not configured yet.');
       if (role === 'clinician') {
         const { db, clinician } = await requireClinician(request);
         const { data: appointment } = await db.from('appointments').select('id').eq('id', appointmentId).eq('clinician_id', clinician.id).maybeSingle();
         if (!appointment) throw new Error('You are not authorised for this measurement.');
-      } else {
+      } else if (role === 'patient') {
         if (!invitationToken || invitationToken.length < 32) throw new Error('A valid patient link is required.');
         const db = database();
         const { data: invite } = await db.from('patient_invites').select('expires_at, revoked_at, appointment_id').eq('token_hash', await tokenHash(invitationToken)).maybeSingle();
         if (!invite || invite.appointment_id !== appointmentId || invite.revoked_at || new Date(invite.expires_at) <= new Date()) throw new Error('This patient link is not authorised for measurement.');
       }
 
-      const sessionId = `rppg-${crypto.randomUUID().replaceAll('-', '')}`;
-      const ticket = await sign({ aud: 'pulsewindow-rppg', appointment_id: appointmentId, role, session_id: sessionId, exp: Math.floor(Date.now() / 1000) + 120, jti: crypto.randomUUID() }, secret);
+      const sessionId = `${role === 'showcase' ? 'showcase' : 'rppg'}-${crypto.randomUUID().replaceAll('-', '')}`;
+      const ticket = await sign({ aud: 'pulsewindow-rppg', appointment_id: role === 'showcase' ? 'public-showcase' : appointmentId, role, session_id: sessionId, exp: Math.floor(Date.now() / 1000) + 120, jti: crypto.randomUUID() }, secret);
       const websocketBase = apiUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:').replace(/\/$/, '');
-      // FUSION is the expanded engine's combined multi-algorithm path. The
-      // browser only selects this research default; all signal acceptance
-      // remains the server engine's responsibility.
-      return Response.json({ websocketUrl: `${websocketBase}/api/v1/stream?session_id=${encodeURIComponent(sessionId)}&ticket=${encodeURIComponent(ticket)}&algorithm=FUSION&fps=15` }, { headers: { 'Cache-Control': 'no-store' } });
+      // The current production engine exposes its validated browser path as
+      // POS at 30 FPS. Decisions about a usable signal remain server-side.
+      return Response.json({ websocketUrl: `${websocketBase}/api/v1/stream?session_id=${encodeURIComponent(sessionId)}&ticket=${encodeURIComponent(ticket)}&algorithm=POS&fps=30` }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       return Response.json({ error: error instanceof Error ? error.message : 'Unable to start measurement.' }, { status: 403 });
     }

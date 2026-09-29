@@ -14,6 +14,17 @@ export async function getClinicianAccessToken() {
   return session.access_token;
 }
 
+export type ApprovedClinician = { id: string; displayName: string; isAdmin: boolean };
+
+/** Confirm that an authenticated account is an administrator-approved clinician. */
+export async function verifyClinicianAccess(accessToken?: string): Promise<ApprovedClinician> {
+  const token = accessToken ?? await getClinicianAccessToken();
+  const response = await fetch('/api/clinician-access', { headers: { Authorization: `Bearer ${token}` } });
+  const body = await response.json().catch(() => ({ error: 'Clinician access could not be verified.' })) as { clinician?: ApprovedClinician; error?: string };
+  if (!response.ok || !body.clinician) throw new Error(body.error ?? 'This account is not an authorised clinician.');
+  return body.clinician;
+}
+
 export async function claimInitialAdministratorAccess() {
   const token = await getClinicianAccessToken();
   const response = await fetch('/api/claim-initial-admin', {

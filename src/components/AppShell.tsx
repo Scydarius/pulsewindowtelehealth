@@ -27,9 +27,8 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <NavLink to="/" className="brand" aria-label="PulseWindow home">
-          <img src="/pulsewindow-mark.svg" alt="" />
-          <span>PulseWindow</span>
+        <NavLink to="/" className="brand" aria-label="Ventricura home">
+          <img className="brand-wordmark" src="/ventricura-logo-centred.png" alt="Ventricura" />
         </NavLink>
 
         {!isConsultation && (

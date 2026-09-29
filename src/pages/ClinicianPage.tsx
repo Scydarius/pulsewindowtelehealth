@@ -97,7 +97,7 @@ export function ClinicianPage() {
             return <div className="review-card" key={appointment.id}><div className="patient-avatar coral">{(appointment.patient?.display_name ?? '?').split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><strong>{appointment.patient?.display_name ?? 'Patient'}</strong><span>{Math.round(reading.heart_rate_bpm)} BPM · {Math.round(reading.respiratory_rate_bpm)} breaths/min · captured {new Date(reading.measured_at).toLocaleString()}</span></div><Link className="text-button" to={`/consultation/${appointment.id}?role=clinician`}>Review <ArrowRight size={16} /></Link></div>;
           })}
         </article>
-        <article className="panel platform-note"><p className="eyebrow">PulseWindow</p><h2>Measurement context, not a diagnosis.</h2><p>Use signal quality and longitudinal trends to support your assessment. Experimental readings should be verified using approved clinical devices.</p></article>
+        <article className="panel platform-note"><p className="eyebrow">Ventricura</p><h2>Measurement context, not a diagnosis.</h2><p>Use signal quality and longitudinal trends to support your assessment. Research readings should be verified using approved clinical devices.</p></article>
       </section>
     </div>
   );

@@ -29,11 +29,11 @@ async function sendPatientAppointmentEmail(input: { to: string; patientName: str
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? 'PulseWindow <no-reply@pulsewindow.me>',
+        from: process.env.RESEND_FROM_EMAIL ?? 'Ventricura <no-reply@ventricura.com>',
         to: [input.to],
-        subject: 'Your secure PulseWindow appointment link',
-        text: `Hello ${input.patientName},\n\nYour PulseWindow appointment (${input.reason}) is scheduled for ${formattedTime}.\n\nJoin securely: ${input.invitationUrl}\n\nThis is a research prototype and not for emergencies.`,
-        html: `<p>Hello ${safeName},</p><p>Your PulseWindow appointment for <strong>${safeReason}</strong> is scheduled for <strong>${formattedTime}</strong>.</p><p><a href="${safeUrl}">Join your secure appointment</a></p><p>This research prototype is not for emergencies.</p>`,
+        subject: 'Your secure Ventricura appointment link',
+        text: `Hello ${input.patientName},\n\nYour Ventricura appointment (${input.reason}) is scheduled for ${formattedTime}.\n\nJoin securely: ${input.invitationUrl}\n\nThis service is not for emergencies.`,
+        html: `<p>Hello ${safeName},</p><p>Your Ventricura appointment for <strong>${safeReason}</strong> is scheduled for <strong>${formattedTime}</strong>.</p><p><a href="${safeUrl}">Join your secure appointment</a></p><p>This service is not for emergencies.</p>`,
       }),
     });
     if (!response.ok) return { sent: false, warning: 'The secure link was created, but the appointment email could not be delivered.' };

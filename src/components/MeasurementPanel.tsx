@@ -91,7 +91,7 @@ function PrivateNotes({ appointmentId }: { appointmentId: string }) {
     try { await savePrivateClinicalNote(appointmentId, content); setStatus('saved'); }
     catch { setStatus('error'); }
   };
-  return <section className="private-notes" aria-label="Private clinician notes"><div className="private-notes-heading"><div><p className="eyebrow"><LockKeyhole size={13} /> Private clinician notes</p><h3>Consultation notes</h3><span>Only clinicians assigned to this appointment can access these notes.</span></div><button className="button button-secondary" type="button" onClick={() => void save()} disabled={status === 'saving' || status === 'loading'}>{status === 'saving' ? 'Saving…' : 'Save notes'}</button></div><textarea value={content} onChange={(event) => { setContent(event.target.value); if (status !== 'loading') setStatus('saved'); }} placeholder="Document observations, discussion, follow-up, and non-diagnostic research context…" maxLength={10000} /><div className="notes-footer"><span>{status === 'error' ? 'Could not save notes. Please try again.' : status === 'loading' ? 'Loading secure notes…' : `${content.length.toLocaleString()}/10,000 characters`}</span><span>Stored on PulseWindow</span></div></section>;
+  return <section className="private-notes" aria-label="Private clinician notes"><div className="private-notes-heading"><div><p className="eyebrow"><LockKeyhole size={13} /> Private clinician notes</p><h3>Consultation notes</h3><span>Only clinicians assigned to this appointment can access these notes.</span></div><button className="button button-secondary" type="button" onClick={() => void save()} disabled={status === 'saving' || status === 'loading'}>{status === 'saving' ? 'Saving…' : 'Save notes'}</button></div><textarea value={content} onChange={(event) => { setContent(event.target.value); if (status !== 'loading') setStatus('saved'); }} placeholder="Document observations, discussion, follow-up, and non-diagnostic research context…" maxLength={10000} /><div className="notes-footer"><span>{status === 'error' ? 'Could not save notes. Please try again.' : status === 'loading' ? 'Loading secure notes…' : `${content.length.toLocaleString()}/10,000 characters`}</span><span>Stored on Ventricura</span></div></section>;
 }
 
 function exportMeasurementCsv(appointmentId: string, samples: SavedMeasurement[]) {
@@ -99,7 +99,7 @@ function exportMeasurementCsv(appointmentId: string, samples: SavedMeasurement[]
   const rows = samples.map((sample) => [appointmentId, sample.measured_at, sample.heart_rate_bpm, sample.respiratory_rate_bpm, sample.signal_quality, sample.algorithm_version ?? ''].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','));
   const blob = new Blob([[header.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a'); anchor.href = url; anchor.download = `pulsewindow-measurement-${appointmentId}.csv`; anchor.click(); URL.revokeObjectURL(url);
+  const anchor = document.createElement('a'); anchor.href = url; anchor.download = `ventricura-measurement-${appointmentId}.csv`; anchor.click(); URL.revokeObjectURL(url);
 }
 
 export function MeasurementPanel({ appointmentId, role, invitationToken }: MeasurementPanelProps) {
