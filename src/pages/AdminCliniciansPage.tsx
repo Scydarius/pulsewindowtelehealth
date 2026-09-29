@@ -20,21 +20,13 @@ export function AdminCliniciansPage() {
     try {
       const token = await getClinicianAccessToken();
       const response = await fetch('/api/admin-clinicians', { headers: { Authorization: `Bearer ${token}` } });
-      const body = await response.json() as { clinicians?: Clinician[]; error?: string };
+      const body = await response.json() as { clinicians?: Clinician[]; patients?: AdminPatient[]; error?: string };
       if (!response.ok) throw new Error(body.error ?? 'Unable to load clinicians.');
       setClinicians(body.clinicians ?? []);
+      setPatients(body.patients ?? []);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load clinicians.'); }
   }, []);
-  const loadPatients = useCallback(async () => {
-    try {
-      const token = await getClinicianAccessToken();
-      const response = await fetch('/api/admin-patients', { headers: { Authorization: `Bearer ${token}` } });
-      const body = await response.json().catch(() => ({ error: 'Unable to load patients.' })) as { patients?: AdminPatient[]; error?: string };
-      if (!response.ok) throw new Error(body.error ?? 'Unable to load patient records.');
-      setPatients(body.patients ?? []);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load patient records.'); }
-  }, []);
-  useEffect(() => { void load(); void loadPatients(); }, [load, loadPatients]);
+  useEffect(() => { void load(); }, [load]);
   const request = async (method: 'POST' | 'PATCH', payload: object) => {
     const token = await getClinicianAccessToken();
     const response = await fetch('/api/admin-clinicians', { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
@@ -61,10 +53,10 @@ export function AdminCliniciansPage() {
     setWorkingId(`patient:${patient.id}`); setError(''); setMessage('');
     try {
       const token = await getClinicianAccessToken();
-      const response = await fetch('/api/admin-patients', { method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ patientId: patient.id }) });
+      const response = await fetch('/api/admin-clinicians', { method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ patientId: patient.id }) });
       const body = await response.json().catch(() => ({ error: 'Unable to remove patient.' })) as { message?: string; error?: string };
       if (!response.ok) throw new Error(body.error ?? 'Unable to remove patient.');
-      setMessage(body.message ?? 'Patient removed.'); await loadPatients();
+      setMessage(body.message ?? 'Patient removed.'); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to remove patient.'); }
     finally { setWorkingId(''); }
   };

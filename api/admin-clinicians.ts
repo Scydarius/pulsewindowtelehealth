@@ -32,13 +32,33 @@ async function handle(request: Request) {
     try {
       const { db, administratorId } = await requireAdministrator(request);
       if (request.method === 'GET') {
-        const [{ data: profiles, error: profileError }, { data: users, error: userError }] = await Promise.all([
+        const [{ data: profiles, error: profileError }, { data: users, error: userError }, { data: patients, error: patientError }, { data: appointments, error: appointmentError }] = await Promise.all([
           db.from('clinician_profiles').select('id, display_name, is_admin, created_at').order('created_at', { ascending: true }),
           db.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+          db.from('patients').select('id, display_name, email, clinician_id, created_at, clinician:clinician_profiles(display_name)').order('created_at', { ascending: false }),
+          db.from('appointments').select('id, patient_id, starts_at'),
         ]);
-        if (profileError || userError) throw new Error('Unable to load clinician accounts.');
+        if (profileError || userError || patientError || appointmentError) throw new Error('Unable to load clinic administration records.');
         const emails = new Map(users.users.map((user) => [user.id, user.email ?? '']));
-        return Response.json({ clinicians: (profiles ?? []).map((profile) => ({ ...profile, email: emails.get(profile.id) ?? '' })) }, { headers: { 'Cache-Control': 'no-store' } });
+        const counts = new Map<string, number>(); const latest = new Map<string, string>();
+        for (const appointment of appointments ?? []) { counts.set(appointment.patient_id, (counts.get(appointment.patient_id) ?? 0) + 1); if (!latest.get(appointment.patient_id) || new Date(appointment.starts_at) > new Date(latest.get(appointment.patient_id)!)) latest.set(appointment.patient_id, appointment.starts_at); }
+        return Response.json({ clinicians: (profiles ?? []).map((profile) => ({ ...profile, email: emails.get(profile.id) ?? '' })), patients: (patients ?? []).map((patient) => ({ ...patient, appointment_count: counts.get(patient.id) ?? 0, latest_appointment_at: latest.get(patient.id) ?? null })) }, { headers: { 'Cache-Control': 'no-store' } });
+      }
+      if (request.method === 'DELETE') {
+        const { patientId } = await request.json() as { patientId?: string };
+        if (!patientId) throw new Error('Patient is required.');
+        const { data: appointments, error: appointmentError } = await db.from('appointments').select('id').eq('patient_id', patientId);
+        if (appointmentError) throw new Error('Unable to prepare the patient record for deletion.');
+        const appointmentIds = (appointments ?? []).map((appointment) => appointment.id);
+        if (appointmentIds.length) {
+          const { error: measurementError } = await db.from('measurements').delete().in('appointment_id', appointmentIds);
+          if (measurementError) throw new Error('Unable to remove the patient’s saved readings.');
+          const { error: appointmentDeleteError } = await db.from('appointments').delete().in('id', appointmentIds);
+          if (appointmentDeleteError) throw new Error('Unable to remove the patient’s appointments.');
+        }
+        const { error: patientDeleteError } = await db.from('patients').delete().eq('id', patientId);
+        if (patientDeleteError) throw new Error('Unable to remove the patient record.');
+        return Response.json({ message: 'Patient and linked appointment records removed.' });
       }
       if (request.method === 'POST') {
         const { email, displayName } = await request.json() as CreateBody;
