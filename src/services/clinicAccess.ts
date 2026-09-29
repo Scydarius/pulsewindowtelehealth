@@ -27,7 +27,7 @@ export async function verifyClinicianAccess(accessToken?: string): Promise<Appro
 
 export async function claimInitialAdministratorAccess() {
   const token = await getClinicianAccessToken();
-  const response = await fetch('/api/admin-clinicians?action=claim-initial-admin', {
+  const response = await fetch('/api/claim-initial-admin', {
     method: 'POST', headers: { Authorization: `Bearer ${token}` },
   });
   const body = await response.json().catch(() => ({ error: 'The administrator setup service is temporarily unavailable.' })) as { error?: string };
@@ -156,7 +156,7 @@ export async function deleteAppointment(appointmentId: string) {
 }
 
 export async function fetchPatientInvitation(token: string) {
-  const response = await fetch(`/api/clinician-invitations?action=patient-invite&token=${encodeURIComponent(token)}`);
+  const response = await fetch(`/api/patient-invitations?token=${encodeURIComponent(token)}`);
   const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as {
     appointmentId?: string; clinicianName?: string; reason?: string; startsAt?: string; error?: string;
   };

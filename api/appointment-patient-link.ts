@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { deleteGoogleCalendarEvent } from '../lib/googleCalendar';
+import { deleteGoogleCalendarEvent } from '../lib/googleCalendar.js';
 
 type VercelRequest = {
   method?: string;

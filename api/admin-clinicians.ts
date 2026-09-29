@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 type CreateBody = { email?: string; displayName?: string };
 type ManageBody = { action?: 'update' | 'reset_password' | 'repair'; clinicianId?: string; displayName?: string; isAdmin?: boolean };
-type VercelRequest = { method?: string; url?: string; body?: unknown; headers: Record<string, string | string[] | undefined> };
+type VercelRequest = { method?: string; body?: unknown; headers: Record<string, string | string[] | undefined> };
 type VercelResponse = { status: (code: number) => { json: (body: unknown) => void } };
 
 const appUrl = (request: Request, path: string) => `${(process.env.APP_URL || new URL(request.url).origin).replace(/\/$/, '')}${path}`;
@@ -30,32 +30,6 @@ async function findUser(db: ReturnType<typeof database>, clinicianId: string) {
 
 async function handle(request: Request) {
     try {
-      const url = new URL(request.url);
-      const action = url.searchParams.get('action');
-
-      if (action === 'claim-initial-admin' || url.pathname.includes('claim-initial-admin')) {
-        if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 });
-        const allowedEmails = (process.env.VENTRICURA_INITIAL_ADMIN_EMAILS ?? process.env.PULSEWINDOW_INITIAL_ADMIN_EMAIL ?? '')
-          .split(',')
-          .map((email) => email.trim().toLowerCase())
-          .filter(Boolean);
-        if (!allowedEmails.length) throw new Error('Initial administrator setup has not been configured.');
-        const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-        if (!token) throw new Error('Sign in is required.');
-        const db = database();
-        const { data: userData, error: userError } = await db.auth.getUser(token);
-        const user = userData.user;
-        if (userError || !user?.email) throw new Error('Your sign-in session is invalid.');
-        if (!allowedEmails.includes(user.email.toLowerCase())) throw new Error('This signed-in email is not approved for initial administrator setup.');
-        const { error: profileError } = await db.from('clinician_profiles').upsert({
-          id: user.id,
-          display_name: user.user_metadata?.full_name?.trim() || user.email.split('@')[0],
-          is_admin: true,
-        }, { onConflict: 'id' });
-        if (profileError) throw new Error('Unable to create administrator access.');
-        return Response.json({ message: 'Administrator access is ready.' }, { headers: { 'Cache-Control': 'no-store' } });
-      }
-
       const { db, administratorId } = await requireAdministrator(request);
       if (request.method === 'GET') {
         const [{ data: profiles, error: profileError }, { data: users, error: userError }, { data: patients, error: patientError }, { data: appointments, error: appointmentError }] = await Promise.all([
@@ -147,8 +121,7 @@ export default async function adminClinicians(request: VercelRequest, response: 
   const host = Array.isArray(request.headers.host) ? request.headers.host[0] : request.headers.host;
   const method = request.method ?? 'GET';
   const body = method === 'GET' ? undefined : JSON.stringify(request.body ?? {});
-  const reqUrl = request.url?.startsWith('http') ? request.url : `https://${host ?? 'www.ventricura.com'}${request.url ?? '/api/admin-clinicians'}`;
-  const webRequest = new Request(reqUrl, { method, headers, body });
+  const webRequest = new Request(`https://${host ?? 'www.ventricura.com'}/api/admin-clinicians`, { method, headers, body });
   const result = await handle(webRequest);
   const payload = await result.json().catch(() => ({ error: 'The clinician administration service is unavailable.' }));
   return response.status(result.status).json(payload);

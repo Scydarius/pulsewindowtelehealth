@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { createGoogleCalendarEvent, getGoogleFreeBusy } from '../lib/googleCalendar';
+import { createGoogleCalendarEvent, getGoogleFreeBusy } from '../lib/googleCalendar.js';
 
 type AvailabilityDay = { day: number; enabled: boolean; start: string; end: string };
 type RequestBody = { action?: 'save-availability' | 'public-book'; patientName?: string; patientEmail?: string; reason?: string; startsAt?: string; bookingToken?: string; timezone?: string; durationMinutes?: number; weeklyAvailability?: AvailabilityDay[]; bookingEnabled?: boolean; bookingReason?: string };

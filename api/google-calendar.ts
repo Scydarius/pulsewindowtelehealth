@@ -6,7 +6,7 @@ import {
   getCallbackUrl,
   isGoogleCalendarConfigured,
   verifyOAuthState,
-} from '../lib/googleCalendar';
+} from '../lib/googleCalendar.js';
 
 function database() {
   const url = process.env.VITE_SUPABASE_URL;
