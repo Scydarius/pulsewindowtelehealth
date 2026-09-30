@@ -42,8 +42,9 @@ function normaliseAvailability(value: unknown): AvailabilityDay[] {
 async function sendPatientAppointmentEmail(input: { to: string; patientName: string; reason: string; startsAt: Date; invitationUrl: string }): Promise<DeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { sent: false, warning: 'The secure link was created, but appointment email delivery has not been configured yet.' };
-  const configuredSender = process.env.VENTRICURA_FROM_EMAIL?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
-  const from = configuredSender && /@ventricura\.com>?$/i.test(configuredSender) ? configuredSender : 'Ventricura <admin@ventricura.com>';
+  // Appointment confirmations always come from the product mailbox. Do not
+  // inherit a developer's or clinician's personal Resend sender setting.
+  const from = 'Ventricura <noreply@ventricura.com>';
   const replyTo = process.env.VENTRICURA_REPLY_TO?.trim() || 'admin@ventricura.com';
   const formattedTime = new Intl.DateTimeFormat('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Adelaide', timeZoneName: 'short' }).format(input.startsAt);
   try {
