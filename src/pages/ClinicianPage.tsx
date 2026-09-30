@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, CalendarClock, CalendarDays, CircleAlert, Copy, LoaderCircle, RotateCcw, Search, ShieldOff, Trash2, UsersRound, Video } from 'lucide-react';
+import { Activity, ArrowRight, CalendarClock, CalendarDays, CircleAlert, Copy, LoaderCircle, MessageSquareText, RotateCcw, Search, ShieldOff, Trash2, UsersRound, Video } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
@@ -10,6 +10,7 @@ import { claimInitialAdministratorAccess, createReplacementPatientInvitation, de
 type WorkspaceView = 'overview' | 'patients' | 'appointments' | 'measurements' | 'availability';
 const workspaceView = (value: string | null): WorkspaceView => value === 'patients' || value === 'appointments' || value === 'measurements' || value === 'availability' ? value : 'overview';
 const reasonSummary = (value: string) => value.split('\n\nPatient notes:')[0].trim();
+const intakeNote = (value: string) => value.split('\n\nPatient notes:')[1]?.trim() ?? '';
 
 export function ClinicianPage() {
   const [params] = useSearchParams();
@@ -93,6 +94,7 @@ export function ClinicianPage() {
   const appointmentRow = (appointment: ClinicAppointment) => {
     const patientEmail = appointment.patient?.email ?? '';
     const patientId = appointment.patient?.id ?? '';
+    const note = intakeNote(appointment.reason);
     const accessState = revokedLinks[appointment.id] ? 'Access revoked' : replacementLinks[appointment.id] ? 'New link ready' : 'Link active';
     return <article className="appointment-row clinician-record-row" key={appointment.id}>
       <div className="patient-avatar">{(appointment.patient?.display_name ?? '?').split(' ').map((part) => part[0]).join('').slice(0, 2)}</div>
@@ -106,6 +108,7 @@ export function ClinicianPage() {
         <button className="text-button danger-action" onClick={() => void revokeLink(appointment.id)} disabled={revokingLink === appointment.id || Boolean(revokedLinks[appointment.id])}>{revokingLink === appointment.id ? <LoaderCircle className="spin" size={16} /> : <ShieldOff size={16} />}{revokedLinks[appointment.id] ? 'Access revoked' : 'Revoke access'}</button>
         <button className="text-button danger-action" onClick={() => void removeAppointment(appointment.id)} disabled={deletingAppointment === appointment.id}>{deletingAppointment === appointment.id ? <LoaderCircle className="spin" size={16} /> : <Trash2 size={16} />}Delete appointment</button>
       </div>
+      {note && <aside className="appointment-intake-note"><div><MessageSquareText size={16} /><span>Patient intake note</span></div><p>{note}</p></aside>}
       {replacementLinks[appointment.id] && <div className="appointment-link"><span>New patient link created. The old link has been revoked.</span><input value={replacementLinks[appointment.id]} readOnly aria-label="Replacement patient invitation link" /><button className="button button-secondary button-small" onClick={() => void copyLink(appointment.id)}><Copy size={16} /> Copy link</button></div>}
     </article>;
   };
