@@ -1,4 +1,4 @@
-import { Activity, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Download, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind } from 'lucide-react';
+import { Activity, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Copy, Download, FileText, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
 import { loadPatientMeasurementTrend, loadPrivateClinicalNote, savePatientMeasurement, savePrivateClinicalNote, type SavedMeasurement } from '../services/clinicAccess';
@@ -75,20 +75,123 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
   </section>;
 }
 
-function PrivateNotes({ appointmentId }: { appointmentId: string }) {
+function PrivateNotes({
+  appointmentId,
+  vitals,
+}: {
+  appointmentId: string;
+  vitals?: {
+    heartRateBpm: number | null;
+    respiratoryRate: number | null;
+    signalQuality: number;
+    diagnostics?: Record<string, unknown>;
+  } | null;
+}) {
   const [content, setContent] = useState('');
   const [status, setStatus] = useState<'loading' | 'saved' | 'saving' | 'error'>('loading');
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     let active = true;
     void loadPrivateClinicalNote(appointmentId).then((note) => { if (active) { setContent(note.content); setStatus('saved'); } }).catch(() => { if (active) setStatus('error'); });
     return () => { active = false; };
   }, [appointmentId]);
+
   const save = async () => {
     setStatus('saving');
     try { await savePrivateClinicalNote(appointmentId, content); setStatus('saved'); }
     catch { setStatus('error'); }
   };
-  return <section className="private-notes" aria-label="Private clinician notes"><div className="private-notes-heading"><div><p className="eyebrow"><LockKeyhole size={13} /> Private clinician notes</p><h3>Consultation notes</h3><span>Only clinicians assigned to this appointment can access these notes.</span></div><button className="button button-secondary" type="button" onClick={() => void save()} disabled={status === 'saving' || status === 'loading'}>{status === 'saving' ? 'Saving…' : 'Save notes'}</button></div><textarea value={content} onChange={(event) => { setContent(event.target.value); if (status !== 'loading') setStatus('saved'); }} placeholder="Document observations, discussion, and follow-up…" maxLength={10000} /><div className="notes-footer"><span>{status === 'error' ? 'Could not save notes. Please try again.' : status === 'loading' ? 'Loading secure notes…' : `${content.length.toLocaleString()}/10,000 characters`}</span><span>Stored on Ventricura</span></div></section>;
+
+  const insertVitals = () => {
+    const timeStr = new Date().toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+    const cardiac = vitals?.diagnostics?.cardiac as { session_average_bpm?: number; clinical_bpm?: number; hrv_rmssd_ms?: number; stress_score?: number } | undefined;
+    const respiration = vitals?.diagnostics?.respiration as { session_average_brpm?: number; clinical_brpm?: number } | undefined;
+    const bpm = cardiac?.session_average_bpm ?? cardiac?.clinical_bpm ?? vitals?.heartRateBpm;
+    const brpm = respiration?.session_average_brpm ?? respiration?.clinical_brpm ?? vitals?.respiratoryRate;
+    const hrv = cardiac?.hrv_rmssd_ms != null ? ` · HRV: ${Number(cardiac.hrv_rmssd_ms).toFixed(0)} ms` : '';
+    const stress = cardiac?.stress_score != null ? ` · Stress: ${Number(cardiac.stress_score).toFixed(0)}/100` : '';
+    const quality = vitals?.signalQuality != null ? ` · Signal Quality: ${Math.round(vitals.signalQuality * 100)}%` : '';
+
+    const snippet = `[Ventricura rPPG Vitals — ${timeStr}]\n• Pulse: ${bpm ? `${Math.round(bpm)} BPM (30s clinical average)` : 'Pending'}\n• Respiration: ${brpm ? `${Math.round(brpm)} /min` : 'Pending'}${hrv}${stress}${quality}\n`;
+    setContent((prev) => (prev.trim() ? `${prev.trimEnd()}\n\n${snippet}` : snippet));
+    setStatus('saved');
+  };
+
+  const insertSoapTemplate = () => {
+    const template = `SUBJECTIVE:\n- Presenting complaint:\n- History of onset:\n\nOBJECTIVE:\n- Contactless rPPG vitals:\n- Clinical observations:\n\nASSESSMENT:\n- Clinical impression:\n\nPLAN:\n- Management:\n- Prescriptions & follow-up:`;
+    setContent((prev) => (prev.trim() ? `${prev.trimEnd()}\n\n${template}` : template));
+    setStatus('saved');
+  };
+
+  const copyForEhr = async () => {
+    if (!content.trim()) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const hasVitals = (vitals?.heartRateBpm != null && Number.isFinite(vitals.heartRateBpm)) ||
+    (vitals?.diagnostics?.cardiac != null);
+
+  return (
+    <section className="private-notes" aria-label="Private clinician notes">
+      <div className="private-notes-heading">
+        <div>
+          <p className="eyebrow"><LockKeyhole size={13} /> Private clinician notes</p>
+          <h3>Consultation notes</h3>
+          <span>Only clinicians assigned to this appointment can access these notes.</span>
+        </div>
+        <button className="button button-secondary" type="button" onClick={() => void save()} disabled={status === 'saving' || status === 'loading'}>
+          {status === 'saving' ? 'Saving…' : 'Save notes'}
+        </button>
+      </div>
+
+      <div className="private-notes-toolbar" role="toolbar" aria-label="Clinical note shortcuts">
+        <button
+          type="button"
+          className="note-shortcut-btn"
+          onClick={insertVitals}
+          disabled={!hasVitals}
+          title={hasVitals ? 'Insert measured vitals snapshot into notes' : 'Run camera check to capture vitals first'}
+        >
+          <Activity size={12} /> Insert vitals
+        </button>
+        <button
+          type="button"
+          className="note-shortcut-btn"
+          onClick={insertSoapTemplate}
+          title="Insert standard SOAP clinical template"
+        >
+          <FileText size={12} /> SOAP template
+        </button>
+        <button
+          type="button"
+          className="note-shortcut-btn"
+          onClick={() => void copyForEhr()}
+          disabled={!content.trim()}
+          title="Copy notes to clipboard for EHR"
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? 'Copied' : 'Copy for EHR'}
+        </button>
+      </div>
+
+      <textarea
+        value={content}
+        onChange={(event) => { setContent(event.target.value); if (status !== 'loading') setStatus('saved'); }}
+        placeholder="Document observations, discussion, and follow-up…"
+        maxLength={10000}
+      />
+      <div className="notes-footer">
+        <span>{status === 'error' ? 'Could not save notes. Please try again.' : status === 'loading' ? 'Loading secure notes…' : `${content.length.toLocaleString()}/10,000 characters`}</span>
+        <span>Stored on Ventricura</span>
+      </div>
+    </section>
+  );
 }
 
 function exportMeasurementCsv(appointmentId: string, samples: SavedMeasurement[]) {
@@ -226,7 +329,15 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> Video consultation remains available</div>}
       </div>
 
-      <PrivateNotes appointmentId={appointmentId} />
+      <PrivateNotes
+        appointmentId={appointmentId}
+        vitals={{
+          heartRateBpm: measurement.heartRateBpm,
+          respiratoryRate: measurement.respiratoryRate,
+          signalQuality: measurement.signalQuality,
+          diagnostics: measurement.diagnostics,
+        }}
+      />
 
       <p className="clinician-measurement-note">This is the clinician-only results panel. It updates automatically when the patient completes their camera check.</p>
 

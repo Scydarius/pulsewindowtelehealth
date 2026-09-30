@@ -24,11 +24,158 @@ function exportConsultationPdf(input: { appointmentId: string; patientName: stri
   const popup = window.open('', '_blank', 'noopener,noreferrer');
   if (!popup) return false;
   const latest = input.samples.at(-1);
-  const rows = input.samples.map((sample) => `<tr><td>${escapeHtml(time(sample.measured_at))}</td><td>${value(sample.heart_rate_bpm, ' BPM')}</td><td>${value(sample.respiratory_rate_bpm, ' /min')}</td><td>${value(sample.signal_quality * 100, '%')}</td></tr>`).join('');
+  const diag = latest?.diagnostics as {
+    cardiac?: {
+      session_average_bpm?: number;
+      clinical_bpm?: number;
+      hrv_rmssd_ms?: number;
+      stress_score?: number;
+      stress_level?: string;
+    };
+    respiration?: {
+      session_average_brpm?: number;
+      clinical_brpm?: number;
+    };
+    engine?: {
+      algorithm?: string;
+    };
+  } | undefined;
+
+  const bpmVal = diag?.cardiac?.session_average_bpm ?? diag?.cardiac?.clinical_bpm ?? latest?.heart_rate_bpm;
+  const brpmVal = diag?.respiration?.session_average_brpm ?? diag?.respiration?.clinical_brpm ?? latest?.respiratory_rate_bpm;
+  const hrvVal = diag?.cardiac?.hrv_rmssd_ms;
+  const stressVal = diag?.cardiac?.stress_score;
+  const algo = latest?.algorithm_version ?? diag?.engine?.algorithm ?? 'railway-rppg-2.16';
+
+  const rows = input.samples.map((sample) => {
+    const sDiag = sample.diagnostics as { cardiac?: { session_average_bpm?: number; clinical_bpm?: number }; respiration?: { session_average_brpm?: number; clinical_brpm?: number } } | undefined;
+    const sBpm = sDiag?.cardiac?.session_average_bpm ?? sDiag?.cardiac?.clinical_bpm ?? sample.heart_rate_bpm;
+    const sBrpm = sDiag?.respiration?.session_average_brpm ?? sDiag?.respiration?.clinical_brpm ?? sample.respiratory_rate_bpm;
+    return `<tr><td>${escapeHtml(time(sample.measured_at))}</td><td><strong>${value(sBpm, ' BPM')}</strong></td><td>${value(sBrpm, ' /min')}</td><td>${value(sample.signal_quality * 100, '%')}</td><td>${escapeHtml(sample.algorithm_version ?? algo)}</td></tr>`;
+  }).join('');
+
   const safeNotes = escapeHtml(input.notes.trim() || 'No private clinician notes were recorded.').replace(/\n/g, '<br />');
-  popup.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8" /><title>Ventricura consultation summary</title><style>
-    @page { size: A4; margin: 16mm; } * { box-sizing:border-box; } body { margin:0; color:#181818; font-family:Arial,sans-serif; font-size:10pt; line-height:1.45; } header { display:flex; justify-content:space-between; align-items:start; padding-bottom:14px; border-bottom:2px solid #1b1b1b; } .brand { font-size:16pt; font-weight:800; letter-spacing:.12em; } .label { color:#6a6a6a; font-size:7pt; font-weight:700; letter-spacing:.13em; text-transform:uppercase; } h1 { margin:6px 0 3px; font-size:25pt; letter-spacing:-.05em; } h2 { margin:0 0 10px; font-size:13pt; } .meta { margin-top:4px; color:#595959; } .summary { display:grid; grid-template-columns:repeat(3,1fr); margin:22px 0; border:1px solid #c9c9c9; } .summary div { padding:12px; border-right:1px solid #d6d6d6; } .summary div:last-child { border:0; } .summary strong { display:block; margin-top:3px; font-size:15pt; } section { margin-top:22px; } .notes { min-height:96px; padding:14px; border:1px solid #c9c9c9; background:#f8f8f8; } table { width:100%; border-collapse:collapse; font-size:8.5pt; } th { color:#686868; font-size:7pt; letter-spacing:.08em; text-align:left; text-transform:uppercase; } th,td { padding:8px 6px; border-bottom:1px solid #d9d9d9; } footer { margin-top:24px; padding-top:10px; border-top:1px solid #c9c9c9; color:#676767; font-size:7.5pt; } @media print { .no-print { display:none; } }
-  </style></head><body><header><div><div class="brand">VENTRICURA</div><div class="label">Clinician consultation summary</div></div><div class="label">Generated ${escapeHtml(time(new Date().toISOString()))}</div></header><main><section><div class="label">Patient</div><h1>${escapeHtml(input.patientName)}</h1><div class="meta">${escapeHtml(input.patientEmail)} · ${escapeHtml(input.reason)} · scheduled ${escapeHtml(time(input.startsAt))}</div></section><section class="summary"><div><span class="label">Latest pulse</span><strong>${value(latest?.heart_rate_bpm, ' BPM')}</strong></div><div><span class="label">Latest breathing</span><strong>${value(latest?.respiratory_rate_bpm, ' /min')}</strong></div><div><span class="label">Saved samples</span><strong>${input.samples.length}</strong></div></section><section><div class="label">Clinician record</div><h2>Consultation notes</h2><div class="notes">${safeNotes}</div></section><section><div class="label">Session data</div><h2>Saved measurements</h2>${input.samples.length ? `<table><thead><tr><th>Captured</th><th>Pulse</th><th>Breathing</th><th>Signal quality</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No measurements were saved for this consultation.</p>'}</section></main><footer>Appointment ID: ${escapeHtml(input.appointmentId)}</footer><script>window.onload=()=>window.print();<\/script></body></html>`);
+
+  popup.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8" /><title>Ventricura Clinical Encounter Report — ${escapeHtml(input.patientName)}</title><style>
+    @page { size: A4; margin: 15mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #161616; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 9.5pt; line-height: 1.5; background: #ffffff; }
+    header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 14px; border-bottom: 2.5px solid #181818; }
+    .brand-title { font-size: 15pt; font-weight: 900; letter-spacing: .08em; color: #111111; }
+    .report-badge { color: #555555; font-size: 7pt; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-top: 2px; }
+    .header-meta { text-align: right; color: #666666; font-size: 7.5pt; }
+    .patient-box { margin-top: 18px; padding: 14px 16px; background: #f8f8f8; border: 1px solid #dcdcdc; display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; }
+    .patient-box h1 { margin: 2px 0 4px; font-size: 18pt; letter-spacing: -.03em; color: #111111; }
+    .patient-box p { margin: 0; color: #555555; font-size: 8.5pt; }
+    .patient-meta-item strong { display: block; font-size: 8pt; color: #666666; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+    .patient-meta-item span { font-size: 9pt; color: #181818; font-weight: 600; }
+    .vitals-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0; }
+    .vital-card { padding: 12px 14px; border: 1px solid #cfcfcf; background: #fafafa; }
+    .vital-card .label { color: #666666; font-size: 6.8pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .vital-card strong { display: block; margin: 4px 0 2px; font-size: 14.5pt; font-weight: 800; color: #111111; letter-spacing: -.03em; }
+    .vital-card small { color: #777777; font-size: 6.8pt; }
+    .section-title { margin: 20px 0 8px; font-size: 10.5pt; font-weight: 800; letter-spacing: -.02em; text-transform: uppercase; color: #222222; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+    .notes-box { min-height: 80px; padding: 14px; border: 1px solid #d4d4d4; background: #fdfdfd; font-family: inherit; font-size: 9pt; line-height: 1.55; color: #1e1e1e; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 8pt; }
+    th { color: #5a5a5a; font-size: 6.8pt; font-weight: 700; letter-spacing: .06em; text-align: left; text-transform: uppercase; padding: 7px 8px; border-bottom: 1.5px solid #181818; }
+    td { padding: 7px 8px; border-bottom: 1px solid #e2e2e2; }
+    .disclaimer-block { margin-top: 22px; padding: 10px 12px; background: #f5f5f5; border-left: 3px solid #666666; color: #666666; font-size: 7pt; line-height: 1.45; }
+    .signature-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: 30px; margin-top: 26px; padding-top: 14px; border-top: 1px solid #cfcfcf; }
+    .signature-line { border-bottom: 1px solid #111111; height: 26px; margin-top: 8px; }
+    .signature-row span { font-size: 7.5pt; color: #555555; text-transform: uppercase; letter-spacing: .06em; }
+    footer { margin-top: 20px; font-size: 7pt; color: #888888; display: flex; justify-content: space-between; }
+    @media print { .no-print { display: none; } body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+  </style></head><body>
+    <header>
+      <div>
+        <div class="brand-title">VENTRICURA</div>
+        <div class="report-badge">Clinical Telehealth Encounter Report</div>
+      </div>
+      <div class="header-meta">
+        <div><strong>Encounter ID:</strong> ${escapeHtml(input.appointmentId)}</div>
+        <div><strong>Generated:</strong> ${escapeHtml(time(new Date().toISOString()))}</div>
+      </div>
+    </header>
+
+    <main>
+      <section class="patient-box">
+        <div>
+          <div class="report-badge">Patient Record</div>
+          <h1>${escapeHtml(input.patientName)}</h1>
+          <p>${escapeHtml(input.patientEmail)}</p>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div class="patient-meta-item">
+            <strong>Encounter Time</strong>
+            <span>${escapeHtml(time(input.startsAt))}</span>
+          </div>
+          <div class="patient-meta-item">
+            <strong>Clinical Reason</strong>
+            <span>${escapeHtml(input.reason || 'General Consultation')}</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-title">Objective Vitals Summary (contactless rPPG)</div>
+      <section class="vitals-grid">
+        <div class="vital-card">
+          <div class="label">Pulse (Heart Rate)</div>
+          <strong>${value(bpmVal, ' BPM')}</strong>
+          <small>30s quality-weighted avg</small>
+        </div>
+        <div class="vital-card">
+          <div class="label">Respiration Rate</div>
+          <strong>${value(brpmVal, ' /min')}</strong>
+          <small>Continuous optical tracking</small>
+        </div>
+        <div class="vital-card">
+          <div class="label">Autonomic Biomarkers</div>
+          <strong>${hrvVal != null ? `${Math.round(hrvVal)} ms` : '—'}</strong>
+          <small>HRV (RMSSD)${stressVal != null ? ` · Stress ${Math.round(stressVal)}/100` : ''}</small>
+        </div>
+        <div class="vital-card">
+          <div class="label">Signal Confidence</div>
+          <strong>${latest ? value(latest.signal_quality * 100, '%') : '—'}</strong>
+          <small>${input.samples.length} valid samples · ${escapeHtml(algo)}</small>
+        </div>
+      </section>
+
+      <div class="section-title">Attending Clinician Consultation Notes</div>
+      <section class="notes-box">${safeNotes}</section>
+
+      <div class="section-title">Telemetry & Measurement Audit Log</div>
+      <section>
+        ${input.samples.length ? `<table>
+          <thead>
+            <tr><th>Timestamp</th><th>Pulse (BPM)</th><th>Respiration (/min)</th><th>Signal Quality</th><th>Engine Version</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>` : '<p style="color:#777; font-size:8.5pt;">No discrete measurements were logged during this call.</p>'}
+      </section>
+
+      <div class="disclaimer-block">
+        <strong>Notice on Contactless Telemetry:</strong> This record was generated by Ventricura Telehealth using facial reflectance photoplethysmography (rPPG). Optical vital signs are intended to provide supplementary clinical physiological data and must be interpreted by a qualified medical practitioner alongside clinical history and examination. Not certified as a sole diagnostic instrument.
+      </div>
+
+      <section class="signature-row">
+        <div>
+          <span>Attending Clinician Signature</span>
+          <div class="signature-line"></div>
+        </div>
+        <div>
+          <span>Date & Certification</span>
+          <div class="signature-line"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Ventricura Telehealth · Encrypted Health Records</span>
+      <span>Page 1 of 1</span>
+    </footer>
+
+    <script>window.onload = () => { setTimeout(() => window.print(), 350); };</script>
+  </body></html>`);
   popup.document.close();
   return true;
 }
