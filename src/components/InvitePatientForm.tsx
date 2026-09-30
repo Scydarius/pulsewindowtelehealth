@@ -1,74 +1,34 @@
-import { CalendarDays, Clock3, Copy, Link2, LoaderCircle, Plus, X } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { CalendarDays, CheckCircle2, Clock3, Copy, Link2, LoaderCircle, Plus, Video, X } from 'lucide-react';
+import { FormEvent, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { createPatientInvitation } from '../services/clinicAccess';
 import { hasClinicalDatabaseConfiguration } from '../services/supabase';
 
-const localDateTime = (date: Date) => {
-  const local = new Date(date.valueOf() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-};
+const localDateTime = (date: Date) => new Date(date.valueOf() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+const scheduleParts = (date: Date) => { const local = localDateTime(date); return { date: local.slice(0, 10), time: local.slice(11) }; };
+const roundUp = (date = new Date()) => { const next = new Date(date); next.setMinutes(Math.ceil(next.getMinutes() / 15) * 15, 0, 0); return next; };
+const dateLabel = (value: string) => new Intl.DateTimeFormat('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${value}T12:00:00`));
 
-const currentLocalTime = () => {
-  const now = new Date();
-  now.setMinutes(Math.ceil(now.getMinutes() / 5) * 5, 0, 0);
-  return localDateTime(now);
-};
-const scheduleParts = (date: Date) => {
-  const local = localDateTime(date);
-  return { date: local.slice(0, 10), time: local.slice(11) };
-};
+export type ExistingPatientOption = { id: string; displayName: string; email: string; appointmentCount: number };
+type InvitePatientFormProps = { patients?: ExistingPatientOption[]; onCreated?: () => void };
 
-type InvitePatientFormProps = { onCreated?: () => void };
-
-export function InvitePatientForm({ onCreated }: InvitePatientFormProps) {
-  const [open, setOpen] = useState(false);
-  const [patientName, setPatientName] = useState('');
-  const [patientEmail, setPatientEmail] = useState('');
-  const [reason, setReason] = useState('');
-  const initialSchedule = scheduleParts(new Date());
-  const [appointmentDate, setAppointmentDate] = useState(initialSchedule.date);
-  const [appointmentTime, setAppointmentTime] = useState(initialSchedule.time);
-  const [link, setLink] = useState('');
-  const [emailStatus, setEmailStatus] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setSaving(true); setError(''); setLink(''); setEmailStatus('');
-    try {
-      const selectedTime = new Date(`${appointmentDate}T${appointmentTime}`);
-      if (!appointmentDate || !appointmentTime || Number.isNaN(selectedTime.valueOf())) throw new Error('Choose a valid appointment date and time.');
-      const invitation = await createPatientInvitation({ patientName, patientEmail, reason, startsAt: selectedTime.toISOString() });
-      setLink(invitation.invitationUrl);
-      setEmailStatus(invitation.emailSent ? `Appointment link sent to ${patientEmail}.` : invitation.emailWarning ?? 'Appointment link created. Share it with the patient manually.');
-      onCreated?.();
-    } catch (reasonError) {
-      setError(reasonError instanceof Error ? reasonError.message : 'Unable to create patient link.');
-    } finally { setSaving(false); }
-  };
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(link);
-  };
-  const chooseTime = (when: Date) => {
-    const next = scheduleParts(when);
-    setAppointmentDate(next.date); setAppointmentTime(next.time);
-  };
-  const soon = () => { const next = new Date(); next.setMinutes(Math.ceil(next.getMinutes() / 5) * 5 + 30, 0, 0); chooseTime(next); };
-  const tomorrowMorning = () => { const next = new Date(); next.setDate(next.getDate() + 1); next.setHours(9, 0, 0, 0); chooseTime(next); };
-
-  if (!open) return <button className="button button-secondary" onClick={() => setOpen(true)}><Plus size={17} /> New patient link</button>;
-  return <section className="invite-panel" aria-label="Create patient invitation">
-    <div className="section-heading compact"><div><p className="eyebrow">Clinician action</p><h2>Invite a patient</h2></div><button className="icon-button" onClick={() => setOpen(false)} aria-label="Close invitation form"><X size={18} /></button></div>
-    {!hasClinicalDatabaseConfiguration ? <p className="access-warning">Set up the clinical database first. This form cannot create real patient links until protected data storage is configured.</p> : <form onSubmit={(event) => void submit(event)} className="invite-form">
-      <label>Patient name<input value={patientName} onChange={(event) => setPatientName(event.target.value)} required /></label>
-      <label>Patient email<input type="email" value={patientEmail} onChange={(event) => setPatientEmail(event.target.value)} required /></label>
-      <label>Appointment reason<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Scheduled consultation" required /></label>
-      <fieldset className="schedule-picker"><legend>Appointment time</legend><div className="schedule-fields"><label><CalendarDays size={16} /> Date<input type="date" value={appointmentDate} min={currentLocalTime().slice(0, 10)} onChange={(event) => setAppointmentDate(event.target.value)} required /></label><label><Clock3 size={16} /> Time<input type="time" value={appointmentTime} step="300" onChange={(event) => setAppointmentTime(event.target.value)} required /></label></div><div className="schedule-shortcuts"><button type="button" onClick={soon}>In 30 minutes</button><button type="button" onClick={tomorrowMorning}>Tomorrow, 9:00 am</button></div><small>Times are shown in your local timezone.</small></fieldset>
-      <button className="button button-primary" disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Link2 size={17} />}{saving ? 'Creating…' : 'Create secure link'}</button>
+export function InvitePatientForm({ patients = [], onCreated }: InvitePatientFormProps) {
+  const [open, setOpen] = useState(false); const [patientEmail, setPatientEmail] = useState(''); const [patientName, setPatientName] = useState(''); const [reason, setReason] = useState(''); const [patientNote, setPatientNote] = useState('');
+  const initial = scheduleParts(roundUp()); const [appointmentDate, setAppointmentDate] = useState(initial.date); const [appointmentTime, setAppointmentTime] = useState(initial.time); const [link, setLink] = useState(''); const [appointmentId, setAppointmentId] = useState(''); const [emailStatus, setEmailStatus] = useState(''); const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
+  const dates = useMemo(() => Array.from({ length: 5 }, (_, index) => { const day = new Date(); day.setDate(day.getDate() + index); return scheduleParts(day).date; }), []);
+  const timeOptions = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+  const selectExistingPatient = (email: string) => { setPatientEmail(email); const patient = patients.find((entry) => entry.email === email); if (patient) setPatientName(patient.displayName); };
+  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); setError(''); setLink(''); setAppointmentId(''); setEmailStatus(''); try { const selectedTime = new Date(`${appointmentDate}T${appointmentTime}`); if (Number.isNaN(selectedTime.valueOf()) || selectedTime <= new Date()) throw new Error('Choose a future appointment time.'); const invitation = await createPatientInvitation({ patientName, patientEmail, reason, patientNote, startsAt: selectedTime.toISOString() }); setLink(invitation.invitationUrl); setAppointmentId(invitation.appointmentId); setEmailStatus(invitation.emailSent ? `The secure joining link was emailed to ${patientEmail}.` : invitation.emailWarning ?? 'The appointment was created. Copy the secure link below to send it manually.'); onCreated?.(); } catch (reasonError) { setError(reasonError instanceof Error ? reasonError.message : 'Unable to create the appointment.'); } finally { setSaving(false); } };
+  const copy = async () => navigator.clipboard.writeText(link);
+  if (!open) return <button type="button" className="button button-secondary" onClick={() => setOpen(true)}><Plus size={17} /> New appointment</button>;
+  return <section className="invite-panel" aria-label="Create appointment"><div className="section-heading compact"><div><p className="eyebrow">Appointment desk</p><h2>Schedule an appointment</h2><p>Create a new patient record or select an existing patient.</p></div><button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label="Close appointment form"><X size={18} /></button></div>
+    {!hasClinicalDatabaseConfiguration ? <p className="access-warning">Set up the clinical database first. This form cannot create real appointments until protected data storage is configured.</p> : <form onSubmit={(event) => void submit(event)} className="invite-form appointment-form">
+      <section className="appointment-form-section"><span className="form-step">1</span><div><strong>Patient</strong><small>Use their email to keep all visits under one profile.</small></div><label className="patient-picker">Existing patient<select value={patientEmail} onChange={(event) => selectExistingPatient(event.target.value)}><option value="">Add a new patient</option>{patients.map((patient) => <option key={patient.id} value={patient.email}>{patient.displayName} · {patient.email} · {patient.appointmentCount} visit{patient.appointmentCount === 1 ? '' : 's'}</option>)}</select></label><div className="patient-details"><label>Full name<input value={patientName} onChange={(event) => setPatientName(event.target.value)} required autoComplete="name" /></label><label>Email<input type="email" value={patientEmail} onChange={(event) => setPatientEmail(event.target.value.toLowerCase())} required autoComplete="email" /></label></div></section>
+      <section className="appointment-form-section"><span className="form-step">2</span><div><strong>When</strong><small>Times are in your local timezone.</small></div><fieldset className="schedule-picker"><legend><CalendarDays size={15} /> Select a date</legend><div className="schedule-date-tabs">{dates.map((value) => <button type="button" key={value} className={appointmentDate === value ? 'selected' : ''} onClick={() => setAppointmentDate(value)}><span>{value === dates[0] ? 'Today' : value === dates[1] ? 'Tomorrow' : new Intl.DateTimeFormat('en-AU', { weekday: 'short' }).format(new Date(`${value}T12:00:00`))}</span><strong>{new Intl.DateTimeFormat('en-AU', { day: 'numeric' }).format(new Date(`${value}T12:00:00`))}</strong></button>)}</div><label className="custom-date"><CalendarDays size={15} /> Another date<input type="date" value={appointmentDate} min={scheduleParts(new Date()).date} onChange={(event) => setAppointmentDate(event.target.value)} required /></label><div className="time-choice-header"><Clock3 size={15} /><span>Choose a time</span><small>{dateLabel(appointmentDate)}</small></div><div className="schedule-time-grid">{timeOptions.map((time) => <button type="button" key={time} className={appointmentTime === time ? 'selected' : ''} onClick={() => setAppointmentTime(time)}>{new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit' }).format(new Date(`${appointmentDate}T${time}`))}</button>)}</div><label className="custom-time">Other time<input type="time" value={appointmentTime} step="900" onChange={(event) => setAppointmentTime(event.target.value)} required /></label></fieldset></section>
+      <section className="appointment-form-section"><span className="form-step">3</span><div><strong>Appointment details</strong><small>These details are visible to the clinician in the patient record.</small></div><label>What is the appointment for?<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Follow-up consultation" maxLength={140} required /></label><label>Patient notes <small>(optional)</small><textarea value={patientNote} onChange={(event) => setPatientNote(event.target.value)} placeholder="Symptoms, concerns, relevant context, or anything the clinician should know before the appointment." maxLength={2000} /></label></section>
+      <button className="button button-primary appointment-submit" disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Link2 size={17} />}{saving ? 'Creating appointment…' : 'Create appointment and email link'}</button>
     </form>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    {link && <div className="created-link"><strong>Patient link ready</strong><span>{emailStatus} The link expires 24 hours after the appointment start time.</span><div><input value={link} readOnly aria-label="Patient invitation link" /><button className="button button-secondary button-small" onClick={() => void copy()}><Copy size={16} /> Copy</button></div></div>}
+    {link && <div className="created-link created-appointment"><CheckCircle2 size={21} /><div><strong>Appointment created</strong><span>{emailStatus}</span></div><div className="created-appointment-actions">{appointmentId && <Link className="button button-primary button-small" to={`/consultation/${appointmentId}?role=clinician`}><Video size={16} /> Join appointment</Link>}<button type="button" className="button button-secondary button-small" onClick={() => void copy()}><Copy size={16} /> Copy patient link</button></div><input value={link} readOnly aria-label="Patient invitation link" /></div>}
   </section>;
 }

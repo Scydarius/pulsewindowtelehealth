@@ -4,6 +4,7 @@ export type PatientInvitation = {
   patientName: string;
   patientEmail: string;
   reason: string;
+  patientNote?: string;
   startsAt: string;
 };
 
@@ -92,9 +93,9 @@ export async function createPatientInvitation(invitation: PatientInvitation) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(invitation),
   });
-  const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as { invitationUrl?: string; emailSent?: boolean; emailWarning?: string; error?: string };
+  const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as { invitationUrl?: string; appointmentId?: string; emailSent?: boolean; emailWarning?: string; error?: string };
   if (!response.ok || !body.invitationUrl) throw new Error(body.error ?? 'Unable to create the patient link.');
-  return { invitationUrl: body.invitationUrl, emailSent: body.emailSent === true, emailWarning: body.emailWarning };
+  return { invitationUrl: body.invitationUrl, appointmentId: body.appointmentId ?? '', emailSent: body.emailSent === true, emailWarning: body.emailWarning };
 }
 
 export type BookingAvailabilityDay = { day: number; enabled: boolean; start: string; end: string };
@@ -118,7 +119,7 @@ export async function saveClinicianBookingSettings(input: Pick<ClinicianBookingS
 }
 export async function loadPublicBookingProfile(bookingToken: string) { return bookingRequest<PublicBookingProfile>(`/api/clinician-invitations?action=public-profile&bookingToken=${encodeURIComponent(bookingToken)}`); }
 export async function loadPublicBookingSlots(bookingToken: string, date: string) { return bookingRequest<{ slots: string[]; timezone: string }>(`/api/clinician-invitations?action=public-slots&bookingToken=${encodeURIComponent(bookingToken)}&date=${encodeURIComponent(date)}`); }
-export async function bookPublicAppointment(input: { bookingToken: string; patientName: string; patientEmail: string; reason: string; startsAt: string }) {
+export async function bookPublicAppointment(input: { bookingToken: string; patientName: string; patientEmail: string; reason: string; patientNote?: string; startsAt: string }) {
   return bookingRequest<{ emailSent: boolean; emailWarning?: string; startsAt: string }>('/api/clinician-invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'public-book', ...input }) });
 }
 
@@ -232,5 +233,4 @@ export async function testGoogleCalendarSync(): Promise<GoogleSyncDiagnostic> {
   });
   return response.json();
 }
-
 
