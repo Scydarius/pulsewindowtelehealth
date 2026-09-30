@@ -2,6 +2,33 @@ export type MeasurementStatus = 'idle' | 'preparing' | 'measuring' | 'complete' 
 
 export type ResearchDiagnostics = Record<string, unknown>;
 
+export interface CardiacData {
+  bpm: number;
+  clinical_bpm?: number | null;          // Clean 30s quality-weighted average
+  session_average_bpm?: number | null;   // Explicit 30s average
+  confidence_interval_bpm?: number;
+  kalman_bpm?: number;
+  hrv_rmssd_ms?: number | null;
+  stress_score?: number | null;
+  stress_level?: string;
+  peak_freq_hz?: number;
+  waveform_sample?: number;
+  waveform?: number[];
+}
+
+export interface RespirationData {
+  brpm?: number | null;
+  clinical_brpm?: number | null;         // Clean 30s quality-weighted average
+  session_average_brpm?: number | null;  // Explicit 30s average
+  phase?: string;
+  phase_pct?: number;
+  depth?: string;
+  is_apnea?: boolean;
+  ie_ratio?: string;
+  rqi_pct?: number;
+  waveform?: number[];
+}
+
 export type MeasurementUpdate = {
   status: MeasurementStatus;
   progress: number;
@@ -105,6 +132,8 @@ class WebSocketRppgClient implements RppgClient {
     let receivedReady = false;
     let serverFailureMessage = '';
     let latestSample: MeasurementUpdate['sample'];
+    let latestSessionBpm: number | null = null;
+    let latestSessionBrpm: number | null = null;
     let completed = false;
     let recordingStartedAt: number | undefined;
     let captureTimer: number | undefined;
@@ -117,7 +146,21 @@ class WebSocketRppgClient implements RppgClient {
       video.srcObject = null;
       context.onCameraStream?.(null);
       if (latestSample) {
-        onUpdate({ status: 'complete', progress: 100, signalQuality: latestSample.signalQuality, heartRateBpm: latestSample.heartRateBpm, respiratoryRate: latestSample.respiratoryRate, message: '30-second camera check complete', algorithmVersion: 'railway-rppg-2.16', faceDetected: true, trackingState: 'LOCKED', diagnostics: latestSample.diagnostics, sample: latestSample });
+        const finalBpm = latestSessionBpm ?? latestSample.heartRateBpm;
+        const finalBrpm = latestSessionBrpm ?? latestSample.respiratoryRate;
+        onUpdate({
+          status: 'complete',
+          progress: 100,
+          signalQuality: latestSample.signalQuality,
+          heartRateBpm: finalBpm,
+          respiratoryRate: finalBrpm,
+          message: '30-second camera check complete',
+          algorithmVersion: 'railway-rppg-2.16',
+          faceDetected: true,
+          trackingState: 'LOCKED',
+          diagnostics: latestSample.diagnostics,
+          sample: { ...latestSample, heartRateBpm: finalBpm, respiratoryRate: finalBrpm },
+        });
       } else {
         onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: 'No stable reading was received during the 30-second camera check.' });
       }
@@ -158,15 +201,28 @@ class WebSocketRppgClient implements RppgClient {
         }, 1000 / CAPTURE_FPS);
       }
       if (eventData.type === 'telemetry') {
-        const cardiac = eventData.cardiac as { bpm?: number; hrv_rmssd_ms?: number | null; hrv_sdnn_ms?: number | null; hrv_pnn50_pct?: number | null; hrv_lf_hf_ratio?: number | null; stress_index?: number | null; stress_score?: number | null; stress_level?: string } | undefined;
-        const respiration = eventData.respiration as { brpm?: number | null } | undefined;
+        const cardiac = eventData.cardiac as CardiacData | undefined;
+        const respiration = eventData.respiration as RespirationData | undefined;
         const quality = Number(eventData.quality_score ?? 0);
         const state = String(eventData.tracking_state ?? 'CALIBRATING');
         const validReadout = eventData.is_valid_readout === true;
-        const bpm = Number(cardiac?.bpm);
-        const brpm = Number(respiration?.brpm);
+
+        // Use clinical_bpm and clinical_brpm (anchored to 30s quality-weighted average)
+        const bpmRaw = cardiac?.clinical_bpm ?? cardiac?.bpm;
+        const brpmRaw = respiration?.clinical_brpm ?? respiration?.brpm;
+        const bpm = Number(bpmRaw);
+        const brpm = Number(brpmRaw);
+
+        // Keep track of explicit 30s session averages for final reading & export
+        if (cardiac?.session_average_bpm != null && Number.isFinite(Number(cardiac.session_average_bpm))) {
+          latestSessionBpm = Number(cardiac.session_average_bpm);
+        }
+        if (respiration?.session_average_brpm != null && Number.isFinite(Number(respiration.session_average_brpm))) {
+          latestSessionBrpm = Number(respiration.session_average_brpm);
+        }
+
         const motionDetected = eventData.motion_detected === true;
-        // The engine owns all signal-quality decisions.  The browser must not
+        // The engine owns all signal-quality decisions. The browser must not
         // apply another quality, SNR, movement, or tracking-state threshold.
         const acceptedByEngine = validReadout && Number.isFinite(bpm) && Number.isFinite(brpm);
         const now = Date.now();

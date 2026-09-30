@@ -93,7 +93,12 @@ function PrivateNotes({ appointmentId }: { appointmentId: string }) {
 
 function exportMeasurementCsv(appointmentId: string, samples: SavedMeasurement[]) {
   const header = ['appointment_id', 'measured_at', 'heart_rate_bpm', 'respiratory_rate_bpm', 'signal_quality', 'algorithm_version'];
-  const rows = samples.map((sample) => [appointmentId, sample.measured_at, sample.heart_rate_bpm, sample.respiratory_rate_bpm, sample.signal_quality, sample.algorithm_version ?? ''].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','));
+  const rows = samples.map((sample) => {
+    const diag = sample.diagnostics as { cardiac?: { session_average_bpm?: number; clinical_bpm?: number }; respiration?: { session_average_brpm?: number; clinical_brpm?: number } } | undefined;
+    const bpm = diag?.cardiac?.session_average_bpm ?? diag?.cardiac?.clinical_bpm ?? sample.heart_rate_bpm;
+    const brpm = diag?.respiration?.session_average_brpm ?? diag?.respiration?.clinical_brpm ?? sample.respiratory_rate_bpm;
+    return [appointmentId, sample.measured_at, bpm, brpm, sample.signal_quality, sample.algorithm_version ?? ''].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',');
+  });
   const blob = new Blob([[header.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = `ventricura-measurement-${appointmentId}.csv`; anchor.click(); URL.revokeObjectURL(url);
@@ -196,13 +201,13 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
           <Activity />
           <span>Pulse</span>
           <strong>{measurement.heartRateBpm ?? '— —'}</strong>
-          <small>BPM · current API readout</small>
+          <small>BPM · 30s clinical average</small>
         </article>
         <article>
           <Wind />
           <span>Breathing</span>
           <strong>{measurement.respiratoryRate ?? '— —'}</strong>
-          <small>breaths/min · current API readout</small>
+          <small>breaths/min · 30s clinical average</small>
         </article>
       </div>
 

@@ -61,6 +61,19 @@ export function AppShell() {
           {isClinician && <button className="header-sign-out" onClick={() => void signOut()} disabled={signingOut}><LogOut size={16} /> {signingOut ? 'Signing out…' : 'Sign out'}</button>}
         </div>
       </header>
+
+      {!isConsultation && isClinician && (
+        <nav className="clinician-mobile-nav" aria-label="Mobile workspace navigation">
+          <Link to="/clinician" className={workspaceNavClass('overview')}>Overview</Link>
+          <Link to="/clinician?view=patients" className={workspaceNavClass('patients')}>Patients</Link>
+          <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments')}>Appointments</Link>
+          <Link to="/clinician?view=calendar" className={workspaceNavClass('calendar')}>Calendar</Link>
+          <Link to="/clinician?view=availability" className={workspaceNavClass('availability')}>Availability</Link>
+          <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}>Measurements</Link>
+          {isAdmin && <Link to="/admin" className={isAdminPage ? 'active' : undefined}>Admin</Link>}
+        </nav>
+      )}
+
       <main key={`${location.pathname}${location.search}`} className="app-main app-page-enter">
         <Outlet />
       </main>

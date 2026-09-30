@@ -16,6 +16,8 @@ function metric(value: number | null, digits = 0) { return value === null || !Nu
 
 export function LiveDemoPage() {
   const videoRef = useRef<HTMLVideoElement>(null); const canvasRef = useRef<HTMLCanvasElement>(null); const streamRef = useRef<MediaStream | null>(null); const socketRef = useRef<WebSocket | null>(null); const intervalRef = useRef<number | null>(null); const sessionTimerRef = useRef<number | null>(null); const busyRef = useRef(false); const finishedRef = useRef(false); const measurementStartedRef = useRef<number | null>(null);
+  const latestSessionBpmRef = useRef<number | null>(null);
+  const latestSessionBrpmRef = useRef<number | null>(null);
   const [stage, setStage] = useState<Stage>('idle'); const [status, setStatus] = useState('Camera off — start when you are ready.'); const [reading, setReading] = useState<Reading>(emptyReading); const [seconds, setSeconds] = useState(0);
   const running = stage === 'permission' || stage === 'connecting' || stage === 'positioning' || stage === 'measuring';
   const stop = useCallback((nextStatus = 'Camera off — start when you are ready.') => {
@@ -32,6 +34,13 @@ export function LiveDemoPage() {
     streamRef.current?.getTracks().forEach((track) => track.stop()); streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     finishedRef.current = true; measurementStartedRef.current = null; setSeconds(30); setStage('complete'); setStatus('30-second session complete — your camera has been turned off.');
+    if (latestSessionBpmRef.current !== null || latestSessionBrpmRef.current !== null) {
+      setReading((prev) => ({
+        ...prev,
+        bpm: latestSessionBpmRef.current ?? prev.bpm,
+        respiratoryRate: latestSessionBrpmRef.current ?? prev.respiratoryRate,
+      }));
+    }
   }, []);
   useEffect(() => () => stop(), [stop]);
 
@@ -47,7 +56,15 @@ export function LiveDemoPage() {
   const receive = useCallback((data: Record<string, unknown>) => {
     if (finishedRef.current) return;
     const cardiac = (data.cardiac ?? {}) as Record<string, unknown>; const respiration = (data.respiration ?? {}) as Record<string, unknown>;
-    const bpm = Number(cardiac.bpm); const respiratoryRate = Number(respiration.brpm); const valid = data.is_valid_readout === true && Number.isFinite(bpm);
+    const bpmRaw = cardiac.clinical_bpm ?? cardiac.bpm;
+    const brpmRaw = respiration.clinical_brpm ?? respiration.brpm;
+    const bpm = Number(bpmRaw); const respiratoryRate = Number(brpmRaw); const valid = data.is_valid_readout === true && Number.isFinite(bpm);
+    if (cardiac.session_average_bpm != null && Number.isFinite(Number(cardiac.session_average_bpm))) {
+      latestSessionBpmRef.current = Number(cardiac.session_average_bpm);
+    }
+    if (respiration.session_average_brpm != null && Number.isFinite(Number(respiration.session_average_brpm))) {
+      latestSessionBrpmRef.current = Number(respiration.session_average_brpm);
+    }
     const next: Reading = { bpm: Number.isFinite(bpm) ? bpm : null, respiratoryRate: Number.isFinite(respiratoryRate) ? respiratoryRate : null, quality: Number(data.quality_score ?? 0), snr: Number.isFinite(Number(data.snr_db)) ? Number(data.snr_db) : null, latency: Number.isFinite(Number(data.processing_latency_ms)) ? Number(data.processing_latency_ms) : null, faceDetected: data.face_detected === true, motionDetected: data.motion_detected === true, valid, state: String(data.tracking_state ?? 'CALIBRATING'), waveform: Array.isArray(cardiac.waveform) ? cardiac.waveform.map(Number).filter(Number.isFinite) : [], spectrum: Array.isArray(data.cardiac_spectrum_power) ? data.cardiac_spectrum_power.map(Number).filter(Number.isFinite) : [] };
     setReading(next);
     if (!next.faceDetected) { setStage('positioning'); setStatus('Position your face inside the guide.'); return; }
@@ -61,7 +78,7 @@ export function LiveDemoPage() {
   const start = async () => {
     if (!navigator.mediaDevices?.getUserMedia) { setStage('error'); setStatus('This browser does not provide camera access.'); return; }
     try {
-      finishedRef.current = false; setStage('permission'); setStatus('Approve camera access in your browser.'); setReading(emptyReading); setSeconds(0);
+      finishedRef.current = false; latestSessionBpmRef.current = null; latestSessionBrpmRef.current = null; setStage('permission'); setStatus('Approve camera access in your browser.'); setReading(emptyReading); setSeconds(0);
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false });
       streamRef.current = stream; if (!videoRef.current) throw new Error('Camera preview is unavailable.'); videoRef.current.srcObject = stream; await videoRef.current.play();
       setStage('connecting'); setStatus('Opening a short-lived, secure signal session…');
