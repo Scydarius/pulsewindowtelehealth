@@ -45,6 +45,7 @@ export function AppShell() {
             </Link>
             <Link to="/clinician?view=patients" className={workspaceNavClass('patients')}><UserRound size={18} /> Patients</Link>
             <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments')}><CalendarDays size={18} /> Appointments</Link>
+            <Link to="/clinician?view=calendar" className={workspaceNavClass('calendar')}><CalendarDays size={18} /> Calendar</Link>
             <Link to="/clinician?view=availability" className={workspaceNavClass('availability')}><CalendarDays size={18} /> Availability</Link>
             <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}><Stethoscope size={18} /> Measurements</Link>
             {isAdmin && <Link to="/admin" className={isAdminPage ? 'active' : undefined}><ShieldCheck size={18} /> Admin</Link>}

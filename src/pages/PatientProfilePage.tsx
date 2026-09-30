@@ -7,6 +7,17 @@ const number = (value: number | null, digits = 0) => value === null ? '—' : va
 const dateTime = (value: string) => new Date(value).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
 const appointmentDetail = (value: string) => ({ reason: value.split('\n\nPatient notes:')[0].trim(), note: value.split('\n\nPatient notes:')[1]?.trim() ?? '' });
 
+function PatientTrend({ patient }: { patient: PatientProfile }) {
+  const points = patient.appointments
+    .map((appointment) => ({ date: appointment.starts_at, value: appointment.measurements.at(-1)?.heart_rate_bpm }))
+    .filter((item): item is { date: string; value: number } => typeof item.value === 'number' && Number.isFinite(item.value))
+    .sort((left, right) => new Date(left.date).valueOf() - new Date(right.date).valueOf());
+  if (points.length < 2) return null;
+  const min = Math.min(...points.map((point) => point.value)) - 2; const max = Math.max(...points.map((point) => point.value)) + 2; const range = Math.max(1, max - min);
+  const line = points.map((point, index) => `${(index / (points.length - 1)) * 100},${42 - ((point.value - min) / range) * 34}`).join(' ');
+  return <section className="patient-cross-session-trend"><div><p className="eyebrow">Across appointments</p><h2>Pulse trend</h2><span>{points.length} completed sessions</span></div><div className="cross-session-chart"><span>{Math.round(max)} BPM</span><svg viewBox="0 0 100 46" preserveAspectRatio="none" role="img" aria-label="Pulse trend across completed appointments"><polyline points={line} /></svg><span>{Math.round(min)} BPM</span></div><div className="cross-session-axis"><span>{new Date(points[0].date).toLocaleDateString('en-AU', { month: 'short', day: 'numeric' })}</span><span>Latest appointment</span></div></section>;
+}
+
 export function PatientProfilePage() {
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get('id') ?? '';
@@ -40,6 +51,7 @@ export function PatientProfilePage() {
       <article><div><Activity /></div><span><strong>{completed}</strong>Completed checks</span></article>
       <article><div><ClipboardList /></div><span><strong>{sampleCount}</strong>Saved API samples</span></article>
     </section>
+    <PatientTrend patient={patient} />
     <section className="panel patient-history-panel">
       <div className="section-heading patient-history-heading"><div><p className="eyebrow">Longitudinal record</p><h2>Appointments and measurements</h2><p>Each saved sample is shown exactly as returned by the rPPG API. No portal-side averaging or quality weighting is applied.</p></div></div>
       <div className="patient-history-list">
