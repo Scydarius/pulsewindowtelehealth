@@ -34,7 +34,7 @@ function SignalPlot({ title, values: series, tone = 'primary', primary = false, 
 function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unknown> | null }) {
   const [selectedPlot, setSelectedPlot] = useState<'ppg' | 'respiratory' | 'cardiacSpectrum' | 'respiratorySpectrum'>('ppg');
   const [expanded, setExpanded] = useState(false);
-  if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Signal detail</p><h3>Waveform analysis</h3></div><span>Research use only</span></div><button type="button" className="diagnostics-toggle" onClick={() => setExpanded((isExpanded) => !isExpanded)} aria-expanded={expanded}>{expanded ? <><ChevronUp size={16} /> Hide waveform drawer</> : <><ChevronDown size={16} /> Open waveform drawer</>}</button>{expanded && <div className="diagnostics-expanded-content"><div className="trend-empty">Waveforms, spectra, and engine telemetry will appear here as soon as a patient camera check is underway.</div></div>}</section>;
+  if (!diagnostics) return <section className="research-diagnostics"><div className="diagnostics-heading"><div><p className="eyebrow">Signal detail</p><h3>Waveform analysis</h3></div></div><button type="button" className="diagnostics-toggle" onClick={() => setExpanded((isExpanded) => !isExpanded)} aria-expanded={expanded}>{expanded ? <><ChevronUp size={16} /> Hide waveform drawer</> : <><ChevronDown size={16} /> Open waveform drawer</>}</button>{expanded && <div className="diagnostics-expanded-content"><div className="trend-empty">Waveforms, spectra, and engine telemetry will appear here as soon as a patient camera check is underway.</div></div>}</section>;
   const engine = (diagnostics.diagnostics ?? {}) as Record<string, unknown>;
   const roi = (diagnostics.roi_weights ?? {}) as Record<string, unknown>;
   const cardiac = (diagnostics.cardiac ?? {}) as Record<string, unknown>;
@@ -52,7 +52,7 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
   };
   const selected = plots[selectedPlot];
   return <section className="research-diagnostics">
-    <div className="diagnostics-heading"><div><p className="eyebrow">Signal detail</p><h3>Waveform analysis</h3></div><span>Research use only</span></div>
+    <div className="diagnostics-heading"><div><p className="eyebrow">Signal detail</p><h3>Waveform analysis</h3></div></div>
     <div className="diagnostics-grid diagnostics-grid-wide">
       <span><strong>{Number.isFinite(snr) ? `${snr.toFixed(1)} dB` : '—'}</strong>SNR</span>
       <span><strong>{Number(diagnostics.quality_score ?? 0).toFixed(2)}</strong>Signal quality</span>
@@ -69,7 +69,7 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
       <div className="research-secondary-plots">
         {(Object.entries(plots) as [keyof typeof plots, typeof selected][]).map(([key, plot]) => <SignalPlot key={key} title={plot.title} values={plot.series} tone={plot.tone} detail={plot.detail} xAxis={plot.xAxis} yAxis={plot.yAxis} active={selectedPlot === key} onSelect={() => setSelectedPlot(key)} />)}
       </div>
-      <section className="advanced-telemetry"><div><p className="eyebrow">Expanded engine telemetry</p><h4>Raw API diagnostics</h4></div><div className="advanced-telemetry-grid"><span><strong>{Number(cardiac.hrv_rmssd_ms ?? 0).toFixed(0)} ms</strong>HRV RMSSD</span><span><strong>{Number(cardiac.hrv_sdnn_ms ?? 0).toFixed(0)} ms</strong>HRV SDNN</span><span><strong>{Number(cardiac.hrv_pnn50_pct ?? 0).toFixed(0)}%</strong>pNN50</span><span><strong>{Number(cardiac.hrv_lf_hf_ratio ?? 0).toFixed(2)}</strong>LF/HF ratio</span><span><strong>{Number(respiration.rqi_pct ?? 0).toFixed(0)}%</strong>Respiratory quality</span><span><strong>{String(respiration.phase ?? '—')}</strong>Breathing phase</span></div><p>Values are rendered directly from the rPPG API. Research telemetry only; not a diagnosis, assessment, or clinical decision tool.</p></section>
+      <section className="advanced-telemetry"><div><p className="eyebrow">Expanded engine telemetry</p><h4>Raw API diagnostics</h4></div><div className="advanced-telemetry-grid"><span><strong>{Number(cardiac.hrv_rmssd_ms ?? 0).toFixed(0)} ms</strong>HRV RMSSD</span><span><strong>{Number(cardiac.hrv_sdnn_ms ?? 0).toFixed(0)} ms</strong>HRV SDNN</span><span><strong>{Number(cardiac.hrv_pnn50_pct ?? 0).toFixed(0)}%</strong>pNN50</span><span><strong>{Number(cardiac.hrv_lf_hf_ratio ?? 0).toFixed(2)}</strong>LF/HF ratio</span><span><strong>{Number(respiration.rqi_pct ?? 0).toFixed(0)}%</strong>Respiratory quality</span><span><strong>{String(respiration.phase ?? '—')}</strong>Breathing phase</span></div></section>
       <div className="engine-line">{String(engine.algorithm ?? 'FUSION')} algorithm · motion {Number(engine.motion_velocity ?? 0).toFixed(2)} IOD/s · landmark displacement {Number(engine.motion_displacement_px ?? 0).toFixed(2)} px · spectral entropy {Number(engine.spectral_entropy ?? 0).toFixed(2)} · buffer {String(engine.buffer_samples ?? '—')}/{String(engine.buffer_capacity ?? '—')} samples</div>
     </div>}
   </section>;
@@ -88,7 +88,7 @@ function PrivateNotes({ appointmentId }: { appointmentId: string }) {
     try { await savePrivateClinicalNote(appointmentId, content); setStatus('saved'); }
     catch { setStatus('error'); }
   };
-  return <section className="private-notes" aria-label="Private clinician notes"><div className="private-notes-heading"><div><p className="eyebrow"><LockKeyhole size={13} /> Private clinician notes</p><h3>Consultation notes</h3><span>Only clinicians assigned to this appointment can access these notes.</span></div><button className="button button-secondary" type="button" onClick={() => void save()} disabled={status === 'saving' || status === 'loading'}>{status === 'saving' ? 'Saving…' : 'Save notes'}</button></div><textarea value={content} onChange={(event) => { setContent(event.target.value); if (status !== 'loading') setStatus('saved'); }} placeholder="Document observations, discussion, follow-up, and non-diagnostic research context…" maxLength={10000} /><div className="notes-footer"><span>{status === 'error' ? 'Could not save notes. Please try again.' : status === 'loading' ? 'Loading secure notes…' : `${content.length.toLocaleString()}/10,000 characters`}</span><span>Stored on Ventricura</span></div></section>;
+  return <section className="private-notes" aria-label="Private clinician notes"><div className="private-notes-heading"><div><p className="eyebrow"><LockKeyhole size={13} /> Private clinician notes</p><h3>Consultation notes</h3><span>Only clinicians assigned to this appointment can access these notes.</span></div><button className="button button-secondary" type="button" onClick={() => void save()} disabled={status === 'saving' || status === 'loading'}>{status === 'saving' ? 'Saving…' : 'Save notes'}</button></div><textarea value={content} onChange={(event) => { setContent(event.target.value); if (status !== 'loading') setStatus('saved'); }} placeholder="Document observations, discussion, and follow-up…" maxLength={10000} /><div className="notes-footer"><span>{status === 'error' ? 'Could not save notes. Please try again.' : status === 'loading' ? 'Loading secure notes…' : `${content.length.toLocaleString()}/10,000 characters`}</span><span>Stored on Ventricura</span></div></section>;
 }
 
 function exportMeasurementCsv(appointmentId: string, samples: SavedMeasurement[]) {
@@ -225,7 +225,6 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
 
       <p className="clinician-measurement-note">This is the clinician-only results panel. It updates automatically when the patient completes their camera check.</p>
 
-      <p className="clinical-note">Measurements are not intended for diagnosis or emergency assessment.</p>
     </aside>
   );
 }

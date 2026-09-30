@@ -14,8 +14,7 @@ const copy = {
     ['How we use information', 'We use information to provide bookings and consultations, operate clinician access controls, send appointment emails, maintain security, troubleshoot issues, and improve the service.'],
     ['Questions or requests', 'For privacy questions, access requests, or correction and deletion requests, contact admin@ventricura.com.'],
   ] },
-  terms: { title: 'Terms of use', intro: 'The basic rules for using the Ventricura website and research platform.', sections: [
-    ['Research technology only', 'Ventricura presents camera-based rPPG research telemetry. It is not a diagnostic device, emergency service, or replacement for clinical judgement or validated medical equipment.'],
+  terms: { title: 'Terms of use', intro: 'The basic rules for using the Ventricura website and platform.', sections: [
     ['Appropriate use', 'Use the public website lawfully and do not submit sensitive patient information through the contact form. Clinician workspace access is restricted to administrator-approved users.'],
     ['Accounts and links', 'Clinicians are responsible for keeping their account access secure. Patient appointment links are intended only for the person and appointment they were issued for.'],
     ['Changes and contact', 'The service and these terms may change as Ventricura develops. Questions can be sent to admin@ventricura.com.'],

@@ -41,7 +41,6 @@ export function PatientInvitePage() {
       <div className="invite-details"><span><CalendarDays size={17} /> {new Date(invitation.startsAt).toLocaleString()}</span><span><Video size={17} /> Camera and microphone needed</span></div>
       <label className="patient-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I consent to Ventricura using the information I provide and my camera feed for this appointment, as described in the <Link to="/privacy" target="_blank">Privacy Policy</Link>.</span></label>
       <button className="button button-primary button-full" type="button" onClick={() => void join()} disabled={!consent || consenting}>{consenting ? 'Preparing appointment…' : 'Join consultation'}</button>
-      <p className="clinical-note">Research prototype only. Do not use this service for an emergency.</p>
     </>}
   </section></main>;
 }

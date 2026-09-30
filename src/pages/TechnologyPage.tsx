@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PublicFooter, Seo } from '../components/PublicSite';
 
 export function TechnologyPage() {
-  return <main className="ventricura-public technology-page"><Seo title="Contactless rPPG technology | Ventricura" description="How Ventricura connects guided camera checks, rPPG research telemetry, and clinician review in a telehealth workflow." path="/technology" />
+  return <main className="ventricura-public technology-page"><Seo title="Contactless rPPG technology | Ventricura" description="How Ventricura connects guided camera checks, rPPG signals, and clinician review in a telehealth workflow." path="/technology" />
     <PublicHeader />
     <section className="technology-hero">
       <div>
@@ -26,7 +26,7 @@ export function TechnologyPage() {
     </section>
 
     <section className="signal-explainer">
-      <div className="signal-explainer-copy"><p className="mono-kicker">REMOTE PHOTOPLETHYSMOGRAPHY</p><h2>Small optical changes.<br />A more useful view.</h2><p>rPPG analyses subtle changes in reflected light from the face. Ventricura presents this as research telemetry and consultation context—not a diagnosis or a substitute for validated clinical devices.</p></div>
+      <div className="signal-explainer-copy"><p className="mono-kicker">REMOTE PHOTOPLETHYSMOGRAPHY</p><h2>Small optical changes.<br />A more useful view.</h2><p>rPPG analyses subtle changes in reflected light from the face and presents those signals in the consultation workflow.</p></div>
       <div className="signal-sequence" aria-label="Signal processing sequence"><div><span>INPUT</span><strong>Video frames</strong><i /></div><b>→</b><div><span>EXTRACT</span><strong>Skin regions</strong><i /></div><b>→</b><div><span>ANALYSE</span><strong>Optical waveform</strong><i /></div><b>→</b><div><span>REVIEW</span><strong>Clinical context</strong><i /></div></div>
     </section>
 
