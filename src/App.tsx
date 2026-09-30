@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { AdminSessionGate } from './components/AdminSessionGate';
 import { ClinicianSessionGate } from './components/ClinicianSessionGate';
+import { PatientSessionGate } from './components/PatientSessionGate';
 import { LandingPage } from './pages/LandingPage';
 
 const ClinicianPage = lazy(() => import('./pages/ClinicianPage').then((module) => ({ default: module.ClinicianPage })));
@@ -31,7 +32,9 @@ const page = (element: React.ReactNode) => (
 function ConsultationRoute() {
   const [params] = useSearchParams();
   const consultation = page(<ConsultationPage />);
-  return params.get('role') === 'clinician' ? <ClinicianSessionGate>{consultation}</ClinicianSessionGate> : consultation;
+  return params.get('role') === 'clinician'
+    ? <ClinicianSessionGate>{consultation}</ClinicianSessionGate>
+    : <PatientSessionGate>{consultation}</PatientSessionGate>;
 }
 
 export default function App() {

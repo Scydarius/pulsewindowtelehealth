@@ -1,8 +1,9 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createGoogleCalendarEvent, getGoogleFreeBusy } from '../lib/googleCalendar.js';
+import { recordAuditEvent } from '../lib/audit.js';
 
 type AvailabilityDay = { day: number; enabled: boolean; start: string; end: string };
-type RequestBody = { action?: 'save-availability' | 'public-book'; patientName?: string; patientEmail?: string; reason?: string; patientNote?: string; startsAt?: string; bookingToken?: string; timezone?: string; durationMinutes?: number; weeklyAvailability?: AvailabilityDay[]; bookingEnabled?: boolean; bookingReason?: string };
+type RequestBody = { action?: 'save-availability' | 'public-book' | 'patient-consent'; patientName?: string; patientEmail?: string; reason?: string; patientNote?: string; startsAt?: string; bookingToken?: string; timezone?: string; durationMinutes?: number; weeklyAvailability?: AvailabilityDay[]; bookingEnabled?: boolean; bookingReason?: string; appointmentId?: string; invitationToken?: string };
 type DeliveryResult = { sent: boolean; warning?: string };
 type BookingProfile = { clinician_id: string; booking_token: string; timezone: string; duration_minutes: number; weekly_availability: AvailabilityDay[]; booking_enabled: boolean; booking_reason: string };
 
@@ -105,6 +106,7 @@ async function createAppointment(input: { db: SupabaseClient; clinicianId: strin
   } catch {
     // Non-blocking: calendar sync failure should not prevent appointment creation
   }
+  await recordAuditEvent(input.db, { action: 'appointment.created', clinicianId: input.clinicianId, appointmentId: appointment.id, patientId: patient.id, metadata: { source: 'booking' } });
   return { invitationUrl, appointmentId: appointment.id, emailSent: delivery.sent, emailWarning: delivery.warning };
 }
 
@@ -131,6 +133,17 @@ export default { async fetch(request: Request) {
       return Response.json({ error: 'Unknown booking request.' }, { status: 400 });
     }
     if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 }); const body = await request.json() as RequestBody;
+    if (body.action === 'patient-consent') {
+      if (!body.appointmentId || !body.invitationToken || body.invitationToken.length < 32) throw new Error('A valid secure appointment link is required.');
+      const db = database();
+      const { data: invite } = await db.from('patient_invites').select('appointment_id, expires_at, revoked_at').eq('token_hash', await tokenHash(body.invitationToken)).maybeSingle();
+      if (!invite || invite.appointment_id !== body.appointmentId || invite.revoked_at || new Date(invite.expires_at) <= new Date()) throw new Error('This patient link is not authorised for this appointment.');
+      const consentAt = new Date().toISOString();
+      const { data: appointment, error } = await db.from('appointments').update({ patient_consent_at: consentAt, patient_consent_version: '2026-09-30' }).eq('id', body.appointmentId).select('patient_id').single();
+      if (error || !appointment) throw new Error('Unable to record consent for this appointment.');
+      await recordAuditEvent(db, { action: 'patient.consent_recorded', appointmentId: body.appointmentId, patientId: appointment.patient_id, metadata: { version: '2026-09-30' } });
+      return Response.json({ consentAt }, { headers: { 'Cache-Control': 'no-store' } });
+    }
     if (body.action === 'save-availability') { const { db, clinician } = await requireClinician(request); const duration = Number(body.durationMinutes); if (![15, 30, 45, 60].includes(duration)) throw new Error('Choose an appointment length of 15, 30, 45 or 60 minutes.'); const availability = normaliseAvailability(body.weeklyAvailability); if (!availability.some((day) => day.enabled && day.end > day.start)) throw new Error('Add at least one available time window before publishing your booking link.'); const existing = await db.from('clinician_booking_profiles').select('booking_token').eq('clinician_id', clinician.id).maybeSingle(); const bookingToken = existing.data?.booking_token ?? newOpaqueToken().slice(0, 20); const { error } = await db.from('clinician_booking_profiles').upsert({ clinician_id: clinician.id, booking_token: bookingToken, timezone: 'Australia/Adelaide', duration_minutes: duration, weekly_availability: availability, booking_enabled: Boolean(body.bookingEnabled), booking_reason: body.bookingReason?.trim().slice(0, 140) || 'Telehealth consultation', updated_at: new Date().toISOString() }, { onConflict: 'clinician_id' }); if (error) throw new Error('Could not save availability. Run the booking migration in Supabase first.'); return Response.json({ bookingToken, bookingUrl: `${(process.env.APP_URL ?? url.origin).replace(/\/$/, '')}/book/${bookingToken}` }); }
     if (body.action === 'public-book') { if (!body.bookingToken || !body.patientName?.trim() || !body.patientEmail?.trim() || !body.startsAt) throw new Error('Name, email and an available appointment time are required.'); const db = database(); const profile = await getBookingProfile(db, body.bookingToken); const startsAt = new Date(body.startsAt); if (Number.isNaN(startsAt.valueOf())) throw new Error('Choose a valid appointment time.'); if (!(await slotsForDate(db, profile, dateForTimezone(startsAt, profile.timezone))).includes(startsAt.toISOString())) throw new Error('That time has just become unavailable. Please choose another slot.'); const result = await createAppointment({ db, clinicianId: profile.clinician_id, patientName: body.patientName, patientEmail: body.patientEmail, reason: body.reason?.trim() || profile.booking_reason, patientNote: body.patientNote, startsAt, request }); return Response.json({ ...result, startsAt: startsAt.toISOString() }); }
     if (!body.patientName?.trim() || !body.patientEmail?.trim() || !body.reason?.trim() || !body.startsAt) throw new Error('Patient name, email, appointment reason and time are required.'); const startsAt = new Date(body.startsAt); if (Number.isNaN(startsAt.valueOf())) throw new Error('Appointment time is invalid.'); const { db, clinician } = await requireClinician(request); return Response.json(await createAppointment({ db, clinicianId: clinician.id, patientName: body.patientName, patientEmail: body.patientEmail, reason: body.reason, patientNote: body.patientNote, startsAt, request }), { headers: { 'Cache-Control': 'no-store' } });

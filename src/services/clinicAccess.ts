@@ -129,9 +129,9 @@ export async function createReplacementPatientInvitation(appointmentId: string) 
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ appointmentId }),
   });
-  const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable.' })) as { invitationUrl?: string; error?: string };
+  const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable.' })) as { invitationUrl?: string; emailSent?: boolean; emailWarning?: string; error?: string };
   if (!response.ok || !body.invitationUrl) throw new Error(body.error ?? 'Unable to create a replacement patient link.');
-  return body.invitationUrl;
+  return { invitationUrl: body.invitationUrl, emailSent: body.emailSent === true, emailWarning: body.emailWarning };
 }
 
 /** Revoke the current patient joining link without deleting the appointment or clinical record. */
@@ -163,6 +163,17 @@ export async function fetchPatientInvitation(token: string) {
   };
   if (!response.ok || !body.appointmentId) throw new Error(body.error ?? 'This patient link is no longer available.');
   return body as Required<Omit<typeof body, 'error'>>;
+}
+
+/** Records the patient's affirmative consent immediately before a protected call. */
+export async function recordPatientAppointmentConsent(appointmentId: string, invitationToken: string) {
+  const response = await fetch('/api/clinician-invitations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'patient-consent', appointmentId, invitationToken }),
+  });
+  const body = await response.json().catch(() => ({ error: 'The consent service is temporarily unavailable.' })) as { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Unable to record consent for this appointment.');
 }
 
 export type GoogleCalendarStatus = {
@@ -233,4 +244,3 @@ export async function testGoogleCalendarSync(): Promise<GoogleSyncDiagnostic> {
   });
   return response.json();
 }
-

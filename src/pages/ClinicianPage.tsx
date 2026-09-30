@@ -20,6 +20,7 @@ export function ClinicianPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [replacementLinks, setReplacementLinks] = useState<Record<string, string>>({});
+  const [replacementEmailStatus, setReplacementEmailStatus] = useState<Record<string, string>>({});
   const [linkError, setLinkError] = useState('');
   const [creatingLink, setCreatingLink] = useState<string>();
   const [revokingLink, setRevokingLink] = useState<string>();
@@ -57,8 +58,9 @@ export function ClinicianPage() {
   const createReplacementLink = async (appointmentId: string) => {
     setCreatingLink(appointmentId); setLinkError('');
     try {
-      const invitationUrl = await createReplacementPatientInvitation(appointmentId);
-      setReplacementLinks((links) => ({ ...links, [appointmentId]: invitationUrl }));
+      const result = await createReplacementPatientInvitation(appointmentId);
+      setReplacementLinks((links) => ({ ...links, [appointmentId]: result.invitationUrl }));
+      setReplacementEmailStatus((status) => ({ ...status, [appointmentId]: result.emailSent ? 'A new secure link has been emailed to the patient.' : result.emailWarning ?? 'A new secure link was created, but email delivery could not be confirmed.' }));
       setRevokedLinks((links) => { const next = { ...links }; delete next[appointmentId]; return next; });
     } catch (reason) { setLinkError(reason instanceof Error ? reason.message : 'Unable to generate a new patient link.'); }
     finally { setCreatingLink(undefined); }
@@ -109,7 +111,7 @@ export function ClinicianPage() {
         <button className="text-button danger-action" onClick={() => void removeAppointment(appointment.id)} disabled={deletingAppointment === appointment.id}>{deletingAppointment === appointment.id ? <LoaderCircle className="spin" size={16} /> : <Trash2 size={16} />}Delete appointment</button>
       </div>
       {note && <aside className="appointment-intake-note"><div><MessageSquareText size={16} /><span>Patient intake note</span></div><p>{note}</p></aside>}
-      {replacementLinks[appointment.id] && <div className="appointment-link"><span>New patient link created. The old link has been revoked.</span><input value={replacementLinks[appointment.id]} readOnly aria-label="Replacement patient invitation link" /><button className="button button-secondary button-small" onClick={() => void copyLink(appointment.id)}><Copy size={16} /> Copy link</button></div>}
+      {replacementLinks[appointment.id] && <div className="appointment-link"><span>New patient link created. The old link has been revoked. {replacementEmailStatus[appointment.id]}</span><input value={replacementLinks[appointment.id]} readOnly aria-label="Replacement patient invitation link" /><button className="button button-secondary button-small" onClick={() => void copyLink(appointment.id)}><Copy size={16} /> Copy link</button></div>}
     </article>;
   };
   const title = view === 'patients' ? ['Patients', 'Active patients and their longitudinal records'] : view === 'appointments' ? ['Appointments', 'Schedule, call access, and secure links'] : view === 'measurements' ? ['Measurements', 'Readings received from patient sessions'] : view === 'availability' ? ['Booking availability', 'Publish a secure link so patients can choose from your available times.'] : ['Today’s consultations', 'Review your patients, appointments and readings in one secure workspace.'];

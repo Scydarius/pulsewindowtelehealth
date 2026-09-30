@@ -7,9 +7,12 @@ type TrustPageProps = { kind: 'privacy' | 'terms' | 'security' };
 const copy = {
   privacy: { title: 'Privacy', intro: 'How Ventricura handles information supplied through this website and platform.', sections: [
     ['Information we collect', 'Website enquiries may include your name, work email address, organisation, and message. Please do not submit patient records, health information, or urgent requests through the public contact form.'],
-    ['Platform information', 'Clinician accounts, appointment details, consultation notes, and saved research telemetry are used to operate the clinician workflow. Access is limited to the people and systems needed for that workflow.'],
-    ['How we use information', 'We use information to respond to enquiries, provide the platform, maintain security, troubleshoot issues, and improve the service.'],
-    ['Questions or requests', 'For privacy questions or requests about information associated with Ventricura, contact admin@ventricura.com.'],
+    ['Information used in an appointment', 'The platform may hold clinician account details, patient names and email addresses, appointment times, booking notes, private clinician notes, consent records, and measurements saved during an appointment.'],
+    ['How access works', 'Approved clinicians can access their own patient and appointment records. Platform administrators manage clinician access and may remove a patient record when authorised. A patient appointment link is specific to one appointment, expires automatically, and can be revoked by the clinician.'],
+    ['Service providers and storage', 'Ventricura uses Supabase for authentication and clinical database records, Vercel for the web application, LiveKit for configured video rooms, Railway for signal processing, and Resend for appointment emails. Each provider receives only the information needed to provide its part of the service.'],
+    ['Retention and deletion', 'Appointment records are retained under the applicable clinic agreement and operational requirements. An authorised Ventricura administrator can remove a patient record and its linked appointments, notes, measurements and patient links from the platform. Requests are assessed with the clinic before deletion where records may be required to be retained.'],
+    ['How we use information', 'We use information to provide bookings and consultations, operate clinician access controls, send appointment emails, maintain security, troubleshoot issues, and improve the service.'],
+    ['Questions or requests', 'For privacy questions, access requests, or correction and deletion requests, contact admin@ventricura.com.'],
   ] },
   terms: { title: 'Terms of use', intro: 'The basic rules for using the Ventricura website and research platform.', sections: [
     ['Research technology only', 'Ventricura presents camera-based rPPG research telemetry. It is not a diagnostic device, emergency service, or replacement for clinical judgement or validated medical equipment.'],
@@ -18,9 +21,9 @@ const copy = {
     ['Changes and contact', 'The service and these terms may change as Ventricura develops. Questions can be sent to admin@ventricura.com.'],
   ] },
   security: { title: 'Security', intro: 'The controls currently used to support the Ventricura workflow.', sections: [
-    ['Access control', 'Clinician access is restricted to administrator-approved accounts. Patient access uses purpose-specific appointment links.'],
+    ['Access control', 'Clinician access is restricted to administrator-approved accounts. Patient access uses a purpose-specific link for one appointment only; the link expires automatically and clinicians can revoke or replace it.'],
     ['Short-lived measurement access', 'The rPPG signal service is reached through short-lived signed access sessions rather than exposing the service secret in the browser.'],
-    ['Operational safeguards', 'Ventricura uses the platform’s access controls and records to support secure appointments, private clinician notes, and controlled patient links.'],
+    ['Operational safeguards', 'Ventricura records key appointment, patient-link and consent events to support accountable access. Private clinician notes are not available through patient appointment links.'],
     ['Report a concern', 'If you believe you have found a security issue, contact admin@ventricura.com with a clear description. Do not send sensitive patient information by email.'],
   ] },
 } as const;
