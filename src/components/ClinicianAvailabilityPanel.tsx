@@ -417,8 +417,8 @@ export function ClinicianAvailabilityPanel() {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px',
-                      background: '#1b1d1b',
-                      color: '#f6f6f1',
+                      background: '#1c1c1c',
+                      color: '#f6f6f6',
                       padding: '7px 12px',
                       textDecoration: 'none',
                       fontWeight: 600,
@@ -431,7 +431,7 @@ export function ClinicianAvailabilityPanel() {
                 </div>
               )}
               {diagnosticDetail && !diagnosticDetail.startsWith('https://') && (
-                <pre style={{ margin: '6px 0 0', padding: '8px', background: '#fff', border: '1px solid #dcded7', fontSize: '0.68rem', overflowX: 'auto', maxHeight: '160px' }}>
+                <pre style={{ margin: '6px 0 0', padding: '8px', background: '#ffffff', border: '1px solid #dddddd', fontSize: '0.68rem', overflowX: 'auto', maxHeight: '160px' }}>
                   {diagnosticDetail}
                 </pre>
               )}

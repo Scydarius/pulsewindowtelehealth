@@ -25,7 +25,7 @@ function HeartRateTrend({ samples }: { samples: SavedMeasurement[] }) {
   return <div className="trend-chart" role="img" aria-label="Heart rate over the current 30-second camera check"><div className="trend-scale"><span>{Math.round(max)}</span><span>{Math.round(min)}</span></div><svg viewBox="0 0 100 46" preserveAspectRatio="none"><polyline points={points} /></svg><div className="trend-axis"><span>Start</span><span>30 seconds</span></div></div>;
 }
 function values(value: unknown) { return Array.isArray(value) ? value.map(Number).filter(Number.isFinite) : []; }
-function SignalPlot({ title, values: series, tone = 'green', primary = false, detail, xAxis = 'Time (recent samples)', yAxis = 'Normalised amplitude (a.u.)', active = false, onSelect }: { title: string; values: number[]; tone?: 'green' | 'blue' | 'amber'; primary?: boolean; detail?: string; xAxis?: string; yAxis?: string; active?: boolean; onSelect?: () => void }) {
+function SignalPlot({ title, values: series, tone = 'primary', primary = false, detail, xAxis = 'Time (recent samples)', yAxis = 'Normalised amplitude (a.u.)', active = false, onSelect }: { title: string; values: number[]; tone?: 'primary' | 'secondary' | 'tertiary'; primary?: boolean; detail?: string; xAxis?: string; yAxis?: string; active?: boolean; onSelect?: () => void }) {
   if (series.length < 2) return <div className="research-plot-empty">Waiting for live engine telemetry…</div>;
   const min = Math.min(...series); const max = Math.max(...series); const range = Math.max(.0001, max - min);
   const points = series.map((value, index) => `${(index / (series.length - 1)) * 100},${42 - ((value - min) / range) * 34}`).join(' ');
@@ -45,10 +45,10 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
   const respirationFrequencies = values(diagnostics.respiration_spectrum_freq_hz);
   const frequencyLabel = (frequencies: number[]) => frequencies.length > 1 ? `${Math.min(...frequencies).toFixed(2)}–${Math.max(...frequencies).toFixed(2)} Hz` : 'Frequency spectrum';
   const plots = {
-    ppg: { title: 'Photoplethysmogram (PPG) waveform', series: values(cardiac.waveform), tone: 'green' as const, detail: 'API optical pulse signal', xAxis: 'Time (API samples)', yAxis: 'Normalised PPG amplitude (a.u.)' },
-    respiratory: { title: 'Respiratory modulation waveform', series: values(respiration.waveform), tone: 'blue' as const, detail: 'API respiratory signal', xAxis: 'Time (API samples)', yAxis: 'Normalised modulation (a.u.)' },
-    cardiacSpectrum: { title: 'Cardiac power spectrum', series: values(diagnostics.cardiac_spectrum_power), tone: 'amber' as const, detail: frequencyLabel(cardiacFrequencies), xAxis: 'Frequency (Hz)', yAxis: 'Normalised power' },
-    respiratorySpectrum: { title: 'Respiratory power spectrum', series: values(diagnostics.respiration_spectrum_power), tone: 'blue' as const, detail: frequencyLabel(respirationFrequencies), xAxis: 'Frequency (Hz)', yAxis: 'Normalised power' },
+    ppg: { title: 'Photoplethysmogram (PPG) waveform', series: values(cardiac.waveform), tone: 'primary' as const, detail: 'API optical pulse signal', xAxis: 'Time (API samples)', yAxis: 'Normalised PPG amplitude (a.u.)' },
+    respiratory: { title: 'Respiratory modulation waveform', series: values(respiration.waveform), tone: 'secondary' as const, detail: 'API respiratory signal', xAxis: 'Time (API samples)', yAxis: 'Normalised modulation (a.u.)' },
+    cardiacSpectrum: { title: 'Cardiac power spectrum', series: values(diagnostics.cardiac_spectrum_power), tone: 'tertiary' as const, detail: frequencyLabel(cardiacFrequencies), xAxis: 'Frequency (Hz)', yAxis: 'Normalised power' },
+    respiratorySpectrum: { title: 'Respiratory power spectrum', series: values(respiration.waveform), tone: 'secondary' as const, detail: frequencyLabel(respirationFrequencies), xAxis: 'Frequency (Hz)', yAxis: 'Normalised power' },
   };
   const selected = plots[selectedPlot];
   return <section className="research-diagnostics">

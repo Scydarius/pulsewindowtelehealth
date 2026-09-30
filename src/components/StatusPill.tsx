@@ -1,5 +1,5 @@
 type StatusPillProps = {
-  tone?: 'green' | 'amber' | 'neutral' | 'coral';
+  tone?: 'active' | 'muted' | 'neutral' | 'alert';
   children: React.ReactNode;
 };
 

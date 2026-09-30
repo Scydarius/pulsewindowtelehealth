@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ventricura">
-  <rect width="64" height="64" fill="#1b1d1b"/>
-  <path d="M10 14h10l12 27 12-27h10L36 51h-8L10 14Z" fill="#f4f4ee"/>
-  <path d="M29 22h6l-3 9-3-9Z" fill="#aeb0ac"/>
+  <rect width="64" height="64" fill="#1c1c1c"/>
+  <path d="M10 14h10l12 27 12-27h10L36 51h-8L10 14Z" fill="#f4f4f4"/>
+  <path d="M29 22h6l-3 9-3-9Z" fill="#afafaf"/>
 </svg>
