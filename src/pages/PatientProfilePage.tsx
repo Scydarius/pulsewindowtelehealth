@@ -1,7 +1,8 @@
 import { Activity, ArrowLeft, CalendarClock, ClipboardList, LoaderCircle, Mail, MessageSquareText, UserRound, Video } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { loadPatientProfile, type PatientProfile } from '../services/clinicAccess';
+import { CopyButton } from '../components/CopyButton';
+import { getOrGeneratePatientInvitation, loadPatientProfile, type PatientProfile } from '../services/clinicAccess';
 
 const number = (value: number | null, digits = 0) => value === null ? '—' : value.toFixed(digits);
 const dateTime = (value: string) => new Date(value).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
@@ -56,7 +57,7 @@ export function PatientProfilePage() {
       <div className="section-heading patient-history-heading"><div><p className="eyebrow">Longitudinal record</p><h2>Appointments and measurements</h2><p>Each saved sample is shown exactly as returned by the rPPG API. No portal-side averaging or quality weighting is applied.</p></div></div>
       <div className="patient-history-list">
         {appointments.map((appointment) => <article className="patient-history-card" key={appointment.id}>
-          {(() => { const details = appointmentDetail(appointment.reason); return <><div className="patient-history-main"><div><strong>{details.reason || 'Consultation'}</strong><span>{dateTime(appointment.starts_at)}</span></div><div className="patient-history-actions"><Link className="button button-primary button-small" to={`/consultation/${appointment.id}?role=clinician${patient?.display_name ? `&patientName=${encodeURIComponent(patient.display_name)}` : ''}`}><Video size={15} /> Join call</Link><Link className="button button-secondary button-small" to={`/clinician/review?appointment=${encodeURIComponent(appointment.id)}&patient=${encodeURIComponent(patientId)}`}>Review record</Link></div></div>{details.note && <aside className="patient-intake-note"><div><MessageSquareText size={16} /><span>Patient intake note</span></div><p>{details.note}</p></aside>}</>; })()}
+          {(() => { const details = appointmentDetail(appointment.reason); return <><div className="patient-history-main"><div><strong>{details.reason || 'Consultation'}</strong><span>{dateTime(appointment.starts_at)}</span></div><div className="patient-history-actions"><Link className="button button-primary button-small" to={`/consultation/${appointment.id}?role=clinician${patient?.display_name ? `&patientName=${encodeURIComponent(patient.display_name)}` : ''}`}><Video size={15} /> Join call</Link><CopyButton getText={() => getOrGeneratePatientInvitation(appointment.id)} label="Copy patient link" copiedLabel="Patient link copied!" className="button button-secondary button-small" /><Link className="button button-secondary button-small" to={`/clinician/review?appointment=${encodeURIComponent(appointment.id)}&patient=${encodeURIComponent(patientId)}`}>Review record</Link></div></div>{details.note && <aside className="patient-intake-note"><div><MessageSquareText size={16} /><span>Patient intake note</span></div><p>{details.note}</p></aside>}</>; })()}
           {appointment.measurements.length ? <>
             {(() => { const latest = appointment.measurements.at(-1)!; return <div className="patient-measurement-summary">
               <div><span>Latest API pulse</span><strong>{number(latest.heart_rate_bpm)} <small>BPM</small></strong></div>

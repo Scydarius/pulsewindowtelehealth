@@ -188,9 +188,9 @@ function PrivateNotes({
           label="Copy for EHR"
           copiedLabel="Copied for EHR!"
           className="note-shortcut-btn"
-          iconSize={12}
           disabled={!content.trim()}
           title="Copy notes to clipboard for EHR"
+          iconSize={12}
         />
       </div>
 
