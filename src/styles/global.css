@@ -315,6 +315,118 @@ h1, h2, h3, p { margin-top: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .clinical-note { color: var(--muted); font-size: .65rem; line-height: 1.45; text-align: center; margin: 13px 5px 0; }
 .livekit-frame [data-lk-theme] { height: 100%; }
+
+/* ==========================================================================
+   LiveKit Consultation Picture-in-Picture (PiP) Layout
+   The remote participant is large and fills the entire video frame.
+   The local participant is a small mini-window in the bottom-right corner over their image.
+   ========================================================================== */
+.livekit-pip-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.livekit-pip-container .lk-video-conference {
+  height: 100%;
+}
+
+/* Ensure grid wrapper is a relative container */
+.livekit-pip-container.has-remote-participant .lk-grid-layout-wrapper,
+.livekit-frame .lk-grid-layout-wrapper:has(.lk-participant-tile[data-lk-local-participant="false"]) {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Override LiveKit CSS grid to block layout when remote person is present */
+.livekit-pip-container.has-remote-participant .lk-grid-layout,
+.livekit-frame .lk-grid-layout:has(.lk-participant-tile[data-lk-local-participant="false"]) {
+  display: block !important;
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Remote participant: Large, full frame */
+.livekit-pip-container.has-remote-participant .lk-participant-tile[data-lk-local-participant="false"],
+.livekit-frame .lk-grid-layout:has(.lk-participant-tile[data-lk-local-participant="false"]) .lk-participant-tile[data-lk-local-participant="false"] {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  z-index: 1 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+.livekit-pip-container.has-remote-participant .lk-participant-tile[data-lk-local-participant="false"] video,
+.livekit-pip-container.has-remote-participant .lk-participant-tile[data-lk-local-participant="false"] .lk-participant-media-video,
+.livekit-frame .lk-grid-layout:has(.lk-participant-tile[data-lk-local-participant="false"]) .lk-participant-tile[data-lk-local-participant="false"] video,
+.livekit-frame .lk-grid-layout:has(.lk-participant-tile[data-lk-local-participant="false"]) .lk-participant-tile[data-lk-local-participant="false"] .lk-participant-media-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Local participant: Small mini-window in the bottom-right corner over the remote image */
+.livekit-pip-container.has-remote-participant .lk-participant-tile[data-lk-local-participant="true"],
+.livekit-frame .lk-grid-layout:has(.lk-participant-tile[data-lk-local-participant="false"]) .lk-participant-tile[data-lk-local-participant="true"] {
+  position: absolute !important;
+  right: 18px !important;
+  bottom: 18px !important;
+  width: 200px !important;
+  max-width: 28% !important;
+  aspect-ratio: 4 / 3 !important;
+  height: auto !important;
+  max-height: 35% !important;
+  z-index: 10 !important;
+  border: 2px solid rgba(255, 255, 255, 0.8) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55) !important;
+  background: #1e1e1e !important;
+}
+
+.livekit-pip-container.has-remote-participant .lk-participant-tile[data-lk-local-participant="true"] video,
+.livekit-pip-container.has-remote-participant .lk-participant-tile[data-lk-local-participant="true"] .lk-participant-media-video,
+.livekit-frame .lk-grid-layout:has(.lk-participant-tile[data-lk-local-participant="false"]) .lk-participant-tile[data-lk-local-participant="true"] video,
+.livekit-frame .lk-grid-layout:has(.lk-participant-tile[data-lk-local-participant="false"]) .lk-participant-tile[data-lk-local-participant="true"] .lk-participant-media-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Compact metadata label on local PiP tile */
+.livekit-pip-container.has-remote-participant .lk-participant-tile[data-lk-local-participant="true"] .lk-participant-metadata,
+.livekit-frame .lk-grid-layout:has(.lk-participant-tile[data-lk-local-participant="false"]) .lk-participant-tile[data-lk-local-participant="true"] .lk-participant-metadata {
+  position: absolute !important;
+  inset: auto 6px 6px !important;
+  padding: 2px 6px !important;
+  font-size: 0.65rem !important;
+  border-radius: 6px !important;
+  background: rgba(18, 18, 18, 0.75) !important;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .livekit-pip-container.has-remote-participant .lk-participant-tile[data-lk-local-participant="true"],
+  .livekit-frame .lk-grid-layout:has(.lk-participant-tile[data-lk-local-participant="false"]) .lk-participant-tile[data-lk-local-participant="true"] {
+    width: 130px !important;
+    max-width: 32% !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    border-width: 1.5px !important;
+    border-radius: 8px !important;
+  }
+}
 .access-page { min-height: 100vh; display: grid; place-items: center; padding: 30px 18px; background: radial-gradient(circle at top right, #eaeaea, transparent 38%), var(--cream); }
 .access-card { width: min(100%, 500px); padding: 36px; background: white; border: 1px solid var(--line); border-radius: 26px; box-shadow: var(--shadow); }
 .access-card .back-link { margin-bottom: 31px; }.access-card h1 { font-family: Georgia, serif; color: var(--ink-strong); font-size: 2.5rem; font-weight: 500; letter-spacing: -.045em; margin: 7px 0 13px; }.access-card > p { color: var(--muted); line-height: 1.55; }
