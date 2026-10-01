@@ -7,6 +7,36 @@ import { fetchPatientInvitation } from '../services/clinicAccess';
 import { loadConsultationDetails } from '../services/clinicianData';
 import { subscribeToCameraCheck, type CameraCheckSyncState } from '../services/consultationSync';
 
+function getCallStartTime(appointmentId: string): number {
+  if (typeof window === 'undefined') return Date.now();
+  const storageKey = `ventricura_call_start_${appointmentId}`;
+  try {
+    const saved = sessionStorage.getItem(storageKey);
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && Date.now() - parsed >= 0 && Date.now() - parsed < 12 * 3600 * 1000) {
+        return parsed;
+      }
+    }
+  } catch {}
+  const now = Date.now();
+  try {
+    sessionStorage.setItem(storageKey, String(now));
+  } catch {}
+  return now;
+}
+
+function formatCallDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${pad(minutes)}:${pad(seconds)}`;
+}
+
 export function ConsultationPage() {
   const { appointmentId = 'demo' } = useParams();
   const [searchParams] = useSearchParams();
@@ -24,6 +54,18 @@ export function ConsultationPage() {
 
   const [patientSync, setPatientSync] = useState<CameraCheckSyncState | null>(null);
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  // Live call timer counting up from appointment start
+  useEffect(() => {
+    const startTime = getCallStartTime(appointmentId);
+    const update = () => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startTime) / 1000)));
+    };
+    update();
+    const interval = window.setInterval(update, 1000);
+    return () => window.clearInterval(interval);
+  }, [appointmentId]);
 
   // Load participant names from appointment or patient invite
   useEffect(() => {
@@ -81,7 +123,10 @@ export function ConsultationPage() {
             <span>{role === 'clinician' ? 'Secure clinical consultation' : 'Secure video appointment'}</span>
           </div>
         </div>
-        <div className="call-time"><span className="live-dot" /><Clock3 size={16} /> 00:00</div>
+        <div className="call-time" aria-label={`Call elapsed time: ${formatCallDuration(elapsedSeconds)}`}>
+          <span className="live-dot" />
+          <Clock3 size={16} /> {formatCallDuration(elapsedSeconds)}
+        </div>
       </header>
 
       <main className={`consultation-grid consultation-workspace ${role === 'patient' ? 'patient-consultation-grid' : ''}`}>
