@@ -1,7 +1,6 @@
-import { CalendarDays, CheckCircle2, Clock3, Link2, LoaderCircle, Plus, Video, X } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Clock3, Copy, Link2, LoaderCircle, Plus, Video, X } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CopyButton } from './CopyButton';
 import { createPatientInvitation } from '../services/clinicAccess';
 import { hasClinicalDatabaseConfiguration } from '../services/supabase';
 
@@ -30,6 +29,6 @@ export function InvitePatientForm({ patients = [], onCreated }: InvitePatientFor
       <button className="button button-primary appointment-submit" disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Link2 size={17} />}{saving ? 'Creating appointment…' : 'Create appointment and email link'}</button>
     </form>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    {link && <div className="created-link created-appointment"><CheckCircle2 size={21} /><div><strong>Appointment created</strong><span>{emailStatus}</span></div><div className="created-appointment-actions">{appointmentId && <Link className="button button-primary button-small" to={`/consultation/${appointmentId}?role=clinician${patientName ? `&patientName=${encodeURIComponent(patientName)}` : ''}`}><Video size={16} /> Join appointment</Link>}<CopyButton text={link} label="Copy patient link" copiedLabel="Patient link copied!" className="button button-secondary button-small" /></div><input value={link} readOnly aria-label="Patient invitation link" /></div>}
+    {link && <div className="created-link created-appointment"><CheckCircle2 size={21} /><div><strong>Appointment created</strong><span>{emailStatus}</span></div><div className="created-appointment-actions">{appointmentId && <Link className="button button-primary button-small" to={`/consultation/${appointmentId}?role=clinician${patientName ? `&patientName=${encodeURIComponent(patientName)}` : ''}`}><Video size={16} /> Join appointment</Link>}<button type="button" className="button button-secondary button-small" onClick={() => void copy()}><Copy size={16} /> Copy patient link</button></div><input value={link} readOnly aria-label="Patient invitation link" /></div>}
   </section>;
 }

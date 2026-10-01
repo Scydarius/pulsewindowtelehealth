@@ -1,10 +1,9 @@
 import { ArrowLeft, CheckCircle2, Clock3, Pill, UserRound, Video } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { CopyButton } from '../components/CopyButton';
 import { MeasurementPanel } from '../components/MeasurementPanel';
 import { VideoRoom } from '../components/VideoRoom';
-import { fetchPatientInvitation, getOrGeneratePatientInvitation } from '../services/clinicAccess';
+import { fetchPatientInvitation } from '../services/clinicAccess';
 import { loadConsultationDetails } from '../services/clinicianData';
 import { subscribeToCameraCheck, type CameraCheckSyncState } from '../services/consultationSync';
 
@@ -82,14 +81,6 @@ export function ConsultationPage() {
             <span>{role === 'clinician' ? 'Secure clinical consultation' : 'Secure video appointment'}</span>
           </div>
         </div>
-        {role === 'clinician' && appointmentId !== 'demo' && (
-          <CopyButton
-            getText={() => getOrGeneratePatientInvitation(appointmentId)}
-            label="Copy patient link"
-            copiedLabel="Patient link copied!"
-            className="button button-secondary button-small consultation-patient-link-btn"
-          />
-        )}
         <div className="call-time"><span className="live-dot" /><Clock3 size={16} /> 00:00</div>
       </header>
 

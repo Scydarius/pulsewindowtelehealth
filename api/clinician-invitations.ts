@@ -94,7 +94,7 @@ async function createAppointment(input: { db: SupabaseClient; clinicianId: strin
     const endIso = new Date(input.startsAt.valueOf() + duration).toISOString();
     const googleEventId = await createGoogleCalendarEvent(input.db, input.clinicianId, {
       summary: `Ventricura: ${input.patientName.trim()} (${input.reason.trim()})`,
-      description: `Ventricura Telehealth Consultation\n\nPatient: ${input.patientName.trim()}\nEmail: ${patientEmail}\nReason: ${input.reason.trim()}\n\nClinician Call Link: ${baseUrl}/consultation/${appointment.id}?role=clinician\nPatient Secure Link: ${invitationUrl}\n\nPrivate and encrypted consultation.`,
+      description: `Ventricura Telehealth Consultation\n\nPatient: ${input.patientName.trim()}\nReason: ${input.reason.trim()}\n\nJoin your secure appointment:\n${invitationUrl}\n\nPrivate and encrypted consultation.`,
       startIso: input.startsAt.toISOString(),
       endIso,
       timeZone: bookingProfile?.timezone ?? 'Australia/Adelaide',

@@ -1,39 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowRight, Menu, X } from 'lucide-react';
-import { supabase } from '../services/supabase';
 
 export function PublicHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const location = useLocation();
-  const isCliniciansRoute = location.pathname === '/clinicians';
-  const [clinicianSignedIn, setClinicianSignedIn] = useState(false);
-
-  useEffect(() => {
-    if (!supabase) return;
-    void supabase.auth.getSession().then(({ data: { session } }) => setClinicianSignedIn(Boolean(session)));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setClinicianSignedIn(Boolean(session)));
-    return () => subscription.unsubscribe();
-  }, []);
 
   return (
     <header className="public-header">
-      <Link
-        to={isCliniciansRoute && clinicianSignedIn ? '/clinician' : '/'}
-        className={`public-brand ${isCliniciansRoute ? 'public-brand-clinician' : ''}`}
-        aria-label={isCliniciansRoute ? 'Ventricura for clinicians' : 'Ventricura home'}
-      >
+      <Link to="/" className="public-brand" aria-label="Ventricura home">
         <img src="/ventricura-logo-centred.png" alt="Ventricura" />
-        {isCliniciansRoute && <span className="brand-subtext">FOR CLINICIANS</span>}
       </Link>
       <nav className="desktop-public-nav" aria-label="Public navigation">
         <Link to="/technology">Technology</Link>
         <Link to="/clinicians">For clinicians</Link>
         <Link to="/demo">Live demo</Link>
         <Link to="/contact">Contact</Link>
-        <Link to={clinicianSignedIn ? '/clinician' : '/clinician/sign-in'} className="header-access">
-          {clinicianSignedIn ? 'Clinician workspace' : 'Clinician access'} <ArrowRight size={15} />
-        </Link>
+        <Link to="/clinician/sign-in" className="header-access">Clinician access <ArrowRight size={15} /></Link>
       </nav>
       <button
         type="button"

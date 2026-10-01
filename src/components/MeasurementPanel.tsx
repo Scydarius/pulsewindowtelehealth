@@ -1,6 +1,5 @@
 import { Activity, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Download, FileText, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { CopyButton } from './CopyButton';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
 import { loadPatientMeasurementTrend, loadPrivateClinicalNote, savePatientMeasurement, savePrivateClinicalNote, type SavedMeasurement } from '../services/clinicAccess';
 import {
@@ -111,6 +110,7 @@ function PrivateNotes({
 }) {
   const [content, setContent] = useState('');
   const [status, setStatus] = useState<'loading' | 'saved' | 'saving' | 'error'>('loading');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -144,6 +144,17 @@ function PrivateNotes({
     const template = `SUBJECTIVE:\n- Presenting complaint:\n- History of onset:\n\nOBJECTIVE:\n- Contactless rPPG vitals:\n- Clinical observations:\n\nASSESSMENT:\n- Clinical impression:\n\nPLAN:\n- Management:\n- Prescriptions & follow-up:`;
     setContent((prev) => (prev.trim() ? `${prev.trimEnd()}\n\n${template}` : template));
     setStatus('saved');
+  };
+
+  const copyForEhr = async () => {
+    if (!content.trim()) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
   };
 
   const cardiacData = vitals?.diagnostics?.cardiac as { bpm?: number | null; clinical_bpm?: number | null; session_average_bpm?: number | null } | undefined;
@@ -183,15 +194,15 @@ function PrivateNotes({
         >
           <FileText size={12} /> SOAP template
         </button>
-        <CopyButton
-          text={content}
-          label="Copy for EHR"
-          copiedLabel="Copied for EHR!"
+        <button
+          type="button"
           className="note-shortcut-btn"
+          onClick={() => void copyForEhr()}
           disabled={!content.trim()}
           title="Copy notes to clipboard for EHR"
-          iconSize={12}
-        />
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? 'Copied' : 'Copy for EHR'}
+        </button>
       </div>
 
       <textarea

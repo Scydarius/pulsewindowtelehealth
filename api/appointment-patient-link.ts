@@ -91,9 +91,8 @@ export default async function patientLink(request: VercelRequest, response: Verc
     const host = Array.isArray(request.headers.host) ? request.headers.host[0] : request.headers.host;
     const origin = host ? `https://${host}` : 'https://www.ventricura.com';
     const invitationUrl = `${origin}/join?token=${encodeURIComponent(inviteToken)}`;
-    const shouldSendEmail = (body as { sendEmail?: boolean; noEmail?: boolean }).sendEmail !== false && !(body as { noEmail?: boolean }).noEmail;
     const patient = appointment.patient as unknown as { display_name: string; email: string } | null;
-    const delivery = (patient?.email && shouldSendEmail) ? await sendReplacementLink({ email: patient.email, patientName: patient.display_name, startsAt: appointment.starts_at, invitationUrl }) : { sent: false, warning: undefined };
+    const delivery = patient?.email ? await sendReplacementLink({ email: patient.email, patientName: patient.display_name, startsAt: appointment.starts_at, invitationUrl }) : { sent: false, warning: 'The new secure link was created, but no patient email is available.' };
     await recordAuditEvent(db, { action: 'patient_link.regenerated', clinicianId: clinician.id, appointmentId: appointment.id, patientId: appointment.patient_id, metadata: { email_sent: delivery.sent } });
     return response.status(200).json({ invitationUrl, emailSent: delivery.sent, emailWarning: delivery.warning });
   } catch (error) {

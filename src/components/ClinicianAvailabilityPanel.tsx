@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CopyButton } from './CopyButton';
 import {
   type BookingAvailabilityDay,
   type ClinicianBookingSettings,
@@ -114,6 +113,13 @@ export function ClinicianAvailabilityPanel() {
       setMessage(error instanceof Error ? error.message : 'Could not save availability.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const copy = async () => {
+    if (settings?.bookingUrl) {
+      await navigator.clipboard.writeText(settings.bookingUrl);
+      setMessage('Booking link copied.');
     }
   };
 
@@ -411,8 +417,8 @@ export function ClinicianAvailabilityPanel() {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px',
-                      background: '#1c1c1c',
-                      color: '#f6f6f6',
+                      background: '#1b1d1b',
+                      color: '#f6f6f1',
                       padding: '7px 12px',
                       textDecoration: 'none',
                       fontWeight: 600,
@@ -425,7 +431,7 @@ export function ClinicianAvailabilityPanel() {
                 </div>
               )}
               {diagnosticDetail && !diagnosticDetail.startsWith('https://') && (
-                <pre style={{ margin: '6px 0 0', padding: '8px', background: '#ffffff', border: '1px solid #dddddd', fontSize: '0.68rem', overflowX: 'auto', maxHeight: '160px' }}>
+                <pre style={{ margin: '6px 0 0', padding: '8px', background: '#fff', border: '1px solid #dcded7', fontSize: '0.68rem', overflowX: 'auto', maxHeight: '160px' }}>
                   {diagnosticDetail}
                 </pre>
               )}
@@ -441,13 +447,9 @@ export function ClinicianAvailabilityPanel() {
           </span>
           <input value={settings.bookingUrl} readOnly aria-label="Patient booking link" />
         </div>
-        <CopyButton
-          text={settings.bookingUrl}
-          label="Copy link"
-          copiedLabel="Booking link copied!"
-          className="button button-secondary"
-          onCopied={() => setMessage('Booking link copied.')}
-        />
+        <button type="button" className="button button-secondary" onClick={() => void copy()}>
+          <Copy size={16} /> Copy link
+        </button>
         <button
           type="button"
           className="button button-primary"
