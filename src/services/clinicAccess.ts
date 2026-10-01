@@ -127,11 +127,23 @@ export async function createReplacementPatientInvitation(appointmentId: string) 
   const token = await getClinicianAccessToken();
   const response = await fetch('/api/appointment-patient-link', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ appointmentId }),
+    body: JSON.stringify({ appointmentId, sendEmail: true }),
   });
   const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable.' })) as { invitationUrl?: string; emailSent?: boolean; emailWarning?: string; error?: string };
   if (!response.ok || !body.invitationUrl) throw new Error(body.error ?? 'Unable to create a replacement patient link.');
   return { invitationUrl: body.invitationUrl, emailSent: body.emailSent === true, emailWarning: body.emailWarning };
+}
+
+/** Obtain or generate an active patient link for an appointment without re-sending email to the patient. */
+export async function getOrGeneratePatientInvitation(appointmentId: string): Promise<string> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/appointment-patient-link', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ appointmentId, noEmail: true, sendEmail: false }),
+  });
+  const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable.' })) as { invitationUrl?: string; error?: string };
+  if (!response.ok || !body.invitationUrl) throw new Error(body.error ?? 'Unable to obtain patient link.');
+  return body.invitationUrl;
 }
 
 /** Revoke the current patient joining link without deleting the appointment or clinical record. */

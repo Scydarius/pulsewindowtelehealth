@@ -39,9 +39,14 @@ export function AppShell() {
           to={isClinician ? '/clinician' : '/'}
           className={`brand ${isClinician ? 'brand-clinician' : ''}`}
           aria-label={isClinician ? 'Ventricura clinician dashboard' : 'Ventricura home'}
+          onClick={() => {
+            if (isClinician) {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }}
         >
           <img className="brand-wordmark" src="/ventricura-logo-centred.png" alt="Ventricura" />
-          {isClinician && <span className="brand-subtext">for clinicians</span>}
+          {isClinician && <span className="brand-subtext">FOR CLINICIANS</span>}
         </NavLink>
 
         {!isConsultation && (

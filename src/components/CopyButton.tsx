@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, LoaderCircle } from 'lucide-react';
 
-export interface CopyButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  text: string;
+export interface CopyButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+  text?: string;
+  getText?: () => Promise<string> | string;
   label?: string;
   copiedLabel?: string;
+  loadingLabel?: string;
   iconSize?: number;
   onCopied?: () => void;
 }
@@ -15,8 +17,10 @@ export interface CopyButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEl
  */
 export function CopyButton({
   text,
+  getText,
   label = 'Copy link',
   copiedLabel = 'Copied!',
+  loadingLabel = 'Copying…',
   iconSize = 16,
   className = 'button button-secondary',
   onClick,
@@ -25,15 +29,30 @@ export function CopyButton({
   ...rest
 }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleCopy = async (event: React.MouseEvent<HTMLButtonElement>) => {
     onClick?.(event);
-    if (!text || copied) return;
+    if (copied || loading) return;
+
+    let targetText = text;
+    if (!targetText && getText) {
+      setLoading(true);
+      try {
+        targetText = await getText();
+      } catch {
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    }
+
+    if (!targetText) return;
 
     let succeeded = false;
     try {
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(targetText);
         succeeded = true;
       }
     } catch {
@@ -43,7 +62,7 @@ export function CopyButton({
     if (!succeeded) {
       try {
         const textarea = document.createElement('textarea');
-        textarea.value = text;
+        textarea.value = targetText;
         textarea.style.position = 'fixed';
         textarea.style.left = '-999999px';
         textarea.style.top = '-999999px';
@@ -63,25 +82,33 @@ export function CopyButton({
       onCopied?.();
       setTimeout(() => {
         setCopied(false);
-      }, 2200);
+      }, 2400);
     }
   };
+
+  const displayText = copied ? copiedLabel : loading ? loadingLabel : label;
 
   return (
     <button
       type="button"
-      className={`copy-btn ${className} ${copied ? 'copy-btn-copied' : ''}`}
+      className={`copy-btn ${className} ${copied ? 'copy-btn-copied' : ''} ${loading ? 'copy-btn-loading' : ''}`}
       onClick={(e) => void handleCopy(e)}
-      aria-label={copied ? copiedLabel : label}
-      title={copied ? copiedLabel : label}
-      disabled={disabled}
+      aria-label={displayText}
+      title={displayText}
+      disabled={disabled || loading}
       {...rest}
     >
       <span className="copy-btn-icon-wrap" aria-hidden="true">
-        {copied ? <Check size={iconSize} /> : <Copy size={iconSize} />}
+        {loading ? (
+          <LoaderCircle size={iconSize} className="spin" />
+        ) : copied ? (
+          <Check size={iconSize} className="copy-btn-check-icon" />
+        ) : (
+          <Copy size={iconSize} />
+        )}
       </span>
       <span className="copy-btn-text" aria-live="polite">
-        {copied ? copiedLabel : label}
+        {displayText}
       </span>
     </button>
   );
