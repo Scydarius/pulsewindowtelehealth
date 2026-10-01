@@ -717,6 +717,9 @@ h1, h2, h3, p { margin-top: 0; }
 .app-shell { --portal-ink:#1a1a1a; --portal-grey:#686868; --portal-line:#d8d8d8; --portal-paper:#f3f3f3; --portal-soft:#e9e9e9; background:var(--portal-paper); color:var(--portal-ink); }
 .app-header { height:88px; padding:0 max(24px,calc((100vw - 1400px)/2)); background:#f8f8f8; border-bottom:1px solid var(--portal-line); grid-template-columns:minmax(210px,1fr) auto minmax(280px,1fr); }
 .app-header .brand img.brand-wordmark { width:168px; mix-blend-mode:multiply; }
+.app-header .brand.brand-clinician { display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; text-decoration: none; }
+.app-header .brand.brand-clinician img.brand-wordmark { width: 152px; }
+.app-header .brand.brand-clinician .brand-subtext { display: inline-block !important; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .62rem; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; color: #686868; line-height: 1; padding-left: 2px; }
 .app-header .primary-nav { display:flex; align-items:center; gap:3px; padding:4px; border:1px solid var(--portal-line); background:#eeeeee; }
 .app-header .primary-nav a { display:inline-flex; align-items:center; gap:7px; padding:9px 12px; color:#727272; font-size:.71rem; font-weight:800; border-radius:0; }
 .app-header .primary-nav a.active { color:#191919; background:#f8f8f8; box-shadow:0 1px 0 rgba(0, 0, 0, .05); }

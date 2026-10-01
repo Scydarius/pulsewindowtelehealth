@@ -35,8 +35,13 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <NavLink to="/" className="brand" aria-label="Ventricura home">
+        <NavLink
+          to={isClinician ? '/clinician' : '/'}
+          className={`brand ${isClinician ? 'brand-clinician' : ''}`}
+          aria-label={isClinician ? 'Ventricura clinician dashboard' : 'Ventricura home'}
+        >
           <img className="brand-wordmark" src="/ventricura-logo-centred.png" alt="Ventricura" />
+          {isClinician && <span className="brand-subtext">for clinicians</span>}
         </NavLink>
 
         {!isConsultation && (
