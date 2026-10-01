@@ -45,3 +45,39 @@ export async function loadClinicianWorkspace() {
 
   return { profile: profile as ClinicianProfile, appointments: appointmentRows.map((appointment) => ({ ...appointment, latestMeasurement: latestMeasurements.get(appointment.id) ?? null })) };
 }
+
+export type ConsultationDetails = {
+  clinicianName: string;
+  patientName: string;
+  reason: string;
+  startsAt: string;
+};
+
+export async function loadConsultationDetails(appointmentId: string): Promise<ConsultationDetails | null> {
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from('clinician_profiles')
+    .select('id, display_name')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const { data: appointment } = await supabase
+    .from('appointments')
+    .select('id, reason, starts_at, patient:patients(id, display_name, email)')
+    .eq('id', appointmentId)
+    .maybeSingle();
+
+  if (!appointment) return null;
+
+  const patient = appointment.patient as unknown as { id: string; display_name: string; email: string } | null;
+
+  return {
+    clinicianName: profile?.display_name ?? 'Clinician',
+    patientName: patient?.display_name ?? 'Patient',
+    reason: appointment.reason ?? '',
+    startsAt: appointment.starts_at ?? '',
+  };
+}

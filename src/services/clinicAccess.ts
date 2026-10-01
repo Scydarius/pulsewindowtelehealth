@@ -159,7 +159,7 @@ export async function deleteAppointment(appointmentId: string) {
 export async function fetchPatientInvitation(token: string) {
   const response = await fetch(`/api/patient-invitations?token=${encodeURIComponent(token)}`);
   const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as {
-    appointmentId?: string; clinicianName?: string; reason?: string; startsAt?: string; error?: string;
+    appointmentId?: string; clinicianName?: string; patientName?: string; reason?: string; startsAt?: string; error?: string;
   };
   if (!response.ok || !body.appointmentId) throw new Error(body.error ?? 'This patient link is no longer available.');
   return body as Required<Omit<typeof body, 'error'>>;

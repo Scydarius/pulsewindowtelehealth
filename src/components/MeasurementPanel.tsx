@@ -4,7 +4,13 @@ import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
 import { loadPatientMeasurementTrend, loadPrivateClinicalNote, savePatientMeasurement, savePrivateClinicalNote, type SavedMeasurement } from '../services/clinicAccess';
 import { broadcastCameraCheckState, requestCameraCheckState, subscribeToCameraCheck, type CameraCheckSyncState } from '../services/consultationSync';
 
-type MeasurementPanelProps = { appointmentId: string; role: 'patient' | 'clinician'; invitationToken?: string };
+type MeasurementPanelProps = {
+  appointmentId: string;
+  role: 'patient' | 'clinician';
+  invitationToken?: string;
+  patientName?: string;
+  clinicianName?: string;
+};
 
 const initialState: MeasurementUpdate = {
   status: 'idle',
@@ -82,8 +88,10 @@ function ResearchDiagnostics({ diagnostics }: { diagnostics?: Record<string, unk
 function PrivateNotes({
   appointmentId,
   vitals,
+  patientName,
 }: {
   appointmentId: string;
+  patientName?: string;
   vitals?: {
     heartRateBpm: number | null;
     respiratoryRate: number | null;
@@ -117,7 +125,8 @@ function PrivateNotes({
     const stress = cardiac?.stress_score != null && Number.isFinite(Number(cardiac.stress_score)) ? ` · Stress: ${Number(cardiac.stress_score).toFixed(0)}/100` : '';
     const quality = vitals?.signalQuality != null && Number.isFinite(vitals.signalQuality) ? ` · Signal Quality: ${Math.round(vitals.signalQuality * 100)}%` : '';
 
-    const snippet = `[Ventricura rPPG Vitals — ${timeStr}]\n• Pulse: ${bpm != null && Number.isFinite(Number(bpm)) ? `${Math.round(Number(bpm))} BPM (30s clinical average)` : 'Pending'}\n• Respiration: ${brpm != null && Number.isFinite(Number(brpm)) ? `${Math.round(Number(brpm))} /min` : 'Pending'}${hrv}${stress}${quality}\n`;
+    const targetName = patientName && patientName !== 'Patient' ? ` — ${patientName}` : '';
+    const snippet = `[Ventricura rPPG Vitals${targetName} — ${timeStr}]\n• Pulse: ${bpm != null && Number.isFinite(Number(bpm)) ? `${Math.round(Number(bpm))} BPM (30s clinical average)` : 'Pending'}\n• Respiration: ${brpm != null && Number.isFinite(Number(brpm)) ? `${Math.round(Number(brpm))} /min` : 'Pending'}${hrv}${stress}${quality}\n`;
     setContent((prev) => (prev.trim() ? `${prev.trimEnd()}\n\n${snippet}` : snippet));
     setStatus('saved');
   };
@@ -214,7 +223,13 @@ function exportMeasurementCsv(appointmentId: string, samples: SavedMeasurement[]
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = `ventricura-measurement-${appointmentId}.csv`; anchor.click(); URL.revokeObjectURL(url);
 }
 
-export function MeasurementPanel({ appointmentId, role, invitationToken }: MeasurementPanelProps) {
+export function MeasurementPanel({
+  appointmentId,
+  role,
+  invitationToken,
+  patientName = 'Patient',
+  clinicianName = 'Clinician',
+}: MeasurementPanelProps) {
   const [measurement, setMeasurement] = useState<MeasurementUpdate>(initialState);
   const stopRef = useRef<(() => void) | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -224,6 +239,14 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
   const [recordMessage, setRecordMessage] = useState('');
   const [trend, setTrend] = useState<SavedMeasurement[]>([]);
   const [patientSyncState, setPatientSyncState] = useState<CameraCheckSyncState | null>(null);
+
+  const effectivePatientName = (patientSyncState?.patientName && patientSyncState.patientName !== 'Patient')
+    ? patientSyncState.patientName
+    : (patientName !== 'Patient' ? patientName : 'Patient');
+
+  const effectiveClinicianName = (patientSyncState?.clinicianName && patientSyncState.clinicianName !== 'Clinician')
+    ? patientSyncState.clinicianName
+    : (clinicianName !== 'Clinician' ? clinicianName : 'Clinician');
 
   useEffect(() => () => stopRef.current?.(), []);
   useEffect(() => {
@@ -323,9 +346,9 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
     if (role !== 'patient' || !sample || !invitationToken || savedSampleIdsRef.current.has(sample.capturedAt)) return;
     savedSampleIdsRef.current.add(sample.capturedAt);
     void savePatientMeasurement({ appointmentId, invitationToken, heartRateBpm: sample.heartRateBpm, respiratoryRateBpm: sample.respiratoryRate, signalQuality: sample.signalQuality, algorithmVersion: measurement.algorithmVersion, diagnostics: sample.diagnostics })
-      .then(() => { if (measurement.status === 'complete') setRecordMessage('30-second trend saved for your clinician.'); })
-      .catch(() => setRecordMessage('Reading is visible here, but could not be saved for your clinician.'));
-  }, [appointmentId, invitationToken, measurement, role]);
+      .then(() => { if (measurement.status === 'complete') setRecordMessage(`30-second trend saved for ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`); })
+      .catch(() => setRecordMessage(`Reading is visible here, but could not be saved for ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`));
+  }, [appointmentId, effectiveClinicianName, invitationToken, measurement, role]);
 
   // Patient: broadcast state to clinician in real time
   useEffect(() => {
@@ -356,8 +379,10 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
       message: measurement.message,
       algorithmVersion: measurement.algorithmVersion,
       diagnostics: measurement.diagnostics,
+      patientName: effectivePatientName,
+      clinicianName: effectiveClinicianName,
     }, 'patient');
-  }, [appointmentId, measurement, role]);
+  }, [appointmentId, effectiveClinicianName, effectivePatientName, measurement, role]);
 
   // Patient: respond to clinician pings by re-broadcasting immediately
   useEffect(() => {
@@ -388,6 +413,8 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         message: measurement.message,
         algorithmVersion: measurement.algorithmVersion,
         diagnostics: measurement.diagnostics,
+        patientName: effectivePatientName,
+        clinicianName: effectiveClinicianName,
       }, 'patient');
     });
     return unsub;
@@ -446,12 +473,12 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
           </strong>
           <span>
             {isComplete
-              ? (recordMessage || 'Your clinician can now view the reading.')
+              ? (recordMessage || `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} can now view the reading.`)
               : isCalibrating
-              ? 'Establishing 30s baseline — keep still & breathe naturally. Your clinician sees your live progress.'
+              ? `Establishing 30s baseline — keep still & breathe naturally. ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} sees your live progress.`
               : isRunning && isCalibrated
-              ? 'Signal locked. Finalizing clinical average for your clinician.'
-              : 'Only start this when your clinician asks. Results are shown live to your clinician.'}
+              ? `Signal locked. Finalizing clinical average for ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`
+              : `Only start this when ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'} asks. Results are shown live to ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`}
           </span>
         </div>
       </div>
@@ -486,12 +513,12 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
       <div className="section-heading compact">
         <div>
           <p className="eyebrow">Session telemetry</p>
-          <h2>Patient readings</h2>
+          <h2>{effectivePatientName !== 'Patient' ? `${effectivePatientName}'s readings` : 'Patient readings'}</h2>
         </div>
         {role === 'clinician' && isPatientRecording ? (
           <div className="recording-pill-live" aria-live="polite">
             <span className="pulsing-record-dot" />
-            <span>PATIENT RECORDING ({secondsRemaining}s)</span>
+            <span>{effectivePatientName !== 'Patient' ? `${effectivePatientName.toUpperCase()} RECORDING` : 'PATIENT RECORDING'} ({secondsRemaining}s)</span>
           </div>
         ) : (
           <span className={`status-dot ${isCalibrating ? 'calibrating' : isRunning ? 'active' : ''}`} aria-hidden="true" />
@@ -508,26 +535,26 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
             </div>
             <div className="active-banner-details">
               <div className="active-banner-badges">
-                <span className="status-tag status-recording">● PATIENT RECORDING IN PROGRESS</span>
+                <span className="status-tag status-recording">● {effectivePatientName !== 'Patient' ? `${effectivePatientName.toUpperCase()} RECORDING IN PROGRESS` : 'PATIENT RECORDING IN PROGRESS'}</span>
                 <span className="status-tag status-time">
                   <Clock3 size={11} /> {secondsRemaining > 0 ? `${secondsRemaining}s remaining` : 'Finalizing…'}
                 </span>
               </div>
               <h3 className="active-banner-title">
-                {isCalibrating ? 'Calibrating 30-second baseline' : 'Optical signal locked — measuring'}
+                {isCalibrating ? `Calibrating 30-second baseline${effectivePatientName !== 'Patient' ? ` for ${effectivePatientName}` : ''}` : 'Optical signal locked — measuring'}
               </h3>
               <p className="active-banner-description">
                 {patientSyncState?.motionDetected || diagData?.motion_detected ? (
                   <span className="guidance-warning">
-                    <CircleAlert size={14} /> Motion detected on patient camera — please advise patient to hold still.
+                    <CircleAlert size={14} /> Motion detected on {effectivePatientName !== 'Patient' ? `${effectivePatientName}'s` : 'patient'} camera — please advise {effectivePatientName !== 'Patient' ? effectivePatientName : 'patient'} to hold still.
                   </span>
                 ) : measurement.faceDetected === false ? (
                   <span className="guidance-warning">
-                    <CircleAlert size={14} /> Patient face is not centered in their camera frame.
+                    <CircleAlert size={14} /> {effectivePatientName !== 'Patient' ? `${effectivePatientName}'s face` : 'Patient face'} is not centered in their camera frame.
                   </span>
                 ) : isCalibrating ? (
                   <span>
-                    Establishing quality-weighted optical baseline. Instruct patient to remain still, face their camera, and breathe naturally.
+                    Establishing quality-weighted optical baseline. Instruct {effectivePatientName !== 'Patient' ? effectivePatientName : 'patient'} to remain still, face their camera, and breathe naturally.
                   </span>
                 ) : (
                   <span>
@@ -547,7 +574,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         <div className="clinician-reading-complete-banner" role="status">
           <CheckCircle2 size={18} />
           <div>
-            <strong>30-second patient reading received</strong>
+            <strong>30-second reading received{effectivePatientName !== 'Patient' ? ` for ${effectivePatientName}` : ''}</strong>
             <span>
               Pulse: {measurement.heartRateBpm != null ? `${Math.round(measurement.heartRateBpm)} BPM` : '—'} · Respiration: {measurement.respiratoryRate != null ? `${(Math.round(measurement.respiratoryRate * 10) / 10).toFixed(1)} /min` : '—'} · Quality: {Math.round(measurement.signalQuality * 100)}%
             </span>
@@ -559,8 +586,8 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         <div className="instruction-card">
           <div className="face-guide-small"><span /></div>
           <div>
-            <strong>Patient camera status</strong>
-            <span>The patient completes a 30-second camera check from their call screen. Real-time progress and results appear here automatically.</span>
+            <strong>{effectivePatientName !== 'Patient' ? `${effectivePatientName}'s camera status` : 'Patient camera status'}</strong>
+            <span>{effectivePatientName !== 'Patient' ? effectivePatientName : 'The patient'} completes a 30-second camera check from their call screen. Real-time progress and results appear here automatically.</span>
           </div>
         </div>
       )}
@@ -612,12 +639,13 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
               : `Signal quality ${Math.round(measurement.signalQuality * 100)}%`}
           </div>
         )}
-        {isComplete && <div className="signal-line success"><CheckCircle2 size={16} /> {recordMessage || (isPatient ? 'Reading ready — saving for your clinician…' : 'Patient result received')}</div>}
+        {isComplete && <div className="signal-line success"><CheckCircle2 size={16} /> {recordMessage || (isPatient ? `Reading ready — saving for ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}…` : `${effectivePatientName !== 'Patient' ? effectivePatientName : 'Patient'} result received`)}</div>}
         {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> Video consultation remains available</div>}
       </div>
 
       <PrivateNotes
         appointmentId={appointmentId}
+        patientName={effectivePatientName}
         vitals={{
           heartRateBpm: measurement.heartRateBpm,
           respiratoryRate: measurement.respiratoryRate,
@@ -626,7 +654,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         }}
       />
 
-      <p className="clinician-measurement-note">This is the clinician-only results panel. It updates automatically when the patient completes their camera check.</p>
+      <p className="clinician-measurement-note">This is the clinician-only results panel. It updates automatically when {effectivePatientName !== 'Patient' ? effectivePatientName : 'the patient'} completes their camera check.</p>
 
     </aside>
   );

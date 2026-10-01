@@ -17,6 +17,8 @@ export type CameraCheckSyncState = {
   message: string;
   algorithmVersion?: string;
   diagnostics?: Record<string, unknown> | null;
+  patientName?: string;
+  clinicianName?: string;
 };
 
 type SyncBroadcastMessage =

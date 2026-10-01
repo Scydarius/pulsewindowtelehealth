@@ -16,6 +16,8 @@ type LocalVideoRoomProps = {
   appointmentId: string;
   displayName: string;
   role: 'patient' | 'clinician';
+  patientName?: string;
+  clinicianName?: string;
 };
 
 type SignalMessage = {
@@ -33,7 +35,7 @@ function createLocalParticipantId(role: LocalVideoRoomProps['role']) {
   return `${role}-${Date.now().toString(36)}-${randomPart}`;
 }
 
-export default function LocalVideoRoom({ appointmentId, displayName, role }: LocalVideoRoomProps) {
+export default function LocalVideoRoom({ appointmentId, displayName, role, patientName, clinicianName }: LocalVideoRoomProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | undefined>(undefined);
@@ -44,7 +46,17 @@ export default function LocalVideoRoom({ appointmentId, displayName, role }: Loc
   const makingOfferRef = useRef(false);
   const localIdRef = useRef(createLocalParticipantId(role));
   const [connectionState, setConnectionState] = useState<ConnectionState>('preparing');
-  const [remoteName, setRemoteName] = useState(role === 'patient' ? 'Your clinician' : 'Your patient');
+  const expectedRemoteName = role === 'patient'
+    ? (clinicianName && clinicianName !== 'Clinician' ? clinicianName : 'Your clinician')
+    : (patientName && patientName !== 'Patient' ? patientName : 'Your patient');
+  const [remoteName, setRemoteName] = useState(expectedRemoteName);
+
+  useEffect(() => {
+    if (expectedRemoteName && expectedRemoteName !== 'Your clinician' && expectedRemoteName !== 'Your patient') {
+      setRemoteName(expectedRemoteName);
+    }
+  }, [expectedRemoteName]);
+
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [microphoneEnabled, setMicrophoneEnabled] = useState(true);
   const [speakerEnabled, setSpeakerEnabled] = useState(true);
@@ -241,9 +253,13 @@ export default function LocalVideoRoom({ appointmentId, displayName, role }: Loc
     if (remoteVideoRef.current) remoteVideoRef.current.muted = !speakerEnabled;
   }, [speakerEnabled]);
 
+  const targetOtherName = role === 'patient'
+    ? (clinicianName && clinicianName !== 'Clinician' ? clinicianName : 'your clinician')
+    : (patientName && patientName !== 'Patient' ? patientName : 'your patient');
+
   const connectionCopy = {
     preparing: 'Starting camera…',
-    waiting: `Waiting for ${role === 'patient' ? 'clinician' : 'patient'} to join`,
+    waiting: `Waiting for ${targetOtherName} to join`,
     connecting: `Connecting to ${remoteName}…`,
     connected: `Connected to ${remoteName}`,
     failed: 'Connection unavailable',
@@ -271,7 +287,7 @@ export default function LocalVideoRoom({ appointmentId, displayName, role }: Loc
             ? <LoaderCircle className="spin" size={38} />
             : <UsersRound size={40} />}
           <strong>{connectionCopy}</strong>
-          <span>{error ?? `Open this appointment from the ${role === 'patient' ? 'clinician' : 'patient'} portal in another tab.`}</span>
+          <span>{error ?? `Waiting for ${targetOtherName} to enter the consultation room.`}</span>
         </div>
       )}
 

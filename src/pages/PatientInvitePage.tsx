@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchPatientInvitation } from '../services/clinicAccess';
 
-type Invitation = { appointmentId: string; clinicianName: string; reason: string; startsAt: string };
+type Invitation = { appointmentId: string; clinicianName: string; patientName?: string; reason: string; startsAt: string };
 
 export function PatientInvitePage() {
   const [params] = useSearchParams();
@@ -27,7 +27,9 @@ export function PatientInvitePage() {
     try {
       const { recordPatientAppointmentConsent } = await import('../services/clinicAccess');
       await recordPatientAppointmentConsent(invitation.appointmentId, token);
-      navigate(`/consultation/${invitation.appointmentId}?role=patient&invite=${encodeURIComponent(token)}`);
+      const patientParam = invitation.patientName ? `&patientName=${encodeURIComponent(invitation.patientName)}` : '';
+      const clinicianParam = invitation.clinicianName ? `&clinicianName=${encodeURIComponent(invitation.clinicianName)}` : '';
+      navigate(`/consultation/${invitation.appointmentId}?role=patient&invite=${encodeURIComponent(token)}${patientParam}${clinicianParam}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to record your consent. Please try again.');
     } finally { setConsenting(false); }
