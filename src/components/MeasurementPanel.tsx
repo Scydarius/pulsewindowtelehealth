@@ -1,8 +1,17 @@
-import { Activity, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Download, FileText, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind } from 'lucide-react';
+import { Activity, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Download, FileText, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
 import { loadPatientMeasurementTrend, loadPrivateClinicalNote, savePatientMeasurement, savePrivateClinicalNote, type SavedMeasurement } from '../services/clinicAccess';
-import { broadcastCameraCheckState, requestCameraCheckState, subscribeToCameraCheck, type CameraCheckSyncState } from '../services/consultationSync';
+import {
+  broadcastCameraCheckRequest,
+  broadcastCameraCheckResponse,
+  broadcastCameraCheckState,
+  cancelCameraCheckRequest,
+  requestCameraCheckState,
+  subscribeToCameraCheck,
+  type CameraCheckRequestMessage,
+  type CameraCheckSyncState,
+} from '../services/consultationSync';
 
 type MeasurementPanelProps = {
   appointmentId: string;
@@ -239,6 +248,8 @@ export function MeasurementPanel({
   const [recordMessage, setRecordMessage] = useState('');
   const [trend, setTrend] = useState<SavedMeasurement[]>([]);
   const [patientSyncState, setPatientSyncState] = useState<CameraCheckSyncState | null>(null);
+  const [requestStatus, setRequestStatus] = useState<'idle' | 'waiting' | 'accepted' | 'declined'>('idle');
+  const [incomingConsent, setIncomingConsent] = useState<CameraCheckRequestMessage | null>(null);
 
   const effectivePatientName = (patientSyncState?.patientName && patientSyncState.patientName !== 'Patient')
     ? patientSyncState.patientName
@@ -247,6 +258,27 @@ export function MeasurementPanel({
   const effectiveClinicianName = (patientSyncState?.clinicianName && patientSyncState.clinicianName !== 'Clinician')
     ? patientSyncState.clinicianName
     : (clinicianName !== 'Clinician' ? clinicianName : 'Clinician');
+
+  const handleInitiateRequest = () => {
+    setRequestStatus('waiting');
+    broadcastCameraCheckRequest(appointmentId, effectiveClinicianName);
+  };
+
+  const handleCancelRequest = () => {
+    setRequestStatus('idle');
+    cancelCameraCheckRequest(appointmentId);
+  };
+
+  const handleAcceptConsent = () => {
+    broadcastCameraCheckResponse(appointmentId, effectivePatientName, true);
+    setIncomingConsent(null);
+    void startMeasurement();
+  };
+
+  const handleDeclineConsent = () => {
+    broadcastCameraCheckResponse(appointmentId, effectivePatientName, false);
+    setIncomingConsent(null);
+  };
 
   useEffect(() => () => stopRef.current?.(), []);
   useEffect(() => {
@@ -257,43 +289,57 @@ export function MeasurementPanel({
   useEffect(() => {
     if (role !== 'clinician') return;
     requestCameraCheckState(appointmentId, 'clinician');
-    const unsub = subscribeToCameraCheck(appointmentId, (sync) => {
-      setPatientSyncState(sync);
-      if (sync.isRecording || sync.status === 'preparing' || sync.status === 'measuring') {
-        setMeasurement({
-          status: sync.status,
-          progress: sync.progress,
-          signalQuality: sync.signalQuality,
-          heartRateBpm: sync.heartRateBpm,
-          respiratoryRate: sync.respiratoryRate,
-          message: sync.message,
-          algorithmVersion: sync.algorithmVersion,
-          faceDetected: sync.faceDetected,
-          trackingState: sync.isCalibrating ? 'CALIBRATING' : 'LOCKED',
-          diagnostics: sync.diagnostics ?? undefined,
-        });
-      } else if (sync.status === 'complete') {
-        setMeasurement((prev) => ({
-          ...prev,
-          status: 'complete',
-          progress: 100,
-          signalQuality: sync.signalQuality,
-          heartRateBpm: sync.heartRateBpm,
-          respiratoryRate: sync.respiratoryRate,
-          message: sync.message || '30-second camera check complete',
-          diagnostics: sync.diagnostics ?? prev.diagnostics,
-        }));
-        void loadPatientMeasurementTrend(appointmentId).then((readings) => {
-          if (readings.length) setTrend(readings);
-        }).catch(() => {});
-      } else if (sync.status === 'failed') {
-        setMeasurement((prev) => ({
-          ...prev,
-          status: 'failed',
-          message: sync.message || 'Camera check interrupted',
-        }));
+    const unsub = subscribeToCameraCheck(
+      appointmentId,
+      (sync) => {
+        setPatientSyncState(sync);
+        if (sync.isRecording || sync.status === 'preparing' || sync.status === 'measuring') {
+          setRequestStatus('idle');
+          setMeasurement({
+            status: sync.status,
+            progress: sync.progress,
+            signalQuality: sync.signalQuality,
+            heartRateBpm: sync.heartRateBpm,
+            respiratoryRate: sync.respiratoryRate,
+            message: sync.message,
+            algorithmVersion: sync.algorithmVersion,
+            faceDetected: sync.faceDetected,
+            trackingState: sync.isCalibrating ? 'CALIBRATING' : 'LOCKED',
+            diagnostics: sync.diagnostics ?? undefined,
+          });
+        } else if (sync.status === 'complete') {
+          setMeasurement((prev) => ({
+            ...prev,
+            status: 'complete',
+            progress: 100,
+            signalQuality: sync.signalQuality,
+            heartRateBpm: sync.heartRateBpm,
+            respiratoryRate: sync.respiratoryRate,
+            message: sync.message || '30-second camera check complete',
+            diagnostics: sync.diagnostics ?? prev.diagnostics,
+          }));
+          void loadPatientMeasurementTrend(appointmentId).then((readings) => {
+            if (readings.length) setTrend(readings);
+          }).catch(() => {});
+        } else if (sync.status === 'failed') {
+          setMeasurement((prev) => ({
+            ...prev,
+            status: 'failed',
+            message: sync.message || 'Camera check interrupted',
+          }));
+        }
+      },
+      undefined,
+      {
+        onResponse: (response) => {
+          if (response.accepted) {
+            setRequestStatus('accepted');
+          } else {
+            setRequestStatus('declined');
+          }
+        },
       }
-    });
+    );
     return unsub;
   }, [appointmentId, role]);
 
@@ -384,41 +430,59 @@ export function MeasurementPanel({
     }, 'patient');
   }, [appointmentId, effectiveClinicianName, effectivePatientName, measurement, role]);
 
-  // Patient: respond to clinician pings by re-broadcasting immediately
+  const measurementRef = useRef(measurement);
+  measurementRef.current = measurement;
+  const effectiveNamesRef = useRef({ patient: effectivePatientName, clinician: effectiveClinicianName });
+  effectiveNamesRef.current = { patient: effectivePatientName, clinician: effectiveClinicianName };
+
+  // Patient: respond to clinician pings and listen for clinician check requests
   useEffect(() => {
     if (role !== 'patient') return;
-    const unsub = subscribeToCameraCheck(appointmentId, () => {}, () => {
-      const isRunningNow = measurement.status === 'preparing' || measurement.status === 'measuring';
-      const diagDataNow = measurement.diagnostics as {
-        diagnostics?: {
-          is_calibrated?: boolean;
-          calibration_seconds_remaining?: number;
-        };
-        motion_detected?: boolean;
-      } | undefined;
-      const isCalibratedNow = diagDataNow?.diagnostics?.is_calibrated ?? (measurement.status === 'complete' || measurement.heartRateBpm != null);
-      const calibRemainingNow = Number(diagDataNow?.diagnostics?.calibration_seconds_remaining ?? 0);
+    const unsub = subscribeToCameraCheck(
+      appointmentId,
+      () => {},
+      () => {
+        const cur = measurementRef.current;
+        const isRunningNow = cur.status === 'preparing' || cur.status === 'measuring';
+        const diagDataNow = cur.diagnostics as {
+          diagnostics?: {
+            is_calibrated?: boolean;
+            calibration_seconds_remaining?: number;
+          };
+          motion_detected?: boolean;
+        } | undefined;
+        const isCalibratedNow = diagDataNow?.diagnostics?.is_calibrated ?? (cur.status === 'complete' || cur.heartRateBpm != null);
+        const calibRemainingNow = Number(diagDataNow?.diagnostics?.calibration_seconds_remaining ?? 0);
 
-      broadcastCameraCheckState(appointmentId, {
-        status: measurement.status,
-        isRecording: isRunningNow,
-        progress: measurement.progress,
-        secondsRemaining: Math.max(0, Math.ceil(calibRemainingNow)),
-        isCalibrating: isRunningNow && !isCalibratedNow,
-        faceDetected: measurement.faceDetected ?? true,
-        motionDetected: Boolean(diagDataNow?.motion_detected),
-        heartRateBpm: measurement.heartRateBpm,
-        respiratoryRate: measurement.respiratoryRate,
-        signalQuality: measurement.signalQuality,
-        message: measurement.message,
-        algorithmVersion: measurement.algorithmVersion,
-        diagnostics: measurement.diagnostics,
-        patientName: effectivePatientName,
-        clinicianName: effectiveClinicianName,
-      }, 'patient');
-    });
+        broadcastCameraCheckState(appointmentId, {
+          status: cur.status,
+          isRecording: isRunningNow,
+          progress: cur.progress,
+          secondsRemaining: Math.max(0, Math.ceil(calibRemainingNow)),
+          isCalibrating: isRunningNow && !isCalibratedNow,
+          faceDetected: cur.faceDetected ?? true,
+          motionDetected: Boolean(diagDataNow?.motion_detected),
+          heartRateBpm: cur.heartRateBpm,
+          respiratoryRate: cur.respiratoryRate,
+          signalQuality: cur.signalQuality,
+          message: cur.message,
+          algorithmVersion: cur.algorithmVersion,
+          diagnostics: cur.diagnostics,
+          patientName: effectiveNamesRef.current.patient,
+          clinicianName: effectiveNamesRef.current.clinician,
+        }, 'patient');
+      },
+      {
+        onRequest: (request) => {
+          setIncomingConsent(request);
+        },
+        onRequestCancel: () => {
+          setIncomingConsent(null);
+        },
+      }
+    );
     return unsub;
-  }, [appointmentId, measurement, role]);
+  }, [appointmentId, role]);
 
   const startMeasurement = async () => {
     stopRef.current?.();
@@ -459,52 +523,126 @@ export function MeasurementPanel({
 
   if (isPatient) return (
     <aside className={`patient-camera-check ${isRunning ? 'patient-camera-check-active' : ''}`}>
-      <div className="patient-camera-copy">
-        <ShieldCheck size={21} />
-        <div>
-          <strong>
-            {isComplete
-              ? 'Camera check complete'
-              : isCalibrating
-              ? `Calibrating baseline (${Math.ceil(calibRemaining)}s left)`
-              : isRunning && isCalibrated
-              ? 'Live monitoring'
-              : 'Camera check'}
-          </strong>
-          <span>
-            {isComplete
-              ? (recordMessage || `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} can now view the reading.`)
-              : isCalibrating
-              ? `Establishing 30s baseline — keep still & breathe naturally. ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} sees your live progress.`
-              : isRunning && isCalibrated
-              ? `Signal locked. Finalizing clinical average for ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`
-              : `Only start this when ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'} asks. Results are shown live to ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`}
-          </span>
-        </div>
-      </div>
-      {!isRunning && !isComplete && <div className="patient-camera-positioning"><div className="face-guide-large"><span /></div><div><strong>Position your face here</strong><span>Keep your forehead and both cheeks inside the oval. Sit comfortably, face the camera, and avoid looking directly into a bright window behind you.</span></div></div>}
-      {isRunning && (
-        <div className="patient-camera-running">
-          <div className={`face-guide-small patient-camera-preview ${cameraStream ? 'camera-active' : ''}`}>
-            {cameraStream ? <video ref={videoRef} autoPlay muted playsInline /> : <span />}
-            {cameraStream && <i className={measurement.faceDetected ? 'face-locked' : ''} />}
+      {incomingConsent && !isRunning ? (
+        <div className="patient-consent-prompt" role="alertdialog" aria-labelledby="consent-title" aria-describedby="consent-desc">
+          <div className="consent-header">
+            <div className="consent-icon-badge">
+              <Activity size={22} className="consent-pulse-icon" />
+            </div>
+            <div>
+              <span className="consent-eyebrow">Clinician Request</span>
+              <h3 id="consent-title">30-Second Vitals Reading</h3>
+            </div>
           </div>
-          <div>
-            <strong>
-              {isCalibrating
-                ? `Calibrating (${Math.ceil(calibRemaining)}s left)`
-                : measurement.faceDetected
-                ? 'Face tracking active'
-                : 'Centre your face'}
-            </strong>
-            <span>{measurement.message} · {measurement.progress}%</span>
+
+          <div className="consent-body">
+            <p id="consent-desc" className="consent-message">
+              <strong>{incomingConsent.clinicianName || effectiveClinicianName}</strong> has requested to perform a 30-second contactless vitals check.
+            </p>
+
+            <div className="consent-privacy-box">
+              <div className="privacy-pill">
+                <ShieldCheck size={14} />
+                <span>Zero Video Stored</span>
+              </div>
+              <p className="privacy-details">
+                Using optical photoplethysmography (rPPG), subtle color variations in your skin are analyzed locally in your browser to measure your pulse and respiration. <strong>No video, photo, or biometric identity data is recorded or sent to any server.</strong> Only anonymous numeric vitals are shared directly with your clinician.
+              </p>
+            </div>
+
+            <div className="consent-positioning-hint">
+              <div className="face-guide-small"><span /></div>
+              <span>Sit comfortably, ensure good lighting on your face, and look towards the camera.</span>
+            </div>
+          </div>
+
+          <div className="consent-actions">
+            <button
+              type="button"
+              className="button button-primary consent-accept-btn"
+              onClick={handleAcceptConsent}
+            >
+              <Check size={18} /> Consent & Begin Reading (30s)
+            </button>
+            <button
+              type="button"
+              className="button button-ghost consent-decline-btn"
+              onClick={handleDeclineConsent}
+            >
+              <X size={16} /> Decline
+            </button>
           </div>
         </div>
+      ) : (
+        <>
+          <div className="patient-camera-copy">
+            <ShieldCheck size={21} />
+            <div>
+              <strong>
+                {isComplete
+                  ? 'Camera check complete'
+                  : isCalibrating
+                  ? `Calibrating baseline (${Math.ceil(calibRemaining)}s left)`
+                  : isRunning && isCalibrated
+                  ? 'Live monitoring'
+                  : 'Awaiting clinician request'}
+              </strong>
+              <span>
+                {isComplete
+                  ? (recordMessage || `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} can now view the reading.`)
+                  : isCalibrating
+                  ? `Establishing 30s baseline — keep still & breathe naturally. ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} sees your live progress.`
+                  : isRunning && isCalibrated
+                  ? `Signal locked. Finalizing clinical average for ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`
+                  : `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} will initiate your 30-second contactless vitals check when ready. When requested, a consent prompt will appear here.`}
+              </span>
+            </div>
+          </div>
+          {!isRunning && !isComplete && (
+            <>
+              <div className="patient-camera-positioning">
+                <div className="face-guide-large"><span /></div>
+                <div>
+                  <strong>Position your face here</strong>
+                  <span>Keep your forehead and both cheeks inside the oval. Sit comfortably, face the camera, and avoid looking directly into a bright window behind you.</span>
+                </div>
+              </div>
+              <div className="patient-awaiting-badge">
+                <span className="pulsing-beacon-dot" />
+                <span>Ready for {effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'clinician'} to initiate reading</span>
+              </div>
+            </>
+          )}
+          {isRunning && (
+            <div className="patient-camera-running">
+              <div className={`face-guide-small patient-camera-preview ${cameraStream ? 'camera-active' : ''}`}>
+                {cameraStream ? <video ref={videoRef} autoPlay muted playsInline /> : <span />}
+                {cameraStream && <i className={measurement.faceDetected ? 'face-locked' : ''} />}
+              </div>
+              <div>
+                <strong>
+                  {isCalibrating
+                    ? `Calibrating (${Math.ceil(calibRemaining)}s left)`
+                    : measurement.faceDetected
+                    ? 'Face tracking active'
+                    : 'Centre your face'}
+                </strong>
+                <span>{measurement.message} · {measurement.progress}%</span>
+              </div>
+            </div>
+          )}
+          {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> {measurement.message}</div>}
+          {isComplete ? (
+            <button className="button button-secondary patient-camera-button" onClick={() => void startMeasurement()} disabled={isRunning}>
+              <RotateCcw size={17} /> Run again
+            </button>
+          ) : !isRunning ? (
+            <button type="button" className="patient-self-test-btn" onClick={() => void startMeasurement()}>
+              Or start self-test reading
+            </button>
+          ) : null}
+        </>
       )}
-      {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> {measurement.message}</div>}
-      <button className="button button-secondary patient-camera-button" onClick={() => void startMeasurement()} disabled={isRunning}>
-        {isComplete ? <><RotateCcw size={17} /> Run again</> : <><Play size={17} /> {isRunning ? 'Camera check running…' : 'Enable camera check'}</>}
-      </button>
     </aside>
   );
 
@@ -572,23 +710,109 @@ export function MeasurementPanel({
 
       {role === 'clinician' && isComplete && !isPatientRecording && (
         <div className="clinician-reading-complete-banner" role="status">
-          <CheckCircle2 size={18} />
-          <div>
-            <strong>30-second reading received{effectivePatientName !== 'Patient' ? ` for ${effectivePatientName}` : ''}</strong>
-            <span>
-              Pulse: {measurement.heartRateBpm != null ? `${Math.round(measurement.heartRateBpm)} BPM` : '—'} · Respiration: {measurement.respiratoryRate != null ? `${(Math.round(measurement.respiratoryRate * 10) / 10).toFixed(1)} /min` : '—'} · Quality: {Math.round(measurement.signalQuality * 100)}%
-            </span>
+          <div className="complete-banner-left">
+            <CheckCircle2 size={18} />
+            <div>
+              <strong>30-second reading received{effectivePatientName !== 'Patient' ? ` for ${effectivePatientName}` : ''}</strong>
+              <span>
+                Pulse: {measurement.heartRateBpm != null ? `${Math.round(measurement.heartRateBpm)} BPM` : '—'} · Respiration: {measurement.respiratoryRate != null ? `${(Math.round(measurement.respiratoryRate * 10) / 10).toFixed(1)} /min` : '—'} · Quality: {Math.round(measurement.signalQuality * 100)}%
+              </span>
+            </div>
           </div>
+          <button
+            type="button"
+            className="retest-request-btn"
+            onClick={handleInitiateRequest}
+            disabled={requestStatus === 'waiting'}
+          >
+            <RotateCcw size={14} /> Request new reading
+          </button>
         </div>
       )}
 
-      {!isPatientRecording && !isComplete && (
-        <div className="instruction-card">
-          <div className="face-guide-small"><span /></div>
-          <div>
-            <strong>{effectivePatientName !== 'Patient' ? `${effectivePatientName}'s camera status` : 'Patient camera status'}</strong>
-            <span>{effectivePatientName !== 'Patient' ? effectivePatientName : 'The patient'} completes a 30-second camera check from their call screen. Real-time progress and results appear here automatically.</span>
-          </div>
+      {role === 'clinician' && !isPatientRecording && (!isComplete || requestStatus !== 'idle') && (
+        <div className="clinician-vitals-initiate-card">
+          {requestStatus === 'idle' && (
+            <div className="clinician-request-idle">
+              <div className="request-card-info">
+                <div className="request-card-icon">
+                  <Activity size={20} />
+                </div>
+                <div>
+                  <strong>Request 30s Contactless Vitals</strong>
+                  <span>Send a consent prompt to {effectivePatientName !== 'Patient' ? effectivePatientName : 'the patient'} to initiate their 30-second rPPG camera reading.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="button button-primary request-vitals-button"
+                onClick={handleInitiateRequest}
+              >
+                <Play size={16} /> Request vitals reading
+              </button>
+            </div>
+          )}
+
+          {requestStatus === 'waiting' && (
+            <div className="clinician-request-pending" role="status">
+              <div className="request-card-info">
+                <div className="pending-spinner-box">
+                  <LoaderCircle className="spin" size={22} />
+                </div>
+                <div>
+                  <div className="pending-status-pill">
+                    <span className="pulsing-beacon-dot" />
+                    <span>AWAITING PATIENT CONSENT</span>
+                  </div>
+                  <strong>Waiting for {effectivePatientName !== 'Patient' ? effectivePatientName : 'patient'} to consent…</strong>
+                  <span>A consent prompt has been displayed on {effectivePatientName !== 'Patient' ? `${effectivePatientName}'s` : "the patient's"} screen.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="button button-secondary cancel-request-button"
+                onClick={handleCancelRequest}
+              >
+                <X size={14} /> Cancel request
+              </button>
+            </div>
+          )}
+
+          {requestStatus === 'declined' && (
+            <div className="clinician-request-declined" role="alert">
+              <div className="request-card-info">
+                <div className="declined-icon-box">
+                  <CircleAlert size={20} />
+                </div>
+                <div>
+                  <div className="declined-status-pill">DECLINED</div>
+                  <strong>{effectivePatientName !== 'Patient' ? effectivePatientName : 'Patient'} declined the reading request</strong>
+                  <span>You may discuss with the patient or request again when ready.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="button button-primary request-vitals-button"
+                onClick={handleInitiateRequest}
+              >
+                <RotateCcw size={15} /> Request again
+              </button>
+            </div>
+          )}
+
+          {requestStatus === 'accepted' && (
+            <div className="clinician-request-accepted" role="status">
+              <div className="request-card-info">
+                <div className="accepted-icon-box">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <strong>{effectivePatientName !== 'Patient' ? effectivePatientName : 'Patient'} accepted consent!</strong>
+                  <span>Initializing camera and starting calibration…</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
