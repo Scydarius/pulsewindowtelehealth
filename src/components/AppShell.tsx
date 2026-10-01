@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { verifyClinicianAccess } from '../services/clinicAccess';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export function AppShell() {
   const location = useLocation();
@@ -75,7 +76,9 @@ export function AppShell() {
       )}
 
       <main key={`${location.pathname}${location.search}`} className="app-main app-page-enter">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );

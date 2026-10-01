@@ -2,8 +2,7 @@ import { ArrowRight, ChartNoAxesCombined, LockKeyhole, ScanFace, Video } from 'l
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { organizationSchema, PublicFooter, Seo } from '../components/PublicSite';
-import { PublicHeader } from './TechnologyPage';
+import { organizationSchema, PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
 
 export function LandingPage() {
   const [clinicianSignedIn, setClinicianSignedIn] = useState(false);

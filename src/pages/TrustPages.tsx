@@ -1,7 +1,6 @@
 import { ArrowRight, LockKeyhole } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { PublicFooter, Seo } from '../components/PublicSite';
-import { PublicHeader } from './TechnologyPage';
+import { PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
 
 type TrustPageProps = { kind: 'privacy' | 'terms' | 'security' };
 const copy = {

@@ -1,7 +1,6 @@
 import { ArrowRight, CheckCircle2, LoaderCircle, Mail, ShieldCheck } from 'lucide-react';
 import { FormEvent, useState } from 'react';
-import { PublicHeader } from './TechnologyPage';
-import { PublicFooter, Seo } from '../components/PublicSite';
+import { PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
 
 export function ContactPage() {
   const [name, setName] = useState('');

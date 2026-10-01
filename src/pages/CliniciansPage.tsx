@@ -1,8 +1,7 @@
 import { ArrowRight, CalendarPlus, ChartNoAxesCombined, ChevronDown, FileDown, Video } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PublicFooter, Seo } from '../components/PublicSite';
-import { PublicHeader } from './TechnologyPage';
+import { PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
 
 const steps = [
   { icon: CalendarPlus, title: 'Create an appointment', text: 'Create a patient record, select an appointment time, and issue a purpose-specific patient link.' },

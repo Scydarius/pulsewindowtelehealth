@@ -1,7 +1,6 @@
 import { Camera, CircleStop, LoaderCircle, Play, ScanFace, ShieldCheck, Waves } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PublicHeader } from './TechnologyPage';
-import { PublicFooter, Seo } from '../components/PublicSite';
+import { PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
 
 type Stage = 'idle' | 'permission' | 'connecting' | 'positioning' | 'calibrating' | 'measuring' | 'complete' | 'error';
 type Reading = {

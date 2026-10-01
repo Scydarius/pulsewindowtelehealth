@@ -1,31 +1,35 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { AdminSessionGate } from './components/AdminSessionGate';
 import { ClinicianSessionGate } from './components/ClinicianSessionGate';
 import { PatientSessionGate } from './components/PatientSessionGate';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 import { LandingPage } from './pages/LandingPage';
 
-const ClinicianPage = lazy(() => import('./pages/ClinicianPage').then((module) => ({ default: module.ClinicianPage })));
-const ConsultationPage = lazy(() => import('./pages/ConsultationPage').then((module) => ({ default: module.ConsultationPage })));
-const ClinicianSignInPage = lazy(() => import('./pages/ClinicianSignInPage').then((module) => ({ default: module.ClinicianSignInPage })));
-const ClinicianResetPasswordPage = lazy(() => import('./pages/ClinicianResetPasswordPage').then((module) => ({ default: module.ClinicianResetPasswordPage })));
-const ClinicianActivateAccountPage = lazy(() => import('./pages/ClinicianActivateAccountPage').then((module) => ({ default: module.ClinicianActivateAccountPage })));
-const PatientInvitePage = lazy(() => import('./pages/PatientInvitePage').then((module) => ({ default: module.PatientInvitePage })));
-const AdminCliniciansPage = lazy(() => import('./pages/AdminCliniciansPage').then((module) => ({ default: module.AdminCliniciansPage })));
-const PatientProfilePage = lazy(() => import('./pages/PatientProfilePage').then((module) => ({ default: module.PatientProfilePage })));
-const TechnologyPage = lazy(() => import('./pages/TechnologyPage').then((module) => ({ default: module.TechnologyPage })));
-const LiveDemoPage = lazy(() => import('./pages/LiveDemoPage').then((module) => ({ default: module.LiveDemoPage })));
-const ContactPage = lazy(() => import('./pages/ContactPage').then((module) => ({ default: module.ContactPage })));
-const CliniciansPage = lazy(() => import('./pages/CliniciansPage').then((module) => ({ default: module.CliniciansPage })));
-const TrustPage = lazy(() => import('./pages/TrustPages').then((module) => ({ default: module.TrustPage })));
-const BookingPage = lazy(() => import('./pages/BookingPage').then((module) => ({ default: module.BookingPage })));
-const ConsultationReviewPage = lazy(() => import('./pages/ConsultationReviewPage').then((module) => ({ default: module.ConsultationReviewPage })));
+const ClinicianPage = lazyWithRetry(() => import('./pages/ClinicianPage').then((module) => ({ default: module.ClinicianPage })));
+const ConsultationPage = lazyWithRetry(() => import('./pages/ConsultationPage').then((module) => ({ default: module.ConsultationPage })));
+const ClinicianSignInPage = lazyWithRetry(() => import('./pages/ClinicianSignInPage').then((module) => ({ default: module.ClinicianSignInPage })));
+const ClinicianResetPasswordPage = lazyWithRetry(() => import('./pages/ClinicianResetPasswordPage').then((module) => ({ default: module.ClinicianResetPasswordPage })));
+const ClinicianActivateAccountPage = lazyWithRetry(() => import('./pages/ClinicianActivateAccountPage').then((module) => ({ default: module.ClinicianActivateAccountPage })));
+const PatientInvitePage = lazyWithRetry(() => import('./pages/PatientInvitePage').then((module) => ({ default: module.PatientInvitePage })));
+const AdminCliniciansPage = lazyWithRetry(() => import('./pages/AdminCliniciansPage').then((module) => ({ default: module.AdminCliniciansPage })));
+const PatientProfilePage = lazyWithRetry(() => import('./pages/PatientProfilePage').then((module) => ({ default: module.PatientProfilePage })));
+const TechnologyPage = lazyWithRetry(() => import('./pages/TechnologyPage').then((module) => ({ default: module.TechnologyPage })));
+const LiveDemoPage = lazyWithRetry(() => import('./pages/LiveDemoPage').then((module) => ({ default: module.LiveDemoPage })));
+const ContactPage = lazyWithRetry(() => import('./pages/ContactPage').then((module) => ({ default: module.ContactPage })));
+const CliniciansPage = lazyWithRetry(() => import('./pages/CliniciansPage').then((module) => ({ default: module.CliniciansPage })));
+const TrustPage = lazyWithRetry(() => import('./pages/TrustPages').then((module) => ({ default: module.TrustPage })));
+const BookingPage = lazyWithRetry(() => import('./pages/BookingPage').then((module) => ({ default: module.BookingPage })));
+const ConsultationReviewPage = lazyWithRetry(() => import('./pages/ConsultationReviewPage').then((module) => ({ default: module.ConsultationReviewPage })));
 
 const page = (element: React.ReactNode) => (
-  <Suspense fallback={<div className="page-loading">Loading Ventricura…</div>}>
-    {element}
-  </Suspense>
+  <ErrorBoundary>
+    <Suspense fallback={<div className="page-loading">Loading Ventricura…</div>}>
+      {element}
+    </Suspense>
+  </ErrorBoundary>
 );
 
 /** The same URL hosts patient and clinician calls; only the clinician view needs sign-in. */

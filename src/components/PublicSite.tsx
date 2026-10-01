@@ -1,5 +1,48 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowRight, Menu, X } from 'lucide-react';
+
+export function PublicHeader() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <header className="public-header">
+      <Link to="/" className="public-brand" aria-label="Ventricura home">
+        <img src="/ventricura-logo-centred.png" alt="Ventricura" />
+      </Link>
+      <nav className="desktop-public-nav" aria-label="Public navigation">
+        <Link to="/technology">Technology</Link>
+        <Link to="/clinicians">For clinicians</Link>
+        <Link to="/demo">Live demo</Link>
+        <Link to="/contact">Contact</Link>
+        <Link to="/clinician/sign-in" className="header-access">Clinician access <ArrowRight size={15} /></Link>
+      </nav>
+      <button
+        type="button"
+        className="public-mobile-toggle"
+        onClick={() => setMobileMenuOpen((open) => !open)}
+        aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+        aria-expanded={mobileMenuOpen}
+      >
+        {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+      </button>
+      {mobileMenuOpen && (
+        <>
+          <div className="public-mobile-backdrop" onClick={() => setMobileMenuOpen(false)} aria-hidden="true" />
+          <div className="public-mobile-drawer" role="dialog" aria-label="Mobile navigation">
+            <nav>
+              <Link to="/technology" onClick={() => setMobileMenuOpen(false)}>Technology</Link>
+              <Link to="/clinicians" onClick={() => setMobileMenuOpen(false)}>For clinicians</Link>
+              <Link to="/demo" onClick={() => setMobileMenuOpen(false)}>Live demo</Link>
+              <Link to="/contact" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
+              <Link to="/clinician/sign-in" className="mobile-drawer-access" onClick={() => setMobileMenuOpen(false)}>Clinician access <ArrowRight size={15} /></Link>
+            </nav>
+          </div>
+        </>
+      )}
+    </header>
+  );
+}
 
 type SeoProps = { title: string; description: string; path: string; jsonLd?: Record<string, unknown> };
 
