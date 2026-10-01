@@ -52,17 +52,20 @@ export function PublicHeader() {
       {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
     </button>
     {mobileMenuOpen && (
-      <div className="public-mobile-drawer" role="dialog" aria-label="Mobile navigation">
-        <nav>
-          <Link to="/technology" onClick={() => setMobileMenuOpen(false)}>Technology</Link>
-          <Link to="/clinicians" onClick={() => setMobileMenuOpen(false)}>For clinicians</Link>
-          <Link to="/demo" onClick={() => setMobileMenuOpen(false)}>Live demo</Link>
-          <Link to="/contact" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
-          <Link to="/clinician/sign-in" className="mobile-drawer-access" onClick={() => setMobileMenuOpen(false)}>
-            Clinician access <ArrowRight size={15} />
-          </Link>
-        </nav>
-      </div>
+      <>
+        <div className="public-mobile-backdrop" onClick={() => setMobileMenuOpen(false)} aria-hidden="true" />
+        <div className="public-mobile-drawer" role="dialog" aria-label="Mobile navigation">
+          <nav>
+            <Link to="/technology" onClick={() => setMobileMenuOpen(false)}>Technology</Link>
+            <Link to="/clinicians" onClick={() => setMobileMenuOpen(false)}>For clinicians</Link>
+            <Link to="/demo" onClick={() => setMobileMenuOpen(false)}>Live demo</Link>
+            <Link to="/contact" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
+            <Link to="/clinician/sign-in" className="mobile-drawer-access" onClick={() => setMobileMenuOpen(false)}>
+              Clinician access <ArrowRight size={15} />
+            </Link>
+          </nav>
+        </div>
+      </>
     )}
   </header>;
 }
