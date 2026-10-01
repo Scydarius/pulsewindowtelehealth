@@ -2,6 +2,7 @@ import {
   Camera,
   CameraOff,
   LoaderCircle,
+  Maximize2,
   Mic,
   MicOff,
   PhoneOff,
@@ -60,6 +61,7 @@ export default function LocalVideoRoom({ appointmentId, displayName, role, patie
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [microphoneEnabled, setMicrophoneEnabled] = useState(true);
   const [speakerEnabled, setSpeakerEnabled] = useState(true);
+  const [isSwapped, setIsSwapped] = useState(false);
   const [error, setError] = useState<string>();
 
   const sendSignal = useCallback((type: SignalMessage['type'], payload?: SignalMessage['payload']) => {
@@ -278,8 +280,14 @@ export default function LocalVideoRoom({ appointmentId, displayName, role, patie
   };
 
   return (
-    <div className="video-stage local-call-stage">
-      <video ref={remoteVideoRef} autoPlay playsInline className="remote-video" />
+    <div className={`video-stage local-call-stage ${isSwapped ? 'is-swapped' : ''}`}>
+      <video
+        ref={remoteVideoRef}
+        autoPlay
+        playsInline
+        className="remote-video"
+        onClick={connectionState === 'connected' && isSwapped ? () => setIsSwapped(false) : undefined}
+      />
 
       {connectionState !== 'connected' && (
         <div className="call-waiting-state">
@@ -291,10 +299,28 @@ export default function LocalVideoRoom({ appointmentId, displayName, role, patie
         </div>
       )}
 
-      <div className="local-video-tile">
+      <div
+        className={`local-video-tile ${isSwapped ? 'swapped-view' : ''}`}
+        onClick={connectionState === 'connected' && !isSwapped ? () => setIsSwapped(true) : undefined}
+        title={connectionState === 'connected' ? 'Click to swap video view' : undefined}
+      >
         <video ref={localVideoRef} autoPlay muted playsInline className={cameraEnabled ? '' : 'is-hidden'} />
         {!cameraEnabled && <CameraOff />}
         <span>You · {displayName}</span>
+        {connectionState === 'connected' && (
+          <button
+            type="button"
+            className="pip-swap-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsSwapped((v) => !v);
+            }}
+            title="Swap video views"
+            aria-label="Swap video views"
+          >
+            <Maximize2 size={13} />
+          </button>
+        )}
       </div>
 
       <div className="privacy-chip"><ShieldCheck size={15} /> Local encrypted WebRTC call</div>
