@@ -1,7 +1,8 @@
-import { Activity, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Copy, Download, FileText, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind } from 'lucide-react';
+import { Activity, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Download, FileText, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
 import { loadPatientMeasurementTrend, loadPrivateClinicalNote, savePatientMeasurement, savePrivateClinicalNote, type SavedMeasurement } from '../services/clinicAccess';
+import { broadcastCameraCheckState, requestCameraCheckState, subscribeToCameraCheck, type CameraCheckSyncState } from '../services/consultationSync';
 
 type MeasurementPanelProps = { appointmentId: string; role: 'patient' | 'clinician'; invitationToken?: string };
 
@@ -222,12 +223,67 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [recordMessage, setRecordMessage] = useState('');
   const [trend, setTrend] = useState<SavedMeasurement[]>([]);
+  const [patientSyncState, setPatientSyncState] = useState<CameraCheckSyncState | null>(null);
 
   useEffect(() => () => stopRef.current?.(), []);
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = cameraStream;
   }, [cameraStream]);
 
+  // Clinician: listen for real-time camera check broadcasts from patient
+  useEffect(() => {
+    if (role !== 'clinician') return;
+    requestCameraCheckState(appointmentId, 'clinician');
+    const unsub = subscribeToCameraCheck(appointmentId, (sync) => {
+      setPatientSyncState(sync);
+      if (sync.isRecording || sync.status === 'preparing' || sync.status === 'measuring') {
+        setMeasurement({
+          status: sync.status,
+          progress: sync.progress,
+          signalQuality: sync.signalQuality,
+          heartRateBpm: sync.heartRateBpm,
+          respiratoryRate: sync.respiratoryRate,
+          message: sync.message,
+          algorithmVersion: sync.algorithmVersion,
+          faceDetected: sync.faceDetected,
+          trackingState: sync.isCalibrating ? 'CALIBRATING' : 'LOCKED',
+          diagnostics: sync.diagnostics ?? undefined,
+        });
+      } else if (sync.status === 'complete') {
+        setMeasurement((prev) => ({
+          ...prev,
+          status: 'complete',
+          progress: 100,
+          signalQuality: sync.signalQuality,
+          heartRateBpm: sync.heartRateBpm,
+          respiratoryRate: sync.respiratoryRate,
+          message: sync.message || '30-second camera check complete',
+          diagnostics: sync.diagnostics ?? prev.diagnostics,
+        }));
+        void loadPatientMeasurementTrend(appointmentId).then((readings) => {
+          if (readings.length) setTrend(readings);
+        }).catch(() => {});
+      } else if (sync.status === 'failed') {
+        setMeasurement((prev) => ({
+          ...prev,
+          status: 'failed',
+          message: sync.message || 'Camera check interrupted',
+        }));
+      }
+    });
+    return unsub;
+  }, [appointmentId, role]);
+
+  // Clinician safety timeout: if patient stops sending updates for 12s, clear recording state
+  useEffect(() => {
+    if (role !== 'clinician' || !patientSyncState?.isRecording) return;
+    const timer = window.setTimeout(() => {
+      setPatientSyncState((prev) => (prev ? { ...prev, isRecording: false } : null));
+    }, 12000);
+    return () => window.clearTimeout(timer);
+  }, [patientSyncState?.timestamp, role]);
+
+  // Clinician: poll saved readings as persistent fallback and trend history
   useEffect(() => {
     if (role !== 'clinician') return;
     let active = true;
@@ -237,7 +293,21 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
         if (!active || !readings.length) return;
         const latest = readings.at(-1)!;
         setTrend(readings);
-        setMeasurement({ status: 'complete', progress: 100, signalQuality: latest.signal_quality, heartRateBpm: latest.heart_rate_bpm, respiratoryRate: latest.respiratory_rate_bpm, message: `${readings.length}-point camera-check trend received`, algorithmVersion: latest.algorithm_version ?? undefined, faceDetected: true, trackingState: 'LOCKED', diagnostics: latest.diagnostics ?? undefined });
+        setMeasurement((prev) => {
+          if (prev.status === 'measuring' || prev.status === 'preparing') return prev;
+          return {
+            status: 'complete',
+            progress: 100,
+            signalQuality: latest.signal_quality,
+            heartRateBpm: latest.heart_rate_bpm,
+            respiratoryRate: latest.respiratory_rate_bpm,
+            message: `${readings.length}-point camera-check trend received`,
+            algorithmVersion: latest.algorithm_version ?? undefined,
+            faceDetected: true,
+            trackingState: 'LOCKED',
+            diagnostics: latest.diagnostics ?? undefined,
+          };
+        });
       } catch {
         // A clinician may open the call before their authenticated session has refreshed.
       }
@@ -247,6 +317,7 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
     return () => { active = false; window.clearInterval(interval); };
   }, [appointmentId, role]);
 
+  // Patient: save sample to database
   useEffect(() => {
     const sample = measurement.sample;
     if (role !== 'patient' || !sample || !invitationToken || savedSampleIdsRef.current.has(sample.capturedAt)) return;
@@ -255,6 +326,72 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
       .then(() => { if (measurement.status === 'complete') setRecordMessage('30-second trend saved for your clinician.'); })
       .catch(() => setRecordMessage('Reading is visible here, but could not be saved for your clinician.'));
   }, [appointmentId, invitationToken, measurement, role]);
+
+  // Patient: broadcast state to clinician in real time
+  useEffect(() => {
+    if (role !== 'patient') return;
+    const isRunningNow = measurement.status === 'preparing' || measurement.status === 'measuring';
+    const diagDataNow = measurement.diagnostics as {
+      diagnostics?: {
+        is_calibrated?: boolean;
+        calibration_seconds_remaining?: number;
+        calibration_progress_pct?: number;
+      };
+      motion_detected?: boolean;
+    } | undefined;
+    const isCalibratedNow = diagDataNow?.diagnostics?.is_calibrated ?? (measurement.status === 'complete' || measurement.heartRateBpm != null);
+    const calibRemainingNow = Number(diagDataNow?.diagnostics?.calibration_seconds_remaining ?? 0);
+
+    broadcastCameraCheckState(appointmentId, {
+      status: measurement.status,
+      isRecording: isRunningNow,
+      progress: measurement.progress,
+      secondsRemaining: Math.max(0, Math.ceil(calibRemainingNow)),
+      isCalibrating: isRunningNow && !isCalibratedNow,
+      faceDetected: measurement.faceDetected ?? true,
+      motionDetected: Boolean(diagDataNow?.motion_detected),
+      heartRateBpm: measurement.heartRateBpm,
+      respiratoryRate: measurement.respiratoryRate,
+      signalQuality: measurement.signalQuality,
+      message: measurement.message,
+      algorithmVersion: measurement.algorithmVersion,
+      diagnostics: measurement.diagnostics,
+    }, 'patient');
+  }, [appointmentId, measurement, role]);
+
+  // Patient: respond to clinician pings by re-broadcasting immediately
+  useEffect(() => {
+    if (role !== 'patient') return;
+    const unsub = subscribeToCameraCheck(appointmentId, () => {}, () => {
+      const isRunningNow = measurement.status === 'preparing' || measurement.status === 'measuring';
+      const diagDataNow = measurement.diagnostics as {
+        diagnostics?: {
+          is_calibrated?: boolean;
+          calibration_seconds_remaining?: number;
+        };
+        motion_detected?: boolean;
+      } | undefined;
+      const isCalibratedNow = diagDataNow?.diagnostics?.is_calibrated ?? (measurement.status === 'complete' || measurement.heartRateBpm != null);
+      const calibRemainingNow = Number(diagDataNow?.diagnostics?.calibration_seconds_remaining ?? 0);
+
+      broadcastCameraCheckState(appointmentId, {
+        status: measurement.status,
+        isRecording: isRunningNow,
+        progress: measurement.progress,
+        secondsRemaining: Math.max(0, Math.ceil(calibRemainingNow)),
+        isCalibrating: isRunningNow && !isCalibratedNow,
+        faceDetected: measurement.faceDetected ?? true,
+        motionDetected: Boolean(diagDataNow?.motion_detected),
+        heartRateBpm: measurement.heartRateBpm,
+        respiratoryRate: measurement.respiratoryRate,
+        signalQuality: measurement.signalQuality,
+        message: measurement.message,
+        algorithmVersion: measurement.algorithmVersion,
+        diagnostics: measurement.diagnostics,
+      }, 'patient');
+    });
+    return unsub;
+  }, [appointmentId, measurement, role]);
 
   const startMeasurement = async () => {
     stopRef.current?.();
@@ -284,10 +421,14 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
       calibration_seconds_remaining?: number;
       calibration_progress_pct?: number;
     };
+    motion_detected?: boolean;
   } | undefined;
   const isCalibrated = diagData?.diagnostics?.is_calibrated ?? (isComplete || (measurement.heartRateBpm != null));
   const calibRemaining = Number(diagData?.diagnostics?.calibration_seconds_remaining ?? 0);
   const isCalibrating = isRunning && !isCalibrated;
+
+  const isPatientRecording = role === 'clinician' && (patientSyncState?.isRecording || isRunning);
+  const secondsRemaining = patientSyncState?.secondsRemaining ?? Math.max(0, Math.ceil(calibRemaining));
 
   if (isPatient) return (
     <aside className={`patient-camera-check ${isRunning ? 'patient-camera-check-active' : ''}`}>
@@ -307,10 +448,10 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
             {isComplete
               ? (recordMessage || 'Your clinician can now view the reading.')
               : isCalibrating
-              ? 'Establishing 30s baseline — keep still & breathe naturally.'
+              ? 'Establishing 30s baseline — keep still & breathe naturally. Your clinician sees your live progress.'
               : isRunning && isCalibrated
-              ? 'Signal locked. Finalizing clinical average.'
-              : 'Only start this when your clinician asks. Results are shown to your clinician, not in this call view.'}
+              ? 'Signal locked. Finalizing clinical average for your clinician.'
+              : 'Only start this when your clinician asks. Results are shown live to your clinician.'}
           </span>
         </div>
       </div>
@@ -347,45 +488,109 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
           <p className="eyebrow">Session telemetry</p>
           <h2>Patient readings</h2>
         </div>
-        <span className={`status-dot ${isCalibrating ? 'calibrating' : isRunning ? 'active' : ''}`} aria-hidden="true" />
+        {role === 'clinician' && isPatientRecording ? (
+          <div className="recording-pill-live" aria-live="polite">
+            <span className="pulsing-record-dot" />
+            <span>PATIENT RECORDING ({secondsRemaining}s)</span>
+          </div>
+        ) : (
+          <span className={`status-dot ${isCalibrating ? 'calibrating' : isRunning ? 'active' : ''}`} aria-hidden="true" />
+        )}
       </div>
 
-      <div className="instruction-card">
-        <div className="face-guide-small"><span /></div>
-        <div>
-          <strong>
-            {measurement.status === 'complete'
-              ? 'Patient reading received'
-              : isCalibrating
-              ? `Calibrating baseline (${Math.ceil(calibRemaining)}s left)`
-              : isRunning && isCalibrated
-              ? 'Live monitoring'
-              : 'Patient camera status'}
-          </strong>
-          <span>
-            {measurement.status === 'complete'
-              ? 'Latest patient reading is shown below.'
-              : isCalibrating
-              ? 'Establishing 30s baseline — keep still & breathe naturally.'
-              : isRunning && isCalibrated
-              ? 'Clean 30s quality-weighted clinical average active.'
-              : 'The patient completes a small camera check from their call screen. Results appear here automatically.'}
-          </span>
+      {role === 'clinician' && isPatientRecording && (
+        <section className="clinician-reading-active-banner" aria-live="assertive" role="alert">
+          <div className="active-banner-main">
+            <div className="pulsing-radar-beacon">
+              <span className="beacon-ring beacon-ring-outer" />
+              <span className="beacon-ring beacon-ring-inner" />
+              <span className="beacon-dot" />
+            </div>
+            <div className="active-banner-details">
+              <div className="active-banner-badges">
+                <span className="status-tag status-recording">● PATIENT RECORDING IN PROGRESS</span>
+                <span className="status-tag status-time">
+                  <Clock3 size={11} /> {secondsRemaining > 0 ? `${secondsRemaining}s remaining` : 'Finalizing…'}
+                </span>
+              </div>
+              <h3 className="active-banner-title">
+                {isCalibrating ? 'Calibrating 30-second baseline' : 'Optical signal locked — measuring'}
+              </h3>
+              <p className="active-banner-description">
+                {patientSyncState?.motionDetected || diagData?.motion_detected ? (
+                  <span className="guidance-warning">
+                    <CircleAlert size={14} /> Motion detected on patient camera — please advise patient to hold still.
+                  </span>
+                ) : measurement.faceDetected === false ? (
+                  <span className="guidance-warning">
+                    <CircleAlert size={14} /> Patient face is not centered in their camera frame.
+                  </span>
+                ) : isCalibrating ? (
+                  <span>
+                    Establishing quality-weighted optical baseline. Instruct patient to remain still, face their camera, and breathe naturally.
+                  </span>
+                ) : (
+                  <span>
+                    Baseline locked. Finalizing 30-second quality-weighted clinical average into chart.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="active-banner-progress-track">
+            <div className="active-banner-progress-fill" style={{ width: `${Math.max(5, measurement.progress)}%` }} />
+          </div>
+        </section>
+      )}
+
+      {role === 'clinician' && isComplete && !isPatientRecording && (
+        <div className="clinician-reading-complete-banner" role="status">
+          <CheckCircle2 size={18} />
+          <div>
+            <strong>30-second patient reading received</strong>
+            <span>
+              Pulse: {measurement.heartRateBpm != null ? `${Math.round(measurement.heartRateBpm)} BPM` : '—'} · Respiration: {measurement.respiratoryRate != null ? `${(Math.round(measurement.respiratoryRate * 10) / 10).toFixed(1)} /min` : '—'} · Quality: {Math.round(measurement.signalQuality * 100)}%
+            </span>
+          </div>
         </div>
-      </div>
+      )}
+
+      {!isPatientRecording && !isComplete && (
+        <div className="instruction-card">
+          <div className="face-guide-small"><span /></div>
+          <div>
+            <strong>Patient camera status</strong>
+            <span>The patient completes a 30-second camera check from their call screen. Real-time progress and results appear here automatically.</span>
+          </div>
+        </div>
+      )}
 
       <div className="live-metrics">
-        <article>
-          <Activity />
+        <article className={isPatientRecording && isCalibrating ? 'metric-card-calibrating' : isPatientRecording ? 'metric-card-locked' : ''}>
+          <Activity className={isPatientRecording ? 'pulse-anim' : ''} />
           <span>Pulse</span>
-          <strong>{measurement.heartRateBpm != null && Number.isFinite(measurement.heartRateBpm) ? Math.round(measurement.heartRateBpm) : '--'}</strong>
-          <small>{isCalibrating ? `Calibrating (${Math.ceil(calibRemaining)}s left)` : 'BPM · 30s clinical average'}</small>
+          {isPatientRecording && isCalibrating ? (
+            <div className="metric-calibrating-box">
+              <strong className="metric-calibrating-label">CALIBRATING</strong>
+              <span className="metric-calibrating-time">{secondsRemaining}s left</span>
+            </div>
+          ) : (
+            <strong>{measurement.heartRateBpm != null && Number.isFinite(measurement.heartRateBpm) ? Math.round(measurement.heartRateBpm) : '--'}</strong>
+          )}
+          <small>{isCalibrating ? `${secondsRemaining}s left · baseline establishing` : 'BPM · 30s clinical average'}</small>
         </article>
-        <article>
-          <Wind />
+        <article className={isPatientRecording && isCalibrating ? 'metric-card-calibrating' : isPatientRecording ? 'metric-card-locked' : ''}>
+          <Wind className={isPatientRecording ? 'wind-anim' : ''} />
           <span>Breathing</span>
-          <strong>{measurement.respiratoryRate != null && Number.isFinite(measurement.respiratoryRate) ? (Math.round(measurement.respiratoryRate * 10) / 10).toFixed(1) : '--'}</strong>
-          <small>{isCalibrating ? `Calibrating (${Math.ceil(calibRemaining)}s left)` : 'breaths/min · 30s clinical average'}</small>
+          {isPatientRecording && isCalibrating ? (
+            <div className="metric-calibrating-box">
+              <strong className="metric-calibrating-label">CALIBRATING</strong>
+              <span className="metric-calibrating-time">{secondsRemaining}s left</span>
+            </div>
+          ) : (
+            <strong>{measurement.respiratoryRate != null && Number.isFinite(measurement.respiratoryRate) ? (Math.round(measurement.respiratoryRate * 10) / 10).toFixed(1) : '--'}</strong>
+          )}
+          <small>{isCalibrating ? `${secondsRemaining}s left · baseline establishing` : 'breaths/min · 30s clinical average'}</small>
         </article>
       </div>
 
@@ -399,11 +604,11 @@ export function MeasurementPanel({ appointmentId, role, invitationToken }: Measu
       <div className="progress-block">
         <div className="progress-label"><span>{measurement.message}</span><strong>{measurement.progress}%</strong></div>
         <div className="progress-track"><span style={{ width: `${measurement.progress}%` }} /></div>
-        {isRunning && (
+        {(isRunning || isPatientRecording) && (
           <div className="signal-line">
             <LoaderCircle className="spin" size={16} />
             {isCalibrating
-              ? `Establishing baseline (${Math.ceil(calibRemaining)}s left) · Signal quality ${Math.round(measurement.signalQuality * 100)}%`
+              ? `Establishing baseline (${secondsRemaining}s left) · Signal quality ${Math.round(measurement.signalQuality * 100)}%`
               : `Signal quality ${Math.round(measurement.signalQuality * 100)}%`}
           </div>
         )}
