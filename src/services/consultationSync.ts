@@ -132,6 +132,17 @@ export function broadcastCameraCheckState(
   }
 }
 
+const STORAGE_PREFIX = 'ventricura_cam_';
+const reqKey = (id: string) => `${STORAGE_PREFIX}req_${id}`;
+const resKey = (id: string) => `${STORAGE_PREFIX}res_${id}`;
+const cancelKey = (id: string) => `${STORAGE_PREFIX}cancel_${id}`;
+
+function emitLocalCustomEvent(msg: SyncBroadcastMessage) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ventricura_camera_check_msg', { detail: msg }));
+  }
+}
+
 /**
  * Clinician initiates a request for the patient to take a 30s vitals check.
  */
@@ -143,10 +154,19 @@ export function broadcastCameraCheckRequest(appointmentId: string, clinicianName
   };
   latestLocalRequest = payload;
 
+  try {
+    localStorage.removeItem(cancelKey(appointmentId));
+    localStorage.setItem(reqKey(appointmentId), JSON.stringify(payload));
+  } catch {
+    // Ignore storage quota or disabled storage
+  }
+
   const message: SyncBroadcastMessage = {
     type: 'camera_check_request',
     payload,
   };
+
+  emitLocalCustomEvent(message);
 
   try {
     getBroadcastChannel(appointmentId)?.postMessage(message);
@@ -173,10 +193,20 @@ export function broadcastCameraCheckRequest(appointmentId: string, clinicianName
  */
 export function cancelCameraCheckRequest(appointmentId: string) {
   latestLocalRequest = null;
+
+  try {
+    localStorage.removeItem(reqKey(appointmentId));
+    localStorage.setItem(cancelKey(appointmentId), String(Date.now()));
+  } catch {
+    // Ignore
+  }
+
   const message: SyncBroadcastMessage = {
     type: 'camera_check_request_cancel',
     appointmentId,
   };
+
+  emitLocalCustomEvent(message);
 
   try {
     getBroadcastChannel(appointmentId)?.postMessage(message);
@@ -210,10 +240,21 @@ export function broadcastCameraCheckResponse(appointmentId: string, patientName:
     timestamp: Date.now(),
   };
 
+  try {
+    localStorage.setItem(resKey(appointmentId), JSON.stringify(payload));
+    if (accepted) {
+      localStorage.removeItem(reqKey(appointmentId));
+    }
+  } catch {
+    // Ignore
+  }
+
   const message: SyncBroadcastMessage = {
     type: 'camera_check_response',
     payload,
   };
+
+  emitLocalCustomEvent(message);
 
   try {
     getBroadcastChannel(appointmentId)?.postMessage(message);
@@ -354,6 +395,45 @@ export function subscribeToCameraCheck(
     });
   }
 
+  // 3. Listen on window storage events (cross-tab sync across browser windows)
+  const storageHandler = (event: StorageEvent) => {
+    if (event.key === reqKey(appointmentId)) {
+      if (event.newValue) {
+        try {
+          const req = JSON.parse(event.newValue) as CameraCheckRequestMessage;
+          if (Date.now() - req.timestamp < 10 * 60 * 1000) {
+            handleMessage({ type: 'camera_check_request', payload: req });
+          }
+        } catch {}
+      } else {
+        handleMessage({ type: 'camera_check_request_cancel', appointmentId });
+      }
+    } else if (event.key === cancelKey(appointmentId)) {
+      handleMessage({ type: 'camera_check_request_cancel', appointmentId });
+    } else if (event.key === resKey(appointmentId) && event.newValue) {
+      try {
+        const res = JSON.parse(event.newValue) as CameraCheckResponseMessage;
+        handleMessage({ type: 'camera_check_response', payload: res });
+      } catch {}
+    }
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', storageHandler);
+  }
+
+  // 4. Listen on local CustomEvent (for same-window / same-tab components)
+  const customHandler = (event: Event) => {
+    const customEvt = event as CustomEvent<SyncBroadcastMessage>;
+    if (customEvt.detail) {
+      handleMessage(customEvt.detail);
+    }
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('ventricura_camera_check_msg', customHandler);
+  }
+
   // If there's an active in-memory state, dispatch it
   if (latestLocalState && latestLocalState.appointmentId === appointmentId) {
     onUpdate(latestLocalState);
@@ -364,7 +444,35 @@ export function subscribeToCameraCheck(
     callbacks?.onRequest?.(latestLocalRequest);
   }
 
+  // Check localStorage for an active pending request on mount
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const cancelTime = localStorage.getItem(cancelKey(appointmentId));
+      const reqStr = localStorage.getItem(reqKey(appointmentId));
+      if (reqStr) {
+        const req = JSON.parse(reqStr) as CameraCheckRequestMessage;
+        const isNotCancelled = !cancelTime || Number(cancelTime) < req.timestamp;
+        const isFresh = Date.now() - req.timestamp < 10 * 60 * 1000;
+        if (isNotCancelled && isFresh) {
+          callbacks?.onRequest?.(req);
+        }
+      }
+
+      const resStr = localStorage.getItem(resKey(appointmentId));
+      if (resStr) {
+        const res = JSON.parse(resStr) as CameraCheckResponseMessage;
+        if (Date.now() - res.timestamp < 10 * 60 * 1000) {
+          callbacks?.onResponse?.(res);
+        }
+      }
+    } catch {}
+  }
+
   return () => {
     bc?.removeEventListener('message', bcHandler);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', storageHandler);
+      window.removeEventListener('ventricura_camera_check_msg', customHandler);
+    }
   };
 }

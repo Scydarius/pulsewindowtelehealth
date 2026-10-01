@@ -352,6 +352,15 @@ export function MeasurementPanel({
     return () => window.clearTimeout(timer);
   }, [patientSyncState?.timestamp, role]);
 
+  // Clinician: periodically re-broadcast check request while awaiting patient consent
+  useEffect(() => {
+    if (role !== 'clinician' || requestStatus !== 'waiting') return;
+    const interval = window.setInterval(() => {
+      broadcastCameraCheckRequest(appointmentId, effectiveClinicianName);
+    }, 2500);
+    return () => window.clearInterval(interval);
+  }, [appointmentId, effectiveClinicianName, requestStatus, role]);
+
   // Clinician: poll saved readings as persistent fallback and trend history
   useEffect(() => {
     if (role !== 'clinician') return;
@@ -522,128 +531,159 @@ export function MeasurementPanel({
   const secondsRemaining = patientSyncState?.secondsRemaining ?? Math.max(0, Math.ceil(calibRemaining));
 
   if (isPatient) return (
-    <aside className={`patient-camera-check ${isRunning ? 'patient-camera-check-active' : ''}`}>
-      {incomingConsent && !isRunning ? (
-        <div className="patient-consent-prompt" role="alertdialog" aria-labelledby="consent-title" aria-describedby="consent-desc">
-          <div className="consent-header">
-            <div className="consent-icon-badge">
-              <Activity size={22} className="consent-pulse-icon" />
-            </div>
-            <div>
-              <span className="consent-eyebrow">Clinician Request</span>
-              <h3 id="consent-title">30-Second Vitals Reading</h3>
-            </div>
-          </div>
-
-          <div className="consent-body">
-            <p id="consent-desc" className="consent-message">
-              <strong>{incomingConsent.clinicianName || effectiveClinicianName}</strong> has requested to perform a 30-second contactless vitals check.
-            </p>
-
-            <div className="consent-privacy-box">
-              <div className="privacy-pill">
-                <ShieldCheck size={14} />
-                <span>Zero Video Stored</span>
+    <>
+      {incomingConsent && !isRunning && (
+        <div className="patient-consent-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="consent-title" aria-describedby="consent-desc">
+          <div className="patient-consent-modal">
+            <div className="consent-modal-header">
+              <div className="consent-icon-badge">
+                <Activity size={24} className="consent-pulse-icon" />
               </div>
-              <p className="privacy-details">
-                Using optical photoplethysmography (rPPG), subtle color variations in your skin are analyzed locally in your browser to measure your pulse and respiration. <strong>No video, photo, or biometric identity data is recorded or sent to any server.</strong> Only anonymous numeric vitals are shared directly with your clinician.
-              </p>
+              <div className="consent-modal-titles">
+                <span className="consent-eyebrow">Clinician Request</span>
+                <h2 id="consent-title">30-Second Vitals Reading</h2>
+              </div>
             </div>
 
-            <div className="consent-positioning-hint">
-              <div className="face-guide-small"><span /></div>
-              <span>Sit comfortably, ensure good lighting on your face, and look towards the camera.</span>
+            <div className="consent-modal-body">
+              <p id="consent-desc" className="consent-message">
+                <strong>{incomingConsent.clinicianName || effectiveClinicianName}</strong> has requested to perform a 30-second contactless vitals check.
+              </p>
+
+              <div className="consent-privacy-box">
+                <div className="privacy-pill">
+                  <ShieldCheck size={14} />
+                  <span>Zero Video Stored</span>
+                </div>
+                <p className="privacy-details">
+                  Using optical photoplethysmography (rPPG), subtle color variations in your skin are analyzed locally in your browser to measure your pulse and respiration.
+                  <br />
+                  <strong>No video, photo, or biometric identity data is recorded or sent to any server.</strong> Only anonymous numeric vitals are shared directly with your clinician.
+                </p>
+              </div>
+
+              <div className="consent-positioning-hint">
+                <div className="face-guide-small"><span /></div>
+                <span>Sit comfortably, ensure good lighting on your face, and look towards the camera.</span>
+              </div>
+            </div>
+
+            <div className="consent-modal-actions">
+              <button
+                type="button"
+                className="button button-primary consent-accept-btn"
+                onClick={handleAcceptConsent}
+              >
+                <Check size={18} /> Consent & Begin Reading (30s)
+              </button>
+              <button
+                type="button"
+                className="button button-ghost consent-decline-btn"
+                onClick={handleDeclineConsent}
+              >
+                <X size={16} /> Decline
+              </button>
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="consent-actions">
+      <aside className={`patient-camera-check ${isRunning ? 'patient-camera-check-active' : ''}`}>
+        <div className="patient-camera-copy">
+          <ShieldCheck size={21} />
+          <div>
+            <strong>
+              {incomingConsent && !isRunning
+                ? `Reading requested by ${incomingConsent.clinicianName || effectiveClinicianName}`
+                : isComplete
+                ? 'Camera check complete'
+                : isCalibrating
+                ? `Calibrating baseline (${Math.ceil(calibRemaining)}s left)`
+                : isRunning && isCalibrated
+                ? 'Live monitoring'
+                : 'Awaiting clinician request'}
+            </strong>
+            <span>
+              {incomingConsent && !isRunning
+                ? 'Please respond to the consent pop-up above to begin your 30-second reading.'
+                : isComplete
+                ? (recordMessage || `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} can now view the reading.`)
+                : isCalibrating
+                ? `Establishing 30s baseline — keep still & breathe naturally. ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} sees your live progress.`
+                : isRunning && isCalibrated
+                ? `Signal locked. Finalizing clinical average for ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`
+                : `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} will initiate your 30-second contactless vitals check when ready. When requested, a consent prompt will appear here.`}
+            </span>
+          </div>
+        </div>
+
+        {incomingConsent && !isRunning && (
+          <div className="patient-consent-aside-actions">
             <button
               type="button"
               className="button button-primary consent-accept-btn"
               onClick={handleAcceptConsent}
             >
-              <Check size={18} /> Consent & Begin Reading (30s)
+              <Check size={16} /> Consent & Begin (30s)
             </button>
             <button
               type="button"
               className="button button-ghost consent-decline-btn"
               onClick={handleDeclineConsent}
             >
-              <X size={16} /> Decline
+              <X size={15} /> Decline
             </button>
           </div>
-        </div>
-      ) : (
-        <>
-          <div className="patient-camera-copy">
-            <ShieldCheck size={21} />
+        )}
+
+        {!incomingConsent && !isRunning && !isComplete && (
+          <>
+            <div className="patient-camera-positioning">
+              <div className="face-guide-large"><span /></div>
+              <div>
+                <strong>Position your face here</strong>
+                <span>Keep your forehead and both cheeks inside the oval. Sit comfortably, face the camera, and avoid looking directly into a bright window behind you.</span>
+              </div>
+            </div>
+            <div className="patient-awaiting-badge">
+              <span className="pulsing-beacon-dot" />
+              <span>Ready for {effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'clinician'} to initiate reading</span>
+            </div>
+          </>
+        )}
+
+        {isRunning && (
+          <div className="patient-camera-running">
+            <div className={`face-guide-small patient-camera-preview ${cameraStream ? 'camera-active' : ''}`}>
+              {cameraStream ? <video ref={videoRef} autoPlay muted playsInline /> : <span />}
+              {cameraStream && <i className={measurement.faceDetected ? 'face-locked' : ''} />}
+            </div>
             <div>
               <strong>
-                {isComplete
-                  ? 'Camera check complete'
-                  : isCalibrating
-                  ? `Calibrating baseline (${Math.ceil(calibRemaining)}s left)`
-                  : isRunning && isCalibrated
-                  ? 'Live monitoring'
-                  : 'Awaiting clinician request'}
+                {isCalibrating
+                  ? `Calibrating (${Math.ceil(calibRemaining)}s left)`
+                  : measurement.faceDetected
+                  ? 'Face tracking active'
+                  : 'Centre your face'}
               </strong>
-              <span>
-                {isComplete
-                  ? (recordMessage || `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} can now view the reading.`)
-                  : isCalibrating
-                  ? `Establishing 30s baseline — keep still & breathe naturally. ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} sees your live progress.`
-                  : isRunning && isCalibrated
-                  ? `Signal locked. Finalizing clinical average for ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`
-                  : `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} will initiate your 30-second contactless vitals check when ready. When requested, a consent prompt will appear here.`}
-              </span>
+              <span>{measurement.message} · {measurement.progress}%</span>
             </div>
           </div>
-          {!isRunning && !isComplete && (
-            <>
-              <div className="patient-camera-positioning">
-                <div className="face-guide-large"><span /></div>
-                <div>
-                  <strong>Position your face here</strong>
-                  <span>Keep your forehead and both cheeks inside the oval. Sit comfortably, face the camera, and avoid looking directly into a bright window behind you.</span>
-                </div>
-              </div>
-              <div className="patient-awaiting-badge">
-                <span className="pulsing-beacon-dot" />
-                <span>Ready for {effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'clinician'} to initiate reading</span>
-              </div>
-            </>
-          )}
-          {isRunning && (
-            <div className="patient-camera-running">
-              <div className={`face-guide-small patient-camera-preview ${cameraStream ? 'camera-active' : ''}`}>
-                {cameraStream ? <video ref={videoRef} autoPlay muted playsInline /> : <span />}
-                {cameraStream && <i className={measurement.faceDetected ? 'face-locked' : ''} />}
-              </div>
-              <div>
-                <strong>
-                  {isCalibrating
-                    ? `Calibrating (${Math.ceil(calibRemaining)}s left)`
-                    : measurement.faceDetected
-                    ? 'Face tracking active'
-                    : 'Centre your face'}
-                </strong>
-                <span>{measurement.message} · {measurement.progress}%</span>
-              </div>
-            </div>
-          )}
-          {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> {measurement.message}</div>}
-          {isComplete ? (
-            <button className="button button-secondary patient-camera-button" onClick={() => void startMeasurement()} disabled={isRunning}>
-              <RotateCcw size={17} /> Run again
-            </button>
-          ) : !isRunning ? (
-            <button type="button" className="patient-self-test-btn" onClick={() => void startMeasurement()}>
-              Or start self-test reading
-            </button>
-          ) : null}
-        </>
-      )}
-    </aside>
+        )}
+
+        {measurement.status === 'failed' && <div className="signal-line error"><CircleAlert size={16} /> {measurement.message}</div>}
+
+        {isComplete ? (
+          <button className="button button-secondary patient-camera-button" onClick={() => void startMeasurement()} disabled={isRunning}>
+            <RotateCcw size={17} /> Run again
+          </button>
+        ) : !isRunning && !incomingConsent ? (
+          <button type="button" className="patient-self-test-btn" onClick={() => void startMeasurement()}>
+            Or start self-test reading
+          </button>
+        ) : null}
+      </aside>
+    </>
   );
 
   return (
