@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
 import { InvitePatientForm, type ExistingPatientOption } from '../components/InvitePatientForm';
 import { ClinicianAvailabilityPanel } from '../components/ClinicianAvailabilityPanel';
+import { CopyButton } from '../components/CopyButton';
 import { type ClinicAppointment, type ClinicianProfile, loadClinicianWorkspace } from '../services/clinicianData';
 import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, revokePatientInvitation } from '../services/clinicAccess';
 
@@ -85,7 +86,6 @@ export function ClinicianPage() {
     } catch (reason) { setLinkError(reason instanceof Error ? reason.message : 'Unable to revoke patient access.'); }
     finally { setRevokingLink(undefined); }
   };
-  const copyLink = async (appointmentId: string) => { await navigator.clipboard.writeText(replacementLinks[appointmentId]); };
   const removeAppointment = async (appointmentId: string) => {
     if (!window.confirm('Delete this appointment? Its call link, private notes, and saved measurement data will be removed. The patient record will be kept.')) return;
     setDeletingAppointment(appointmentId); setLinkError('');
@@ -121,7 +121,7 @@ export function ClinicianPage() {
         <button className="text-button danger-action" onClick={() => void removeAppointment(appointment.id)} disabled={deletingAppointment === appointment.id}>{deletingAppointment === appointment.id ? <LoaderCircle className="spin" size={16} /> : <Trash2 size={16} />}Delete appointment</button>
       </div>
       {note && <aside className="appointment-intake-note"><div><MessageSquareText size={16} /><span>Patient intake note</span></div><p>{note}</p></aside>}
-      {replacementLinks[appointment.id] && <div className="appointment-link"><span>New patient link created. The old link has been revoked. {replacementEmailStatus[appointment.id]}</span><input value={replacementLinks[appointment.id]} readOnly aria-label="Replacement patient invitation link" /><button className="button button-secondary button-small" onClick={() => void copyLink(appointment.id)}><Copy size={16} /> Copy link</button></div>}
+      {replacementLinks[appointment.id] && <div className="appointment-link"><span>New patient link created. The old link has been revoked. {replacementEmailStatus[appointment.id]}</span><input value={replacementLinks[appointment.id]} readOnly aria-label="Replacement patient invitation link" /><CopyButton text={replacementLinks[appointment.id]} label="Copy link" copiedLabel="Link copied!" className="button button-secondary button-small" /></div>}
     </article>;
   };
   const title = view === 'patients' ? ['Patients', 'Active patients and their longitudinal records'] : view === 'appointments' ? ['Appointments', 'Schedule, call access, and secure links'] : view === 'measurements' ? ['Review queue', 'Readings received from patient sessions'] : view === 'availability' ? ['Booking availability', 'Publish a secure link so patients can choose from your available times.'] : view === 'calendar' ? ['Calendar', 'Your next seven days at a glance.'] : ['Today', 'Your appointments, follow-up work, and patient activity in one place.'];

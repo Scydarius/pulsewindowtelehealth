@@ -1,6 +1,7 @@
-import { CalendarDays, CheckCircle2, Clock3, Copy, Link2, LoaderCircle, Plus, Video, X } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Clock3, Link2, LoaderCircle, Plus, Video, X } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CopyButton } from './CopyButton';
 import { createPatientInvitation } from '../services/clinicAccess';
 import { hasClinicalDatabaseConfiguration } from '../services/supabase';
 
@@ -19,7 +20,6 @@ export function InvitePatientForm({ patients = [], onCreated }: InvitePatientFor
   const timeOptions = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
   const selectExistingPatient = (email: string) => { setPatientEmail(email); const patient = patients.find((entry) => entry.email === email); if (patient) setPatientName(patient.displayName); };
   const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); setError(''); setLink(''); setAppointmentId(''); setEmailStatus(''); try { const selectedTime = new Date(`${appointmentDate}T${appointmentTime}`); if (Number.isNaN(selectedTime.valueOf()) || selectedTime <= new Date()) throw new Error('Choose a future appointment time.'); const invitation = await createPatientInvitation({ patientName, patientEmail, reason, patientNote, startsAt: selectedTime.toISOString() }); setLink(invitation.invitationUrl); setAppointmentId(invitation.appointmentId); setEmailStatus(invitation.emailSent ? `The secure joining link was emailed to ${patientEmail}.` : invitation.emailWarning ?? 'The appointment was created. Copy the secure link below to send it manually.'); onCreated?.(); } catch (reasonError) { setError(reasonError instanceof Error ? reasonError.message : 'Unable to create the appointment.'); } finally { setSaving(false); } };
-  const copy = async () => navigator.clipboard.writeText(link);
   if (!open) return <button type="button" className="button button-secondary" onClick={() => setOpen(true)}><Plus size={17} /> New appointment</button>;
   return <section className="invite-panel" aria-label="Create appointment"><div className="section-heading compact"><div><p className="eyebrow">Appointment desk</p><h2>Schedule an appointment</h2><p>Create a new patient record or select an existing patient.</p></div><button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label="Close appointment form"><X size={18} /></button></div>
     {!hasClinicalDatabaseConfiguration ? <p className="access-warning">Set up the clinical database first. This form cannot create real appointments until protected data storage is configured.</p> : <form onSubmit={(event) => void submit(event)} className="invite-form appointment-form">
@@ -29,6 +29,6 @@ export function InvitePatientForm({ patients = [], onCreated }: InvitePatientFor
       <button className="button button-primary appointment-submit" disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Link2 size={17} />}{saving ? 'Creating appointment…' : 'Create appointment and email link'}</button>
     </form>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    {link && <div className="created-link created-appointment"><CheckCircle2 size={21} /><div><strong>Appointment created</strong><span>{emailStatus}</span></div><div className="created-appointment-actions">{appointmentId && <Link className="button button-primary button-small" to={`/consultation/${appointmentId}?role=clinician${patientName ? `&patientName=${encodeURIComponent(patientName)}` : ''}`}><Video size={16} /> Join appointment</Link>}<button type="button" className="button button-secondary button-small" onClick={() => void copy()}><Copy size={16} /> Copy patient link</button></div><input value={link} readOnly aria-label="Patient invitation link" /></div>}
+    {link && <div className="created-link created-appointment"><CheckCircle2 size={21} /><div><strong>Appointment created</strong><span>{emailStatus}</span></div><div className="created-appointment-actions">{appointmentId && <Link className="button button-primary button-small" to={`/consultation/${appointmentId}?role=clinician${patientName ? `&patientName=${encodeURIComponent(patientName)}` : ''}`}><Video size={16} /> Join appointment</Link>}<CopyButton text={link} label="Copy patient link" copiedLabel="Patient link copied!" className="button button-secondary button-small" /></div><input value={link} readOnly aria-label="Patient invitation link" /></div>}
   </section>;
 }
