@@ -123,11 +123,11 @@ export async function bookPublicAppointment(input: { bookingToken: string; patie
   return bookingRequest<{ emailSent: boolean; emailWarning?: string; startsAt: string }>('/api/clinician-invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'public-book', ...input }) });
 }
 
-export async function createReplacementPatientInvitation(appointmentId: string) {
+export async function createReplacementPatientInvitation(appointmentId: string, options: { sendEmail?: boolean } = {}) {
   const token = await getClinicianAccessToken();
   const response = await fetch('/api/appointment-patient-link', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ appointmentId }),
+    body: JSON.stringify({ appointmentId, sendEmail: options.sendEmail !== false }),
   });
   const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable.' })) as { invitationUrl?: string; emailSent?: boolean; emailWarning?: string; error?: string };
   if (!response.ok || !body.invitationUrl) throw new Error(body.error ?? 'Unable to create a replacement patient link.');

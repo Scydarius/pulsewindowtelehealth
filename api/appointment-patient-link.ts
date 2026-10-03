@@ -48,7 +48,7 @@ export default async function patientLink(request: VercelRequest, response: Verc
     const rawAuthorization = request.headers.authorization;
     const token = (Array.isArray(rawAuthorization) ? rawAuthorization[0] : rawAuthorization)?.replace(/^Bearer\s+/i, '');
     if (!token) throw new Error('Sign in is required.');
-    const body = (typeof request.body === 'string' ? JSON.parse(request.body) : request.body ?? {}) as { appointmentId?: string; deleteAppointment?: boolean };
+    const body = (typeof request.body === 'string' ? JSON.parse(request.body) : request.body ?? {}) as { appointmentId?: string; deleteAppointment?: boolean; sendEmail?: boolean };
     if (!body.appointmentId) return response.status(400).json({ error: 'Appointment is required.' });
     const db = database();
     const { data: userData, error: userError } = await db.auth.getUser(token);
@@ -92,8 +92,12 @@ export default async function patientLink(request: VercelRequest, response: Verc
     const origin = host ? `https://${host}` : 'https://www.ventricura.com';
     const invitationUrl = `${origin}/join?token=${encodeURIComponent(inviteToken)}`;
     const patient = appointment.patient as unknown as { display_name: string; email: string } | null;
-    const delivery = patient?.email ? await sendReplacementLink({ email: patient.email, patientName: patient.display_name, startsAt: appointment.starts_at, invitationUrl }) : { sent: false, warning: 'The new secure link was created, but no patient email is available.' };
-    await recordAuditEvent(db, { action: 'patient_link.regenerated', clinicianId: clinician.id, appointmentId: appointment.id, patientId: appointment.patient_id, metadata: { email_sent: delivery.sent } });
+    const delivery = body.sendEmail === false
+      ? { sent: false, warning: 'The new secure link is ready to copy. It was not emailed to the patient.' }
+      : patient?.email
+        ? await sendReplacementLink({ email: patient.email, patientName: patient.display_name, startsAt: appointment.starts_at, invitationUrl })
+        : { sent: false, warning: 'The new secure link was created, but no patient email is available.' };
+    await recordAuditEvent(db, { action: 'patient_link.regenerated', clinicianId: clinician.id, appointmentId: appointment.id, patientId: appointment.patient_id, metadata: { email_requested: body.sendEmail !== false, email_sent: delivery.sent } });
     return response.status(200).json({ invitationUrl, emailSent: delivery.sent, emailWarning: delivery.warning });
   } catch (error) {
     return response.status(400).json({ error: error instanceof Error ? error.message : 'Unable to update patient access.' });
