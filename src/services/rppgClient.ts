@@ -30,7 +30,6 @@ export type MeasurementUpdate = {
   sample?: { capturedAt: string; heartRateBpm: number; respiratoryRate: number; signalQuality: number; diagnostics?: ResearchDiagnostics };
 };
 
-const CAPTURE_WINDOW_MS = 30_000;
 const SETUP_TIMEOUT_MS = 90_000;
 const ACTIVE_RPPG_ALGORITHM = 'POS';
 // Keep capture in lockstep with the API session. The engine, rather than the
@@ -204,11 +203,10 @@ class WebSocketRppgClient implements RppgClient {
     let latestSessionBpm: number | null = null;
     let latestSessionBrpm: number | null = null;
     let completed = false;
-    let recordingStartedAt: number | undefined;
-    let captureTimer: number | undefined;
-    const finishWindow = () => {
+    const finishMeasurement = () => {
       if (completed || stopped) return;
       completed = true;
+      window.clearTimeout(setupTimer);
       if (interval) window.clearInterval(interval);
       socket.close();
       stream.getTracks().forEach((track) => track.stop());
@@ -235,7 +233,7 @@ class WebSocketRppgClient implements RppgClient {
       }
     };
     const setupTimer = window.setTimeout(() => {
-      if (stopped || completed || recordingStartedAt) return;
+      if (stopped || completed) return;
       stopped = true;
       if (interval) window.clearInterval(interval);
       socket.close();
@@ -275,93 +273,45 @@ class WebSocketRppgClient implements RppgClient {
         const respiration = payload.respiration;
         const diag = (payload.diagnostics ?? {}) as TelemetryDiagnostics;
         const quality = Number(payload.quality_score ?? 0);
-        const state = String(payload.tracking_state ?? 'CALIBRATING');
         const validReadout = payload.is_valid_readout === true;
         const motionDetected = payload.motion_detected === true;
-
         const isCalibrated = diag.is_calibrated === true;
-        const calibRemaining = Number(diag.calibration_seconds_remaining ?? 0);
+        const calibRemaining = Number(diag.calibration_seconds_remaining ?? 30);
         const calibProgress = Number(diag.calibration_progress_pct ?? 0);
 
-        // Use clinical_bpm and clinical_brpm (anchored to 30s quality-weighted average)
+        // Use the API's quality-weighted 30-second values rather than applying
+        // another browser-side average.
         const bpmRaw = cardiac?.clinical_bpm ?? cardiac?.bpm;
         const brpmRaw = respiration?.clinical_brpm ?? respiration?.brpm;
         const bpm = bpmRaw != null && Number.isFinite(Number(bpmRaw)) ? Number(bpmRaw) : null;
         const brpm = brpmRaw != null && Number.isFinite(Number(brpmRaw)) ? Number(brpmRaw) : null;
 
-        // Keep track of explicit 30s session averages for final reading & export
-        if (cardiac?.session_average_bpm != null && Number.isFinite(Number(cardiac.session_average_bpm))) {
-          latestSessionBpm = Number(cardiac.session_average_bpm);
-        }
-        if (respiration?.session_average_brpm != null && Number.isFinite(Number(respiration.session_average_brpm))) {
-          latestSessionBrpm = Number(respiration.session_average_brpm);
-        }
+        if (cardiac?.session_average_bpm != null && Number.isFinite(Number(cardiac.session_average_bpm))) latestSessionBpm = Number(cardiac.session_average_bpm);
+        if (respiration?.session_average_brpm != null && Number.isFinite(Number(respiration.session_average_brpm))) latestSessionBrpm = Number(respiration.session_average_brpm);
 
-        // The engine owns all signal-quality decisions. The browser accepts
-        // vitals only when engine marks readout valid, calibrated, and numeric.
         const acceptedByEngine = isCalibrated && validReadout && bpm !== null && brpm !== null;
-        const now = Date.now();
-
-        if (acceptedByEngine && !recordingStartedAt) {
-          recordingStartedAt = now;
-          // When 30s calibration baseline is established, finalize shortly after capturing the reading.
-          // If calibration was set to 0s (dev mode), use the full window.
-          const duration = Number(diag.calibration_duration_seconds ?? 30);
-          const waitMs = duration > 0 ? 2500 : CAPTURE_WINDOW_MS;
-          captureTimer = window.setTimeout(finishWindow, waitMs);
+        if (acceptedByEngine) {
+          latestSample = {
+            capturedAt: new Date().toISOString(), heartRateBpm: bpm, respiratoryRate: brpm, signalQuality: quality, diagnostics: eventData,
+          };
+          finishMeasurement();
+          return;
         }
 
-        const candidateSample = acceptedByEngine && bpm !== null && brpm !== null
-          ? {
-              capturedAt: new Date().toISOString(),
-              heartRateBpm: bpm,
-              respiratoryRate: brpm,
-              signalQuality: quality,
-              // Save the complete telemetry message verbatim.
-              diagnostics: eventData,
-            }
-          : undefined;
-
-        if (candidateSample) latestSample = candidateSample;
-        const sample = candidateSample;
-
-        let message = '';
-        let progress = 0;
-
-        if (!payload.face_detected) {
-          message = 'Face not found — centre your face in the camera';
-          progress = 5;
-        } else if (motionDetected) {
-          message = isCalibrated
-            ? 'Movement detected — hold still'
-            : `Movement detected (${Math.ceil(calibRemaining)}s left) — hold still while baseline settles`;
-          progress = isCalibrated ? 99 : Math.max(5, Math.min(99, Math.round(calibProgress)));
-        } else if (!isCalibrated) {
-          const secondsLeft = Math.ceil(calibRemaining);
-          message = `Establishing 30s baseline (${secondsLeft}s left) — keep still & breathe naturally`;
-          progress = Math.max(5, Math.min(99, Math.round(calibProgress)));
-        } else {
-          message = '● LIVE MONITORING — 30-second baseline established';
-          progress = 100;
-        }
-
-        onUpdate({
-          status: recordingStartedAt || isCalibrated ? 'measuring' : 'preparing',
-          progress,
-          signalQuality: quality,
-          heartRateBpm: isCalibrated ? (bpm ?? latestSample?.heartRateBpm ?? null) : null,
-          respiratoryRate: isCalibrated ? (brpm ?? latestSample?.respiratoryRate ?? null) : null,
-          message,
-          algorithmVersion: `${ACTIVE_RPPG_ALGORITHM.toLowerCase()}-rppg-2.16`,
-          faceDetected: payload.face_detected === true,
-          trackingState: isCalibrated ? (payload.tracking_state ?? 'LOCKED') : 'CALIBRATING',
-          diagnostics: eventData,
-          sample,
-        });
+        const remainingSeconds = Number.isFinite(calibRemaining) ? Math.max(0, Math.ceil(calibRemaining)) : 30;
+        const progress = Number.isFinite(calibProgress) ? Math.min(99, Math.max(5, Math.round(calibProgress))) : 5;
+        const message = !payload.face_detected
+          ? 'Face not found — centre your face in the camera'
+          : motionDetected
+            ? `Movement detected (${remainingSeconds}s left) — hold still while baseline settles`
+            : isCalibrated
+              ? 'Finalising the calibrated reading…'
+              : `Establishing 30s baseline (${remainingSeconds}s left) — keep still & breathe naturally`;
+        onUpdate({ status: 'preparing', progress, signalQuality: quality, heartRateBpm: null, respiratoryRate: null, message, algorithmVersion: `${ACTIVE_RPPG_ALGORITHM.toLowerCase()}-rppg-2.16`, faceDetected: payload.face_detected === true, trackingState: isCalibrated ? 'LOCKED' : 'CALIBRATING', diagnostics: eventData });
       }
     });
     socket.addEventListener('error', () => {
-      window.clearTimeout(setupTimer); if (captureTimer) window.clearTimeout(captureTimer);
+      window.clearTimeout(setupTimer);
       onUpdate({
         status: 'failed',
         progress: 0,
@@ -372,11 +322,11 @@ class WebSocketRppgClient implements RppgClient {
       });
     });
     socket.addEventListener('close', () => {
-      if (!completed) { window.clearTimeout(setupTimer); if (captureTimer) window.clearTimeout(captureTimer); }
+      if (!completed) window.clearTimeout(setupTimer);
       if (!stopped && !completed) onUpdate({ status: 'failed', progress: 0, signalQuality: 0, heartRateBpm: null, respiratoryRate: null, message: serverFailureMessage || (receivedReady ? 'Railway ended the measurement before the 30-second check finished.' : 'Railway rejected the secure measurement connection. Check that its RPPG_TICKET_SECRET exactly matches Vercel.') });
     });
 
-    return () => { stopped = true; window.clearTimeout(setupTimer); if (captureTimer) window.clearTimeout(captureTimer); if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; context.onCameraStream?.(null); };
+    return () => { stopped = true; window.clearTimeout(setupTimer); if (interval) window.clearInterval(interval); socket.close(); stream.getTracks().forEach((track) => track.stop()); video.srcObject = null; context.onCameraStream?.(null); };
   }
 }
 
