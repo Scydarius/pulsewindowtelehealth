@@ -19,6 +19,7 @@ type LocalVideoRoomProps = {
   role: 'patient' | 'clinician';
   patientName?: string;
   clinicianName?: string;
+  onLeave?: () => void;
 };
 
 type SignalMessage = {
@@ -36,7 +37,7 @@ function createLocalParticipantId(role: LocalVideoRoomProps['role']) {
   return `${role}-${Date.now().toString(36)}-${randomPart}`;
 }
 
-export default function LocalVideoRoom({ appointmentId, displayName, role, patientName, clinicianName }: LocalVideoRoomProps) {
+export default function LocalVideoRoom({ appointmentId, displayName, role, patientName, clinicianName, onLeave }: LocalVideoRoomProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | undefined>(undefined);
@@ -277,6 +278,7 @@ export default function LocalVideoRoom({ appointmentId, displayName, role, patie
     setMicrophoneEnabled(false);
     setConnectionState('waiting');
     setError('You left the consultation. Return to your dashboard when you are ready.');
+    onLeave?.();
   };
 
   return (

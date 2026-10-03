@@ -19,6 +19,7 @@ type MeasurementPanelProps = {
   invitationToken?: string;
   patientName?: string;
   clinicianName?: string;
+  stopRequest?: number;
 };
 
 const initialState: MeasurementUpdate = {
@@ -238,9 +239,12 @@ export function MeasurementPanel({
   invitationToken,
   patientName = 'Patient',
   clinicianName = 'Clinician',
+  stopRequest = 0,
 }: MeasurementPanelProps) {
   const [measurement, setMeasurement] = useState<MeasurementUpdate>(initialState);
   const stopRef = useRef<(() => void) | null>(null);
+  const handledStopRequestRef = useRef(stopRequest);
+  const stopRequestedRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const savedReadingRef = useRef(false);
   const savedSampleIdsRef = useRef(new Set<string>());
@@ -281,6 +285,20 @@ export function MeasurementPanel({
   };
 
   useEffect(() => () => stopRef.current?.(), []);
+  useEffect(() => {
+    if (stopRequest === handledStopRequestRef.current) return;
+    handledStopRequestRef.current = stopRequest;
+    stopRequestedRef.current = true;
+    stopRef.current?.();
+    stopRef.current = null;
+    setCameraStream((stream) => {
+      stream?.getTracks().forEach((track) => track.stop());
+      return null;
+    });
+    setMeasurement((previous) => (previous.status === 'preparing' || previous.status === 'measuring'
+      ? { ...previous, status: 'failed', message: 'Camera check stopped because the patient left the consultation.' }
+      : previous));
+  }, [stopRequest]);
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = cameraStream;
   }, [cameraStream]);
@@ -495,13 +513,19 @@ export function MeasurementPanel({
 
   const startMeasurement = async () => {
     stopRef.current?.();
+    stopRequestedRef.current = false;
     savedReadingRef.current = false;
     savedSampleIdsRef.current.clear();
     setRecordMessage('');
     setCameraStream(null);
     setMeasurement({ ...initialState, status: 'preparing', message: 'Preparing measurement…' });
     try {
-      stopRef.current = await rppgClient.startMeasurement({ appointmentId, role, invitationToken, onCameraStream: setCameraStream }, setMeasurement);
+      const stop = await rppgClient.startMeasurement({ appointmentId, role, invitationToken, onCameraStream: setCameraStream }, setMeasurement);
+      if (stopRequestedRef.current) {
+        stop();
+        return;
+      }
+      stopRef.current = stop;
     } catch (error) {
       setMeasurement({
         ...initialState,

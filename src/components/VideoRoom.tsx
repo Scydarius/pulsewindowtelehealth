@@ -14,9 +14,10 @@ type VideoRoomProps = {
   invitationToken?: string;
   patientName?: string;
   clinicianName?: string;
+  onLeave?: () => void;
 };
 
-export function VideoRoom({ appointmentId, displayName, role, invitationToken, patientName, clinicianName }: VideoRoomProps) {
+export function VideoRoom({ appointmentId, displayName, role, invitationToken, patientName, clinicianName, onLeave }: VideoRoomProps) {
   const [token, setToken] = useState<string>();
   const [connectionError, setConnectionError] = useState<string>();
   const useLiveKit = import.meta.env.VITE_VIDEO_PROVIDER === 'livekit' && hasLiveKitConfiguration;
@@ -33,7 +34,7 @@ export function VideoRoom({ appointmentId, displayName, role, invitationToken, p
   if (!useLiveKit) {
     return (
       <Suspense fallback={<div className="video-loading"><LoaderCircle className="spin" /> Starting local call…</div>}>
-        <LocalVideoRoom appointmentId={appointmentId} displayName={displayName} role={role} patientName={patientName} clinicianName={clinicianName} />
+        <LocalVideoRoom appointmentId={appointmentId} displayName={displayName} role={role} patientName={patientName} clinicianName={clinicianName} onLeave={onLeave} />
       </Suspense>
     );
   }

@@ -55,6 +55,7 @@ export function ConsultationPage() {
   const [patientSync, setPatientSync] = useState<CameraCheckSyncState | null>(null);
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [measurementStopRequest, setMeasurementStopRequest] = useState(0);
 
   // Live call timer counting up from appointment start
   useEffect(() => {
@@ -192,6 +193,7 @@ export function ConsultationPage() {
             invitationToken={invitationToken}
             patientName={patientName}
             clinicianName={clinicianName}
+            onLeave={role === 'patient' ? () => setMeasurementStopRequest((request) => request + 1) : undefined}
           />
           <div className="medication-context"><div><Pill /></div><span><strong>Appointment privacy</strong>This call is available only to the clinician and the holder of the secure patient link.</span></div>
         </section>
@@ -202,6 +204,7 @@ export function ConsultationPage() {
             invitationToken={invitationToken}
             patientName={patientName}
             clinicianName={clinicianName}
+            stopRequest={measurementStopRequest}
           />
         </section>
       </main>
