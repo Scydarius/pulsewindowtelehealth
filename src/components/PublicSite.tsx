@@ -5,6 +5,17 @@ import { ArrowRight, Menu, X } from 'lucide-react';
 export function PublicHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
   return (
     <header className="public-header">
       <Link to="/" className="public-brand" aria-label="Ventricura home">
@@ -31,11 +42,25 @@ export function PublicHeader() {
           <div className="public-mobile-backdrop" onClick={() => setMobileMenuOpen(false)} aria-hidden="true" />
           <div className="public-mobile-drawer" role="dialog" aria-label="Mobile navigation">
             <nav>
-              <Link to="/technology" onClick={() => setMobileMenuOpen(false)}>Technology</Link>
-              <Link to="/clinicians" onClick={() => setMobileMenuOpen(false)}>For clinicians</Link>
-              <Link to="/demo" onClick={() => setMobileMenuOpen(false)}>Live demo</Link>
-              <Link to="/contact" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
-              <Link to="/clinician/sign-in" className="mobile-drawer-access" onClick={() => setMobileMenuOpen(false)}>Clinician access <ArrowRight size={15} /></Link>
+              <Link to="/technology" onClick={() => setMobileMenuOpen(false)}>
+                <span>Technology</span>
+                <ArrowRight size={16} />
+              </Link>
+              <Link to="/clinicians" onClick={() => setMobileMenuOpen(false)}>
+                <span>For clinicians</span>
+                <ArrowRight size={16} />
+              </Link>
+              <Link to="/demo" onClick={() => setMobileMenuOpen(false)}>
+                <span>Live demo</span>
+                <ArrowRight size={16} />
+              </Link>
+              <Link to="/contact" onClick={() => setMobileMenuOpen(false)}>
+                <span>Contact</span>
+                <ArrowRight size={16} />
+              </Link>
+              <Link to="/clinician/sign-in" className="mobile-drawer-access" onClick={() => setMobileMenuOpen(false)}>
+                Clinician access <ArrowRight size={16} />
+              </Link>
             </nav>
           </div>
         </>
