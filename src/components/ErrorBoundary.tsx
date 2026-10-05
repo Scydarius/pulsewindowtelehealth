@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AlertCircle, RotateCw, Home } from 'lucide-react';
 import { isChunkLoadError } from '../utils/lazyWithRetry';
 
@@ -7,6 +8,7 @@ interface Props {
   fallback?: ReactNode;
   title?: string;
   message?: string;
+  resetKey?: string;
 }
 
 interface State {
@@ -28,6 +30,14 @@ export class ErrorBoundary extends Component<Props, State> {
       error,
       isChunk: isChunkLoadError(error),
     };
+  }
+
+  public componentDidUpdate(prevProps: Props): void {
+    if (this.props.resetKey !== undefined && prevProps.resetKey !== this.props.resetKey) {
+      if (this.state.hasError) {
+        this.setState({ hasError: false, error: null, isChunk: false });
+      }
+    }
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
@@ -118,4 +128,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return this.props.children;
   }
+}
+
+/**
+ * Route-aware ErrorBoundary that automatically clears caught errors
+ * whenever the user navigates to a new path or query state.
+ */
+export function RouteErrorBoundary({ children, ...props }: Omit<Props, 'resetKey'>) {
+  const location = useLocation();
+  return (
+    <ErrorBoundary {...props} resetKey={`${location.pathname}${location.search}`}>
+      {children}
+    </ErrorBoundary>
+  );
 }

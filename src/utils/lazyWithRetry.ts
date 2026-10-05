@@ -7,13 +7,18 @@ import { ComponentType, lazy, LazyExoticComponent } from 'react';
 export function isChunkLoadError(error: unknown): boolean {
   if (!error) return false;
   const message = error instanceof Error ? error.message : String(error);
+  const name = (error as Error)?.name || '';
   return (
-    (error as Error)?.name === 'ChunkLoadError' ||
+    name === 'ChunkLoadError' ||
     /Failed to fetch dynamically imported module/i.test(message) ||
     /Loading chunk [\d]+ failed/i.test(message) ||
     /error loading dynamically imported module/i.test(message) ||
     /Importing a module script failed/i.test(message) ||
-    /Unable to preload CSS/i.test(message)
+    /Unable to preload CSS/i.test(message) ||
+    /Load failed/i.test(message) ||
+    /Failed to load resource/i.test(message) ||
+    /Failed to fetch/i.test(message) ||
+    /NetworkError/i.test(message)
   );
 }
 
@@ -23,7 +28,7 @@ export function isChunkLoadError(error: unknown): boolean {
 export function lazyWithRetry<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>,
   retries = 2,
-  intervalMs = 800
+  intervalMs = 600
 ): LazyExoticComponent<T> {
   return lazy(() =>
     new Promise<{ default: T }>((resolve, reject) => {
@@ -46,6 +51,8 @@ export function lazyWithRetry<T extends ComponentType<any>>(
               if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
                 sessionStorage.setItem(storageKey, String(now));
                 window.location.reload();
+                // Reject after scheduling reload so React Suspense/ErrorBoundary doesn't hang in a void
+                setTimeout(() => reject(error), 500);
                 return;
               }
             }

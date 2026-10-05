@@ -4,32 +4,34 @@ import { AppShell } from './components/AppShell';
 import { AdminSessionGate } from './components/AdminSessionGate';
 import { ClinicianSessionGate } from './components/ClinicianSessionGate';
 import { PatientSessionGate } from './components/PatientSessionGate';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import { RouteErrorBoundary } from './components/ErrorBoundary';
 import { lazyWithRetry } from './utils/lazyWithRetry';
-import { LandingPage } from './pages/LandingPage';
 
-const ClinicianPage = lazyWithRetry(() => import('./pages/ClinicianPage').then((module) => ({ default: module.ClinicianPage })));
+import { LandingPage } from './pages/LandingPage';
+import { TechnologyPage } from './pages/TechnologyPage';
+import { CliniciansPage } from './pages/CliniciansPage';
+import { ContactPage } from './pages/ContactPage';
+import { TrustPage } from './pages/TrustPages';
+import { ClinicianSignInPage } from './pages/ClinicianSignInPage';
+import { ClinicianResetPasswordPage } from './pages/ClinicianResetPasswordPage';
+import { ClinicianActivateAccountPage } from './pages/ClinicianActivateAccountPage';
+import { PatientInvitePage } from './pages/PatientInvitePage';
+import { BookingPage } from './pages/BookingPage';
+import { ClinicianPage } from './pages/ClinicianPage';
+import { PatientProfilePage } from './pages/PatientProfilePage';
+
+// Code-split heavy routes (LiveKit WebRTC, camera processing, review engine)
 const ConsultationPage = lazyWithRetry(() => import('./pages/ConsultationPage').then((module) => ({ default: module.ConsultationPage })));
-const ClinicianSignInPage = lazyWithRetry(() => import('./pages/ClinicianSignInPage').then((module) => ({ default: module.ClinicianSignInPage })));
-const ClinicianResetPasswordPage = lazyWithRetry(() => import('./pages/ClinicianResetPasswordPage').then((module) => ({ default: module.ClinicianResetPasswordPage })));
-const ClinicianActivateAccountPage = lazyWithRetry(() => import('./pages/ClinicianActivateAccountPage').then((module) => ({ default: module.ClinicianActivateAccountPage })));
-const PatientInvitePage = lazyWithRetry(() => import('./pages/PatientInvitePage').then((module) => ({ default: module.PatientInvitePage })));
-const AdminCliniciansPage = lazyWithRetry(() => import('./pages/AdminCliniciansPage').then((module) => ({ default: module.AdminCliniciansPage })));
-const PatientProfilePage = lazyWithRetry(() => import('./pages/PatientProfilePage').then((module) => ({ default: module.PatientProfilePage })));
-const TechnologyPage = lazyWithRetry(() => import('./pages/TechnologyPage').then((module) => ({ default: module.TechnologyPage })));
 const LiveDemoPage = lazyWithRetry(() => import('./pages/LiveDemoPage').then((module) => ({ default: module.LiveDemoPage })));
-const ContactPage = lazyWithRetry(() => import('./pages/ContactPage').then((module) => ({ default: module.ContactPage })));
-const CliniciansPage = lazyWithRetry(() => import('./pages/CliniciansPage').then((module) => ({ default: module.CliniciansPage })));
-const TrustPage = lazyWithRetry(() => import('./pages/TrustPages').then((module) => ({ default: module.TrustPage })));
-const BookingPage = lazyWithRetry(() => import('./pages/BookingPage').then((module) => ({ default: module.BookingPage })));
+const AdminCliniciansPage = lazyWithRetry(() => import('./pages/AdminCliniciansPage').then((module) => ({ default: module.AdminCliniciansPage })));
 const ConsultationReviewPage = lazyWithRetry(() => import('./pages/ConsultationReviewPage').then((module) => ({ default: module.ConsultationReviewPage })));
 
 const page = (element: React.ReactNode) => (
-  <ErrorBoundary>
+  <RouteErrorBoundary>
     <Suspense fallback={<div className="page-loading">Loading Ventricura…</div>}>
       {element}
     </Suspense>
-  </ErrorBoundary>
+  </RouteErrorBoundary>
 );
 
 /** The same URL hosts patient and clinician calls; only the clinician view needs sign-in. */
@@ -44,7 +46,7 @@ function ConsultationRoute() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={page(<LandingPage />)} />
       <Route path="/technology" element={page(<TechnologyPage />)} />
       <Route path="/demo" element={page(<LiveDemoPage />)} />
       <Route path="/contact" element={page(<ContactPage />)} />

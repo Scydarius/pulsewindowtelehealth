@@ -1,7 +1,7 @@
 import { CalendarDays, CircleAlert, HeartPulse, LoaderCircle, Video } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { fetchPatientInvitation } from '../services/clinicAccess';
+import { fetchPatientInvitation, recordPatientAppointmentConsent } from '../services/clinicAccess';
 
 type Invitation = { appointmentId: string; clinicianName: string; patientName?: string; reason: string; startsAt: string };
 
@@ -25,7 +25,6 @@ export function PatientInvitePage() {
     setConsenting(true);
     setError('');
     try {
-      const { recordPatientAppointmentConsent } = await import('../services/clinicAccess');
       await recordPatientAppointmentConsent(invitation.appointmentId, token);
       const patientParam = invitation.patientName ? `&patientName=${encodeURIComponent(invitation.patientName)}` : '';
       const clinicianParam = invitation.clinicianName ? `&clinicianName=${encodeURIComponent(invitation.clinicianName)}` : '';
