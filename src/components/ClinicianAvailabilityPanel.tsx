@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { CopyButton } from './CopyButton';
 import {
   type BookingAvailabilityDay,
   type ClinicianBookingSettings,
@@ -447,9 +448,12 @@ export function ClinicianAvailabilityPanel() {
           </span>
           <input value={settings.bookingUrl} readOnly aria-label="Patient booking link" />
         </div>
-        <button type="button" className="button button-secondary" onClick={() => void copy()}>
-          <Copy size={16} /> Copy link
-        </button>
+        <CopyButton
+          text={settings.bookingUrl}
+          label="Copy link"
+          copiedLabel="Link copied!"
+          className="button button-secondary"
+        />
         <button
           type="button"
           className="button button-primary"
