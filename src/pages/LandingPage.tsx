@@ -3,8 +3,17 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { organizationSchema, PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
+import { ClinicWebsitePage } from './ClinicWebsitePage';
+
+function clinicSlugFromHost() {
+  const host = window.location.hostname.toLowerCase();
+  if (!host.endsWith('.ventricura.com')) return null;
+  const slug = host.slice(0, -'.ventricura.com'.length);
+  return slug && !['www', 'app'].includes(slug) ? slug : null;
+}
 
 export function LandingPage() {
+  const clinicSlug = clinicSlugFromHost();
   const [clinicianSignedIn, setClinicianSignedIn] = useState(false);
   useEffect(() => {
     if (!supabase) return;
@@ -13,6 +22,7 @@ export function LandingPage() {
     return () => subscription.unsubscribe();
   }, []);
 
+  if (clinicSlug) return <ClinicWebsitePage slug={clinicSlug} />;
   return <main className="ventricura-public home-v2"><Seo title="Ventricura | Contactless telehealth technology" description="Contactless rPPG technology for clinician-controlled telehealth and remote care." path="/" jsonLd={organizationSchema} />
     <PublicHeader />
     <section className="v-hero">
