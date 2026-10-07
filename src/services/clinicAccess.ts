@@ -15,7 +15,7 @@ export async function getClinicianAccessToken() {
   return session.access_token;
 }
 
-export type ApprovedClinician = { id: string; displayName: string; isAdmin: boolean };
+export type ApprovedClinician = { id: string; displayName: string; isAdmin: boolean; isPlatformAdmin?: boolean; clinicId?: string | null };
 
 /** Confirm that an authenticated account is an administrator-approved clinician. */
 export async function verifyClinicianAccess(accessToken?: string): Promise<ApprovedClinician> {
@@ -100,7 +100,7 @@ export async function createPatientInvitation(invitation: PatientInvitation) {
 
 export type BookingAvailabilityDay = { day: number; enabled: boolean; start: string; end: string };
 export type ClinicianBookingSettings = { booking_token: string; bookingUrl: string; timezone: string; duration_minutes: number; weekly_availability: BookingAvailabilityDay[]; booking_enabled: boolean; booking_reason: string };
-export type PublicBookingProfile = { clinicianName: string; timezone: string; durationMinutes: number; bookingReason: string };
+export type PublicBookingProfile = { clinicianName: string; professionalTitle: string; aboutMe: string; photoUrl: string; clinicName: string; timezone: string; durationMinutes: number; bookingReason: string };
 
 async function bookingRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, options);

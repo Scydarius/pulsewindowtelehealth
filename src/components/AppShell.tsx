@@ -54,6 +54,7 @@ export function AppShell() {
             <Link to="/clinician?view=calendar" className={workspaceNavClass('calendar')}><CalendarDays size={18} /> Calendar</Link>
             <Link to="/clinician?view=availability" className={workspaceNavClass('availability')}><CalendarDays size={18} /> Availability</Link>
             <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}><Stethoscope size={18} /> Measurements</Link>
+            <Link to="/clinician/profile" className={location.pathname === '/clinician/profile' ? 'active' : undefined}><UserRound size={18} /> My profile</Link>
             {isAdmin && <Link to="/admin" className={isAdminPage ? 'active' : undefined}><ShieldCheck size={18} /> Admin</Link>}
           </nav>
         )}
@@ -76,6 +77,7 @@ export function AppShell() {
           <Link to="/clinician?view=calendar" className={workspaceNavClass('calendar')}>Calendar</Link>
           <Link to="/clinician?view=availability" className={workspaceNavClass('availability')}>Availability</Link>
           <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}>Measurements</Link>
+          <Link to="/clinician/profile" className={location.pathname === '/clinician/profile' ? 'active' : undefined}>Profile</Link>
           {isAdmin && <Link to="/admin" className={isAdminPage ? 'active' : undefined}>Admin</Link>}
         </nav>
       )}

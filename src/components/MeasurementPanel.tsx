@@ -565,13 +565,13 @@ export function MeasurementPanel({
               </div>
               <div className="consent-modal-titles">
                 <span className="consent-eyebrow">Clinician Request</span>
-                <h2 id="consent-title">30-Second Vitals Reading</h2>
+                <h2 id="consent-title">50-Second Vitals Reading</h2>
               </div>
             </div>
 
             <div className="consent-modal-body">
               <p id="consent-desc" className="consent-message">
-                <strong>{incomingConsent.clinicianName || effectiveClinicianName}</strong> has requested to perform a 30-second contactless vitals check.
+                <strong>{incomingConsent.clinicianName || effectiveClinicianName}</strong> has requested a guided contactless vitals check. It takes about 50 seconds from when your camera connects.
               </p>
 
               <div className="consent-privacy-box">
@@ -598,7 +598,7 @@ export function MeasurementPanel({
                 className="button button-primary consent-accept-btn"
                 onClick={handleAcceptConsent}
               >
-                <Check size={18} /> Consent & Begin Reading (30s)
+                <Check size={18} /> Consent & Begin Reading (about 50s)
               </button>
               <button
                 type="button"
@@ -629,14 +629,14 @@ export function MeasurementPanel({
             </strong>
             <span>
               {incomingConsent && !isRunning
-                ? 'Please respond to the consent pop-up above to begin your 30-second reading.'
+                ? 'Please respond to the consent pop-up above to begin your guided 50-second reading.'
                 : isComplete
                 ? (recordMessage || `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} can now view the reading.`)
                 : isCalibrating
-                ? `Establishing 30s baseline — keep still & breathe naturally. ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} sees your live progress.`
+                ? `Calibrating your signal — the guided reading takes about 50 seconds from camera connection. ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} sees your live progress.`
                 : isRunning && isCalibrated
                 ? `Signal locked. Finalizing clinical average for ${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'your clinician'}.`
-                : `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} will initiate your 30-second contactless vitals check when ready. When requested, a consent prompt will appear here.`}
+                : `${effectiveClinicianName !== 'Clinician' ? effectiveClinicianName : 'Your clinician'} will initiate your contactless vitals check when ready. It takes about 50 seconds once the camera connects.`}
             </span>
           </div>
         </div>
@@ -648,7 +648,7 @@ export function MeasurementPanel({
               className="button button-primary consent-accept-btn"
               onClick={handleAcceptConsent}
             >
-              <Check size={16} /> Consent & Begin (30s)
+              <Check size={16} /> Consent & Begin (about 50s)
             </button>
             <button
               type="button"
@@ -743,7 +743,7 @@ export function MeasurementPanel({
                 </span>
               </div>
               <h3 className="active-banner-title">
-                {isCalibrating ? `Calibrating 30-second baseline${effectivePatientName !== 'Patient' ? ` for ${effectivePatientName}` : ''}` : 'Optical signal locked — measuring'}
+                {isCalibrating ? `Calibrating guided reading${effectivePatientName !== 'Patient' ? ` for ${effectivePatientName}` : ''}` : 'Optical signal locked — measuring'}
               </h3>
               <p className="active-banner-description">
                 {patientSyncState?.motionDetected || diagData?.motion_detected ? (
@@ -777,7 +777,7 @@ export function MeasurementPanel({
           <div className="complete-banner-left">
             <CheckCircle2 size={18} />
             <div>
-              <strong>30-second reading received{effectivePatientName !== 'Patient' ? ` for ${effectivePatientName}` : ''}</strong>
+              <strong>Guided reading received{effectivePatientName !== 'Patient' ? ` for ${effectivePatientName}` : ''}</strong>
               <span>
                 Pulse: {measurement.heartRateBpm != null ? `${Math.round(measurement.heartRateBpm)} BPM` : '—'} · Respiration: {measurement.respiratoryRate != null ? `${(Math.round(measurement.respiratoryRate * 10) / 10).toFixed(1)} /min` : '—'} · Quality: {Math.round(measurement.signalQuality * 100)}%
               </span>
@@ -803,8 +803,8 @@ export function MeasurementPanel({
                   <Activity size={20} />
                 </div>
                 <div>
-                  <strong>Request 30s Contactless Vitals</strong>
-                  <span>Send a consent prompt to {effectivePatientName !== 'Patient' ? effectivePatientName : 'the patient'} to initiate their 30-second rPPG camera reading.</span>
+                  <strong>Request contactless vitals</strong>
+                  <span>Send a consent prompt to {effectivePatientName !== 'Patient' ? effectivePatientName : 'the patient'} to begin their guided rPPG camera reading (about 50 seconds).</span>
                 </div>
               </div>
               <button

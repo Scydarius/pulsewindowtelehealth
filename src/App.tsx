@@ -19,6 +19,7 @@ import { PatientInvitePage } from './pages/PatientInvitePage';
 import { BookingPage } from './pages/BookingPage';
 import { ClinicianPage } from './pages/ClinicianPage';
 import { PatientProfilePage } from './pages/PatientProfilePage';
+import { ClinicianProfilePage } from './pages/ClinicianProfilePage';
 
 // Code-split heavy routes (LiveKit WebRTC, camera processing, review engine)
 const ConsultationPage = lazyWithRetry(() => import('./pages/ConsultationPage').then((module) => ({ default: module.ConsultationPage })));
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/clinician" element={page(<ClinicianSessionGate><ClinicianPage /></ClinicianSessionGate>)} />
         <Route path="/clinician/patient" element={page(<ClinicianSessionGate><PatientProfilePage /></ClinicianSessionGate>)} />
         <Route path="/clinician/review" element={page(<ClinicianSessionGate><ConsultationReviewPage /></ClinicianSessionGate>)} />
+        <Route path="/clinician/profile" element={page(<ClinicianSessionGate><ClinicianProfilePage /></ClinicianSessionGate>)} />
         <Route path="/admin" element={page(<ClinicianSessionGate><AdminSessionGate><AdminCliniciansPage /></AdminSessionGate></ClinicianSessionGate>)} />
         <Route path="/admin/clinicians" element={<Navigate to="/admin" replace />} />
         <Route path="/consultation/:appointmentId" element={<ConsultationRoute />} />
