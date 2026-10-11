@@ -59,10 +59,10 @@ function LegacySignalStory() {
       <div className="v12-signal-machine">
         <div className="v12-machine-grid" aria-hidden="true" />
         <div className="v12-machine-topline"><span>VENTRICURA / SIGNAL SESSION</span><b>LIVE</b></div>
-        <div className="v12-camera-card"><span>CAMERA</span><div className="v12-face"><i /><i /><b /></div><small>FACE TRACKED</small></div>
+        <div className="v12-camera-card"><span>CAMERA / LIVE</span><div className="v12-camera-preview"><i className="v12-frame top-left" /><i className="v12-frame top-right" /><i className="v12-frame bottom-left" /><i className="v12-frame bottom-right" /><div className="v12-person"><i /><b /></div><em /></div><small><b /> FACE TRACKED</small></div>
         <div className="v12-signal-particles" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ '--particle': index } as React.CSSProperties} />)}</div>
         <svg className="v12-waveform" viewBox="0 0 620 190" aria-hidden="true"><path d="M0 102h58l30-25 35 53 58-103 58 143 58-70 57 5 35-27 35 58 51-98 54 104 42-40h68" /></svg>
-        <div className="v12-record-card"><span>SESSION RECORD</span><strong>74 <em>BPM</em></strong><i /><i /><i /><small>REVIEW READY</small></div>
+        <div className="v12-record-card"><span>SESSION RECORD</span><div className="v12-record-patient"><i>RS</i><b>Ramsay S.</b><small>Signal ready</small></div><strong>74 <em>BPM</em></strong><svg viewBox="0 0 126 34" aria-hidden="true"><path d="M0 20h19l8-8 9 16 14-25 14 29 14-15 13 2 8-6 9 12 10-17 8 13h10" /></svg><i /><i /><small>REVIEW READY</small></div>
         <div className="v12-machine-footer"><span>INPUT</span><span>OPTICAL SIGNAL</span><span>CLINICIAN VIEW</span></div>
       </div>
       <div className="v12-signal-copy"><h2>{signalSteps[activeStep][1]}</h2><p>{signalSteps[activeStep][2]}</p></div>
@@ -141,10 +141,10 @@ function SignalStory() {
       <div className="v12-signal-heading"><span>02 / SIGNAL PATH</span><span>{`${signalSteps[activeStep][0]} / 03`}</span></div>
       <div className="v12-signal-machine">
         <div className="v12-machine-grid" aria-hidden="true" /><div className="v12-machine-topline"><span>VENTRICURA / SIGNAL SESSION</span><b>LIVE</b></div>
-        <div className="v12-camera-card"><span>CAMERA</span><div className="v12-face"><i /><i /><b /></div><small>FACE TRACKED</small></div>
+        <div className="v12-camera-card"><span>CAMERA / LIVE</span><div className="v12-camera-preview"><i className="v12-frame top-left" /><i className="v12-frame top-right" /><i className="v12-frame bottom-left" /><i className="v12-frame bottom-right" /><div className="v12-person"><i /><b /></div><em /></div><small><b /> FACE TRACKED</small></div>
         <div className="v12-signal-particles" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} />)}</div>
         <svg className="v12-waveform" viewBox="0 0 620 190" aria-hidden="true"><path d="M0 102h58l30-25 35 53 58-103 58 143 58-70 57 5 35-27 35 58 51-98 54 104 42-40h68" /></svg>
-        <div className="v12-record-card"><span>SESSION RECORD</span><strong>74 <em>BPM</em></strong><i /><i /><i /><small>REVIEW READY</small></div>
+        <div className="v12-record-card"><span>SESSION RECORD</span><div className="v12-record-patient"><i>RS</i><b>Ramsay S.</b><small>Signal ready</small></div><strong>74 <em>BPM</em></strong><svg viewBox="0 0 126 34" aria-hidden="true"><path d="M0 20h19l8-8 9 16 14-25 14 29 14-15 13 2 8-6 9 12 10-17 8 13h10" /></svg><i /><i /><small>REVIEW READY</small></div>
         <div className="v12-machine-footer"><span>INPUT</span><span>OPTICAL SIGNAL</span><span>CLINICIAN VIEW</span></div>
       </div>
       <div className="v12-signal-copy">{signalSteps.map(([number, title, text]) => <article key={number}><span>{number} / 03</span><h2>{title}</h2><p>{text}</p></article>)}</div>
