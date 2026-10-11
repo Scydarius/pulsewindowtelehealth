@@ -41,7 +41,7 @@ export function LandingPage() {
       <div className="v6-hero-meta"><span>VENTRICURA / 01</span><span>CLINICAL TELEPRESENCE</span><span>ADELAIDE, AU</span></div>
       <div className="v6-hero-copy">
         <p className="v6-kicker">Remote care should feel<br />closer, not smaller.</p>
-        <h1>THE ROOM<br />IS <em>STILL</em><br />HERE.</h1>
+        <h1>PATIENT CARE,<br />WITHOUT THE<br /><em>EXTRA SYSTEMS.</em></h1>
         <p className="v6-intro">Ventricura is a clinician-led telehealth workspace for the parts of care that happen before, during and after a video call.</p>
         <div className="v6-actions"><Link to="/contact">Talk to our team <ArrowRight size={17} /></Link><Link to="/demo">Open live demo <ArrowRight size={17} /></Link></div>
       </div>
