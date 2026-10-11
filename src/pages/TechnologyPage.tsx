@@ -19,6 +19,17 @@ function SignalStory() {
     let frame = 0;
     const update = () => {
       const bounds = story.getBoundingClientRect();
+      const stageElement = story.querySelector<HTMLElement>('.v12-signal-sticky');
+      if (stageElement) {
+        const stageHeight = stageElement.getBoundingClientRect().height;
+        const stageWidth = stageElement.getBoundingClientRect().width;
+        const shouldPin = bounds.top <= 0 && bounds.bottom >= stageHeight;
+        stageElement.dataset.scrollPinned = shouldPin ? 'true' : 'false';
+        if (shouldPin) {
+          stageElement.style.setProperty('--signal-pinned-left', `${bounds.left}px`);
+          stageElement.style.setProperty('--signal-pinned-width', `${stageWidth}px`);
+        }
+      }
       const travel = Math.max(1, story.offsetHeight - window.innerHeight);
       const progress = Math.min(1, Math.max(0, -bounds.top / travel));
       story.style.setProperty('--signal-progress', progress.toFixed(4));

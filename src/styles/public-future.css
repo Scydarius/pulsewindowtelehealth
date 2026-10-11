@@ -105,6 +105,38 @@ main.home-v6{background:#f4f4ef!important;color:#101010!important}.home-v6 .publ
    CSS number-by-length multiplication and keeps the sequence genuinely fluid. */
 .v12-signal-story{--signal-tilt:0deg;--signal-lift:0px;--signal-grid-y:0px;--signal-camera-x:0px;--signal-record-x:0px;--signal-wave-x:0px;--signal-wave-scale:.15;--signal-camera-scale:1;--signal-record-scale:.7;--signal-wave-offset:840;--signal-step-shift:0px;--signal-particle-opacity:0}.v12-signal-machine{transform:perspective(1300px) rotateX(var(--signal-tilt)) translateY(var(--signal-lift))}.v12-machine-grid{transform:translateY(var(--signal-grid-y))}.v12-camera-card{transform:translate(calc(-50% + var(--signal-camera-x)),-50%) scale(var(--signal-camera-scale))}.v12-record-card{transform:translate(calc(50% + var(--signal-record-x)),-50%) scale(var(--signal-record-scale))}.v12-waveform{transform:translate(calc(-50% + var(--signal-wave-x)),-50%) scaleX(var(--signal-wave-scale))}.v12-waveform path{stroke-dashoffset:var(--signal-wave-offset)}.v12-signal-particles i{opacity:var(--signal-particle-opacity);transform:translate(0,0)}.v12-signal-particles i:nth-child(1){transform:translate(-128px,-34px)}.v12-signal-particles i:nth-child(2){transform:translate(-101px,27px)}.v12-signal-particles i:nth-child(3){transform:translate(-79px,-12px)}.v12-signal-particles i:nth-child(4){transform:translate(-55px,38px)}.v12-signal-particles i:nth-child(5){transform:translate(-30px,-33px)}.v12-signal-particles i:nth-child(6){transform:translate(-4px,19px)}.v12-signal-particles i:nth-child(7){transform:translate(26px,-27px)}.v12-signal-particles i:nth-child(8){transform:translate(51px,35px)}.v12-signal-particles i:nth-child(9){transform:translate(76px,-12px)}.v12-signal-particles i:nth-child(10){transform:translate(101px,27px)}.v12-signal-particles i:nth-child(11){transform:translate(126px,-29px)}.v12-signal-particles i:nth-child(12){transform:translate(148px,14px)}.v12-signal-steps article{transform:translateX(var(--signal-step-shift))}
 
+/* The pinned scenes must include their own padding in the viewport height.
+   Without this, a 100vh panel becomes taller than the viewport and drops out
+   early, leaving the column empty. */
+.v10-story-sticky,.v11-flow-sticky,.v12-signal-sticky{box-sizing:border-box}
+
+/* Keep the visual stage pinned through the final narrative beat instead of
+   letting the last text row outlive it. */
+@media(min-width:901px){.v10-story,.v11-clinician-flow,.v12-signal-story{padding-bottom:100svh}}
+@media(max-width:900px){.v10-story,.v11-clinician-flow,.v12-signal-story{padding-bottom:0}}
+
+/* The legacy public shell clipped overflow, preventing CSS sticky from ever
+   engaging. Story pages need visible overflow for their pinned scenes. */
+main.ventricura-public.home-v6,main.ventricura-public.clinicians-page,main.ventricura-public.technology-page{overflow:visible!important}
+
+/* Grid sizing can prevent a sticky item from establishing its scroll range in
+   some browsers. The stories use a simple document flow on desktop instead:
+   the visual pins on the left while the narrative travels beside it. */
+@media(min-width:901px){
+  .v10-story{display:block;--story-column-gap:clamp(50px,10vw,180px)}
+  .v10-story-sticky{width:calc(58% - var(--story-column-gap))}
+  .v10-story-steps{width:42%;margin-top:-100svh;margin-left:calc(58% + var(--story-column-gap))}
+  .v11-clinician-flow{display:block;--flow-column-gap:clamp(48px,9vw,156px)}
+  .v11-flow-sticky{width:calc(61% - var(--flow-column-gap))}
+  .v11-flow-steps{width:39%;margin-top:-100svh;margin-left:calc(61% + var(--flow-column-gap))}
+  .v12-signal-story{display:block;--signal-column-gap:clamp(48px,9vw,156px)}
+  .v12-signal-sticky{width:calc(64% - var(--signal-column-gap))}
+  .v12-signal-steps{width:36%;margin-top:-100svh;margin-left:calc(64% + var(--signal-column-gap))}
+  .v10-story-sticky[data-scroll-pinned='true']{position:fixed!important;z-index:10;top:0;left:var(--story-pinned-left);width:var(--story-pinned-width)}
+  .v11-flow-sticky[data-scroll-pinned='true']{position:fixed!important;z-index:10;top:0;left:var(--flow-pinned-left);width:var(--flow-pinned-width)}
+  .v12-signal-sticky[data-scroll-pinned='true']{position:fixed!important;z-index:10;top:0;left:var(--signal-pinned-left);width:var(--signal-pinned-width)}
+}
+
 /* The landing sequence is now a continuous horizontal instrument rail rather
    than three elements taking turns fading in. */
 .v10-story{--story-invite-x:0px;--story-consult-x:420px;--story-record-x:840px}.v10-screen{opacity:1!important;transform:translateX(0) scale(1);transition:transform .11s linear}.v10-screen-invite{transform:translateX(var(--story-invite-x)) scale(1)!important}.v10-screen-consult{transform:translateX(var(--story-consult-x)) scale(1)!important}.v10-screen-record{transform:translateX(var(--story-record-x)) scale(1)!important}.v10-device[data-active-stage='1'] .v10-screen-consult path{animation:story-wave 1.15s ease forwards}.v10-device[data-active-stage='2'] .v10-record-lines i{animation:record-line .55s ease forwards}

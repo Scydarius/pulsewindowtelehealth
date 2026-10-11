@@ -38,6 +38,17 @@ export function LandingPage() {
     let frame = 0;
     const updateStory = () => {
       const bounds = story.getBoundingClientRect();
+      const stage = story.querySelector<HTMLElement>('.v10-story-sticky');
+      if (stage) {
+        const stageHeight = stage.getBoundingClientRect().height;
+        const stageWidth = stage.getBoundingClientRect().width;
+        const shouldPin = bounds.top <= 0 && bounds.bottom >= stageHeight;
+        stage.dataset.scrollPinned = shouldPin ? 'true' : 'false';
+        if (shouldPin) {
+          stage.style.setProperty('--story-pinned-left', `${bounds.left}px`);
+          stage.style.setProperty('--story-pinned-width', `${stageWidth}px`);
+        }
+      }
       const travel = Math.max(1, story.offsetHeight - window.innerHeight);
       const progress = Math.min(1, Math.max(0, -bounds.top / travel));
       story.style.setProperty('--story-progress', progress.toFixed(4));
