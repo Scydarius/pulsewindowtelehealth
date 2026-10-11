@@ -31,6 +31,7 @@ export function PublicHeader() {
         <Link to="/contact">Contact</Link>
         <Link to="/clinician/sign-in" className="header-access">Clinician access <ArrowRight size={15} /></Link>
       </nav>
+      <div className="public-header-status" aria-hidden="true"><span>SYSTEM ONLINE</span><span>AU / CLINICAL TELEPRESENCE</span><i /></div>
       <button
         type="button"
         className="public-mobile-toggle"
