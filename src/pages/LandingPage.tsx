@@ -41,6 +41,14 @@ export function LandingPage() {
       const travel = Math.max(1, story.offsetHeight - window.innerHeight);
       const progress = Math.min(1, Math.max(0, -bounds.top / travel));
       story.style.setProperty('--story-progress', progress.toFixed(4));
+      story.style.setProperty('--story-tilt', `${((.5 - progress) * 2).toFixed(3)}deg`);
+      story.style.setProperty('--story-lift', `${((.5 - progress) * 22).toFixed(2)}px`);
+      story.style.setProperty('--story-grid-y', `${(progress * -42).toFixed(2)}px`);
+      story.style.setProperty('--story-caption-y', `${((.5 - progress) * 10).toFixed(2)}px`);
+      story.style.setProperty('--story-step-shift', `${((progress - .5) * -12).toFixed(2)}px`);
+      story.style.setProperty('--story-invite-x', `${(-progress * 840).toFixed(2)}px`);
+      story.style.setProperty('--story-consult-x', `${(420 - progress * 840).toFixed(2)}px`);
+      story.style.setProperty('--story-record-x', `${(840 - progress * 840).toFixed(2)}px`);
       const nextStage = Math.min(2, Math.floor(progress * 3));
       setActiveStory((current) => current === nextStage ? current : nextStage);
       frame = 0;

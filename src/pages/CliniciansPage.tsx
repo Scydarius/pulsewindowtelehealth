@@ -87,6 +87,10 @@ function ClinicianFlow() {
       const travel = Math.max(1, flow.offsetHeight - window.innerHeight);
       const progress = Math.min(1, Math.max(0, -bounds.top / travel));
       flow.style.setProperty('--flow-progress', progress.toFixed(4));
+      flow.style.setProperty('--flow-tilt', `${((.5 - progress) * 2).toFixed(3)}deg`);
+      flow.style.setProperty('--flow-lift', `${((.5 - progress) * 18).toFixed(2)}px`);
+      flow.style.setProperty('--flow-grid-y', `${(progress * -34).toFixed(2)}px`);
+      flow.style.setProperty('--flow-step-shift', `${((progress - .5) * -12).toFixed(2)}px`);
       const stage = Math.min(steps.length - 1, Math.floor(progress * steps.length));
       setActiveStep((current) => current === stage ? current : stage);
       frame = 0;
