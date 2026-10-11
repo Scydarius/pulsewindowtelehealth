@@ -838,6 +838,117 @@ h1, h2, h3, p { margin-top: 0; }
 
 /* Ventricura's consultation workspace uses the shared monochrome system. */
 .ventricura-consultation { --accent:#181818; --ink-strong:#121212; --surface-soft:#e8e8e8; --accent-muted:#c0c0c0; --line:#cccccc; --muted:#6d6d6d; --ink:#181818; }
+
+/* --------------------------------------------------------------------------
+   Refined product UI: quiet hierarchy, fewer decorative surfaces.
+   This layer deliberately only changes presentation; application behaviour,
+   routes and clinical data flows remain in their existing components.
+   -------------------------------------------------------------------------- */
+:root {
+  --ink: #1c1c1b;
+  --ink-strong: #151514;
+  --muted: #686865;
+  --surface-soft: #f1f0ec;
+  --cream: #f8f7f3;
+  --line: #d8d7d1;
+  --white: #fffefa;
+  --shadow: none;
+}
+
+body { background: var(--cream); color: var(--ink); }
+
+/* Public site: editorial rather than a generic startup hero. */
+.ventricura-public { --v-paper:#f8f7f3; --v-white:#fffefa; --v-line:#d8d7d1; --v-grey:#646460; background:var(--v-paper); }
+.public-header { height:82px; }
+.public-header nav { gap:25px; font-size:.8rem; font-weight:650; }
+.public-header .header-access { border-color:#999995; padding:10px 12px; }
+.v-hero { min-height:590px; grid-template-columns:1fr .94fr; gap:clamp(44px,7vw,96px); padding:72px 0 92px; }
+.v-hero-copy h1,.technology-hero h1,.demo-intro h1 { max-width:650px; font-size:clamp(2.8rem,4.9vw,5rem); line-height:.96; letter-spacing:-.065em; }
+.v-hero-copy h1 em { font-family:inherit; font-style:normal; font-weight:400; }
+.v-hero-copy > p:not(.mono-kicker),.technology-hero p,.demo-intro>div>p:last-child { max-width:540px; font-size:1rem; line-height:1.65; }
+.dark-action,.quiet-action { min-height:45px; padding:0 17px; font-size:.82rem; font-weight:720; }
+.dark-action { box-shadow:none; }
+.dark-action:hover { transform:none; background:#343432; box-shadow:none; }
+.quiet-action { border-color:#aaa9a4; }
+.v-hero-console { box-shadow:10px 10px 0 #deddd7; }
+.v-workflow,.technology-grid-wrap { padding:104px 0; }
+.section-caption h2,.signal-explainer h2,.v-split h2 { max-width:710px; font-size:clamp(2.05rem,3.4vw,3.65rem); line-height:1.02; letter-spacing:-.055em; }
+.v-workflow-grid { margin-top:42px; }
+.v-workflow-grid article,.technology-grid article { min-height:240px; padding:22px; }
+.v-workflow-grid svg,.technology-grid svg { margin-top:36px; }
+.v-workflow-grid h3,.technology-grid h3 { margin-top:15px; }
+.v-split { min-height:390px; }
+.v-split>div,.v-split aside { padding-top:72px; padding-bottom:72px; }
+.public-footer { padding-top:29px; }
+.mono-kicker { color:#6d6c68; font-size:.62rem; letter-spacing:.1em; }
+
+/* Shared product language: flatter surfaces, clear actions and normal type. */
+.app-shell { background:var(--cream); }
+.app-header { height:70px; background:rgba(255,254,250,.94); border-color:var(--line); backdrop-filter:blur(12px); }
+.brand-wordmark { width:144px!important; }
+.brand-subtext { color:#73726d; font-size:.67rem; font-weight:650; }
+.primary-nav { gap:2px; }
+.primary-nav a { padding:9px 10px; border-radius:0; font-size:.8rem; font-weight:650; }
+.primary-nav a:hover,.primary-nav a.active { background:transparent; color:#11110f; box-shadow:inset 0 -2px 0 #1c1c1b; }
+.header-sign-out { border-radius:0; border-color:#aaa9a4; font-weight:700; }
+.app-main { padding-top:38px; }
+.dashboard-page { gap:26px; }
+.page-intro { padding-bottom:24px; }
+.page-intro h1 { font-size:clamp(2.25rem,3.7vw,3.55rem); line-height:.98; letter-spacing:-.06em; }
+.page-intro .eyebrow { display:none; }
+.page-intro > div > p:last-child { font-size:.9rem; }
+.panel,.measurement-panel { border-radius:0; box-shadow:none; background:var(--white); }
+.panel { padding:28px; }
+.section-heading { margin-bottom:18px; }
+.section-heading .eyebrow,.command-centre .eyebrow { display:none; }
+.section-heading h2 { font-size:1.3rem; letter-spacing:-.04em; }
+.section-heading p:last-child { color:var(--muted); font-size:.84rem; line-height:1.5; }
+.summary-strip { padding:0; border-radius:0; background:var(--white); }
+.workspace-summary>a { min-height:90px; padding:19px 22px; }
+.workspace-summary>a>div { width:30px; height:30px; background:transparent; color:#252523; }
+.workspace-summary>a>div svg { width:18px; height:18px; }
+.workspace-summary>a:hover { background:#f4f3ef; }
+.command-centre { background:var(--white); border-color:var(--line); }
+.command-centre-main,.command-centre-action { padding:28px; }
+.command-centre-action { background:#f1f0ec; border-color:var(--line); }
+.command-centre-action h2 { font-size:1.35rem; letter-spacing:-.04em; }
+.command-appointment { min-height:76px; }
+.patient-avatar { width:38px; height:38px; border-radius:50%; background:#e8e7e2; }
+.appointment-state,.status-pill { border-radius:0; }
+.button,.dashboard-page .button-primary,.dashboard-page .button-secondary,.admin-page .button-primary,.admin-page .button-secondary { border-radius:0; min-height:43px; font-weight:720; }
+.text-button { font-weight:700; }
+.search-field { height:43px; }
+.meeting-link-email-choice { font-size:.67rem; }
+.workspace-toast { box-shadow:none; }
+
+/* Booking and access pages: plain paper, not floating app-card theatre. */
+.booking-page,.access-page { background:var(--cream); }
+.booking-card,.access-card { border-radius:0; box-shadow:none; }
+.access-card { border-color:var(--line); }
+.access-card h1 { letter-spacing:-.055em; }
+.schedule-picker,.appointment-form-section { border-radius:0!important; }
+
+/* Consultation: preserve the room-first structure while removing ornamental UI. */
+.consultation-page,.ventricura-consultation { background:var(--cream); }
+.consultation-video-panel,.consultation-measurements-panel>.measurement-panel { box-shadow:none; }
+.consultation-video-panel { border-color:var(--line); background:var(--white); }
+.consultation-video-heading>span { background:#edebe6; }
+.video-stage,.livekit-frame { box-shadow:none; border-color:#292927; }
+.consultation-page .measurement-panel { box-shadow:none; background:var(--white); }
+.consultation-page .instruction-card,.consultation-page .progress-block,.consultation-page .measurement-trend,.consultation-page .private-notes { background:#f4f3ef; }
+.diagnostics-toggle { border-color:#aaa9a4; background:transparent; }
+.diagnostics-toggle:hover { background:#edebe6; transform:none; }
+
+@media (max-width: 820px) {
+  .public-header { height:72px; }
+  .v-hero { padding:50px 0 70px; }
+  .v-hero-copy h1,.technology-hero h1,.demo-intro h1 { font-size:clamp(2.55rem,11vw,3.75rem); }
+  .app-header { height:64px; }
+  .brand-wordmark { width:126px!important; }
+  .app-main { padding-top:28px; }
+  .page-intro h1 { font-size:clamp(2.2rem,10vw,3.1rem); }
+  .panel,.command-centre-main,.command-centre-action { padding:20px; }
+}
 .ventricura-consultation .consultation-video-panel { padding:0; overflow:hidden; border-color:#252525; background:#181818; box-shadow:18px 18px 0 #cfcfcf; }
 .ventricura-consultation .consultation-video-heading { min-height:62px; padding:0 20px; border:0; background:#181818; color:#f6f6f6; }
 .ventricura-consultation .consultation-video-heading .eyebrow { color:#bababa; }
