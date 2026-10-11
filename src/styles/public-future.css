@@ -130,3 +130,16 @@ main.ventricura-public.home-v6,main.ventricura-public.clinicians-page,main.ventr
 /* The motion is scroll-led, not a collection of looping effects. This avoids
    visual flicker and keeps the presentation comfortable in clinical settings. */
 .v10-device:before,.v11-flow-icon,.v12-hero-orbit,.v12-hero-orbit.orbit-two,.v12-hero-visual path{animation:none!important}
+
+/* Stable story layout: the visual and its narrative stay in normal document
+   flow. This deliberately avoids tall pinned columns, which left empty bands
+   on some real browser/window-size combinations. */
+@media(min-width:901px){
+  .v10-story,.v11-clinician-flow,.v12-signal-story{display:block;padding:84px max(36px,calc((100vw - 1440px)/2)) 96px}
+  .v10-story-sticky,.v11-flow-sticky,.v12-signal-sticky{position:relative;top:auto;height:auto;min-height:0;padding:0}
+  .v10-story-steps,.v11-flow-steps,.v12-signal-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:52px 0 0}
+  .v10-story-steps article,.v11-flow-steps article,.v12-signal-steps article{min-height:0;margin:0;padding:28px 28px 8px 0;opacity:1;transform:none}
+  .v10-story-steps article+article,.v11-flow-steps article+article,.v12-signal-steps article+article{padding-left:28px;border-left:1px solid currentColor}
+  .v10-story-steps h3,.v11-flow-steps h3,.v12-signal-steps h3{margin:25px 0 13px;font-size:clamp(1.75rem,2.5vw,3rem)}
+  .v10-story-steps b,.v11-flow-steps b,.v12-signal-steps b{display:none}
+}
