@@ -13,6 +13,12 @@ function clinicSlugFromHost() {
   return slug && !['www', 'app'].includes(slug) ? slug : null;
 }
 
+const workflow = [
+  ['01', 'A link with a purpose', 'Invite a patient directly or share a booking link. They join in a browser, with no patient account to manage.'],
+  ['02', 'A consultation with context', 'Bring video, an optional camera capture and the patient’s reason for visit into one focused session.'],
+  ['03', 'A record that stays useful', 'Keep notes, measurements, appointments and an exportable summary together after the call ends.'],
+];
+
 export function LandingPage() {
   const clinicSlug = clinicSlugFromHost();
   const [clinicianSignedIn, setClinicianSignedIn] = useState(false);
@@ -26,44 +32,49 @@ export function LandingPage() {
 
   if (clinicSlug) return <ClinicWebsitePage slug={clinicSlug} />;
 
-  return <main className="ventricura-public home-v5">
+  return <main className="ventricura-public home-v6">
     <Seo title="Ventricura | Contactless telehealth technology" description="Contactless rPPG technology for clinician-controlled telehealth and remote care." path="/" jsonLd={organizationSchema} />
     <PublicHeader />
 
-    <section className="v5-hero">
-      <div className="v5-hero-top"><span>Ventricura / Adelaide</span><span>01 — Remote care, in sequence</span></div>
-      <div className="v5-hero-headline">
-        <div>
-          <p className="v5-hero-label">Telehealth, with a<br />clinical throughline.</p>
-          <h1>Care that<br /><em>continues</em><br />past the call.</h1>
-        </div>
-        <aside className="v5-pathway" aria-label="A simple consultation pathway">
-          <div className="v5-pathway-head"><span>Appointment pathway</span><b>LIVE / 01</b></div>
-          <div className="v5-pathway-line" aria-hidden="true"><i /><i /><i /></div>
-          <ol><li><span>01</span><b>Invite</b><small>Secure browser link</small></li><li><span>02</span><b>Consult</b><small>Video & guided capture</small></li><li><span>03</span><b>Continue</b><small>Record & follow-up</small></li></ol>
-        </aside>
+    <section className="v6-hero">
+      <div className="v6-grid" aria-hidden="true" />
+      <div className="v6-hero-meta"><span>VENTRICURA / 01</span><span>CLINICAL TELEPRESENCE</span><span>ADELAIDE, AU</span></div>
+      <div className="v6-hero-copy">
+        <p className="v6-kicker">Remote care should feel<br />closer, not smaller.</p>
+        <h1>THE ROOM<br />IS <em>STILL</em><br />HERE.</h1>
+        <p className="v6-intro">Ventricura is a clinician-led telehealth workspace for the parts of care that happen before, during and after a video call.</p>
+        <div className="v6-actions"><Link to="/contact">Talk to our team <ArrowRight size={17} /></Link><Link to="/demo">Open live demo <ArrowRight size={17} /></Link></div>
       </div>
-      <div className="v5-hero-foot"><Link to="/contact">Talk to our team <ArrowRight size={17} /></Link><Link to="/demo">Open the live demo <ArrowRight size={17} /></Link><span>One browser link for patients. One protected workspace for clinicians.</span></div>
+      <aside className="v6-signal-module" aria-label="An illustrative live remote-care signal">
+        <div className="v6-module-head"><span>CONSULTATION / LIVE</span><b>◉ ONLINE</b></div>
+        <div className="v6-scope">
+          <div className="v6-scope-ring v6-scope-ring-a" /><div className="v6-scope-ring v6-scope-ring-b" /><div className="v6-scope-core">V</div>
+          <svg viewBox="0 0 360 90" aria-hidden="true"><path d="M0 48 H38 L54 39 L70 58 L95 18 L118 72 L143 47 H178 L202 42 L220 55 L243 26 L265 67 L291 47 H360" /></svg>
+        </div>
+        <div className="v6-module-data"><span><i />PATIENT LINK</span><span><i />VIDEO ROOM</span><span><i />RECORD READY</span></div>
+      </aside>
+      <div className="v6-hero-bottom"><span>ONE LINK FOR THE PATIENT</span><span>ONE PROTECTED WORKSPACE FOR THE CLINIC</span><b>SCROLL TO ENTER ↓</b></div>
     </section>
 
-    <section className="v5-statement"><p>Remote care often fractures into booking systems, video tools and follow-up notes.</p><h2>We’re building the bit that <em>keeps it together.</em></h2></section>
+    <section className="v6-manifesto"><p>Not another layer of telehealth.</p><h2>A single <em>clinical surface</em><br />for the whole conversation.</h2><span>01 / THE POINT</span></section>
 
-    <section className="v5-sequence" aria-label="The Ventricura workflow">
-      <header><span>How it works</span><p>A connected pathway for the appointment—not a new patient app.</p></header>
-      <article><span>Before</span><div><h3>Make the appointment simple.</h3><p>Invite a patient directly or share a booking link. They open it in their browser, with no account to create.</p></div><b>01</b></article>
-      <article><span>During</span><div><h3>Keep the clinician in the room.</h3><p>Meet by video. When useful, the clinician can start a guided camera capture from the same session.</p></div><b>02</b></article>
-      <article><span>After</span><div><h3>Leave with a record, not a loose end.</h3><p>Readings, notes, previous appointments and exportable summaries stay with the patient record.</p></div><b>03</b></article>
+    <section className="v6-workflow" aria-label="The Ventricura workflow">
+      <header><p>THE FLOW</p><h2>The appointment is<br />a <em>throughline.</em></h2><span>02 / BEFORE → DURING → AFTER</span></header>
+      <div className="v6-flow-grid">{workflow.map(([number, title, description]) => <article key={number}><span>{number}</span><div className="v6-flow-node" /><h3>{title}</h3><p>{description}</p><b>→</b></article>)}</div>
     </section>
 
-    <section className="v5-record">
-      <div className="v5-record-title"><span>Inside the workspace</span><h2>Everything a clinician needs<br />is <em>part of the record.</em></h2></div>
-      <div className="v5-record-list"><article><span>Appointments</span><p>Schedule, send a patient link, join a consultation and resend access when needed.</p></article><article><span>Patient history</span><p>Keep consultations, notes and previous readings together under the same patient.</p></article><article><span>Session review</span><p>Review a waveform, document follow-up and export a concise PDF summary.</p></article></div>
-      <Link to={clinicianSignedIn ? '/clinician' : '/clinician/sign-in'} className="v5-workspace-link">{clinicianSignedIn ? 'Open clinician workspace' : 'Explore clinician access'} <ArrowRight size={17} /></Link>
+    <section className="v6-workspace">
+      <div className="v6-workspace-title"><span>03 / THE WORKSPACE</span><h2>Less switching.<br /><em>More attention.</em></h2><p>Appointments, patient history, consultation notes and session review are designed to sit together—rather than get lost across separate tools.</p></div>
+      <div className="v6-workspace-surface">
+        <div className="v6-surface-bar"><span>VENTRICURA / CLINIC WORKSPACE</span><i>SECURE SESSION</i></div>
+        <div className="v6-surface-main"><div><small>PATIENT HISTORY</small><strong>Every appointment.<br />One continuous record.</strong></div><ul><li><span>APPOINTMENT</span><b>Booking & access</b></li><li><span>CONSULTATION</span><b>Notes & video session</b></li><li><span>REVIEW</span><b>Waveform & PDF export</b></li></ul></div>
+        <Link to={clinicianSignedIn ? '/clinician' : '/clinician/sign-in'}>{clinicianSignedIn ? 'Open clinician workspace' : 'Explore clinician access'} <ArrowRight size={17} /></Link>
+      </div>
     </section>
 
-    <section className="v5-demo-block"><div><span>See it in action</span><h2>Use your own camera.<br />See the live flow.</h2></div><p>The public demo connects to the same live signal-processing path used by Ventricura. Nothing is saved from the demo.</p><Link to="/demo">Try the live demo <ArrowRight size={18} /></Link></section>
+    <section className="v6-demo"><span>LIVE CAPTURE / 04</span><h2>Your camera.<br /><em>The actual flow.</em></h2><p>The public demo uses the same live signal-processing pathway as Ventricura. Nothing from the demo is retained.</p><Link to="/demo">Try the live demo <ArrowRight size={20} /></Link></section>
 
-    <section className="v5-close"><p>For practices and clinicians exploring a more connected approach to remote consultations.</p><Link to="/contact">Start a conversation <ArrowRight size={20} /></Link></section>
+    <section className="v6-close"><span>Ventricura is for practices ready to try a more connected way to consult remotely.</span><Link to="/contact">Start a clinic conversation <ArrowRight size={22} /></Link></section>
     <PublicFooter />
   </main>;
 }
