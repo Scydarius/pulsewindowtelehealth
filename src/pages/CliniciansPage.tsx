@@ -84,17 +84,6 @@ function ClinicianFlow() {
     let frame = 0;
     const updateFlow = () => {
       const bounds = flow.getBoundingClientRect();
-      const stage = flow.querySelector<HTMLElement>('.v11-flow-sticky');
-      if (stage) {
-        const stageHeight = stage.getBoundingClientRect().height;
-        const stageWidth = stage.getBoundingClientRect().width;
-        const shouldPin = bounds.top <= 0 && bounds.bottom >= stageHeight;
-        stage.dataset.scrollPinned = shouldPin ? 'true' : 'false';
-        if (shouldPin) {
-          stage.style.setProperty('--flow-pinned-left', `${bounds.left}px`);
-          stage.style.setProperty('--flow-pinned-width', `${stageWidth}px`);
-        }
-      }
       const travel = Math.max(1, flow.offsetHeight - window.innerHeight);
       const progress = Math.min(1, Math.max(0, -bounds.top / travel));
       flow.style.setProperty('--flow-progress', progress.toFixed(4));
