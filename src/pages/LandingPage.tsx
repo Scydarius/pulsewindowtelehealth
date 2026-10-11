@@ -35,15 +35,27 @@ export function LandingPage() {
   useEffect(() => {
     const story = storyRef.current;
     if (!story) return;
-    const steps = Array.from(story.querySelectorAll<HTMLElement>('[data-story-step]'));
-    const observer = new IntersectionObserver(
-      (entries) => entries.forEach((entry) => {
-        if (entry.isIntersecting) setActiveStory(Number((entry.target as HTMLElement).dataset.storyStep));
-      }),
-      { rootMargin: '-38% 0px -45% 0px', threshold: 0 },
-    );
-    steps.forEach((step) => observer.observe(step));
-    return () => observer.disconnect();
+    let frame = 0;
+    const updateStory = () => {
+      const bounds = story.getBoundingClientRect();
+      const travel = Math.max(1, story.offsetHeight - window.innerHeight);
+      const progress = Math.min(1, Math.max(0, -bounds.top / travel));
+      story.style.setProperty('--story-progress', progress.toFixed(4));
+      const nextStage = Math.min(2, Math.floor(progress * 3));
+      setActiveStory((current) => current === nextStage ? current : nextStage);
+      frame = 0;
+    };
+    const requestUpdate = () => {
+      if (!frame) frame = window.requestAnimationFrame(updateStory);
+    };
+    updateStory();
+    window.addEventListener('scroll', requestUpdate, { passive: true });
+    window.addEventListener('resize', requestUpdate);
+    return () => {
+      window.removeEventListener('scroll', requestUpdate);
+      window.removeEventListener('resize', requestUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   if (clinicSlug) return <ClinicWebsitePage slug={clinicSlug} />;
