@@ -1,10 +1,14 @@
 import { ArrowRight } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { organizationSchema, PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
 import { ClinicWebsitePage } from './ClinicWebsitePage';
 import '../styles/home-v4.css';
+
+gsap.registerPlugin(ScrollTrigger);
 
 function clinicSlugFromHost() {
   const host = window.location.hostname.toLowerCase();
@@ -32,38 +36,61 @@ export function LandingPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const story = storyRef.current;
     if (!story) return;
-    let frame = 0;
-    const updateStory = () => {
-      const bounds = story.getBoundingClientRect();
-      const travel = Math.max(1, story.offsetHeight - window.innerHeight);
-      const progress = Math.min(1, Math.max(0, -bounds.top / travel));
-      story.style.setProperty('--story-progress', progress.toFixed(4));
-      story.style.setProperty('--story-tilt', `${((.5 - progress) * 2).toFixed(3)}deg`);
-      story.style.setProperty('--story-lift', `${((.5 - progress) * 22).toFixed(2)}px`);
-      story.style.setProperty('--story-grid-y', `${(progress * -42).toFixed(2)}px`);
-      story.style.setProperty('--story-caption-y', `${((.5 - progress) * 10).toFixed(2)}px`);
-      story.style.setProperty('--story-step-shift', `${((progress - .5) * -12).toFixed(2)}px`);
-      story.style.setProperty('--story-invite-x', `${(-progress * 840).toFixed(2)}px`);
-      story.style.setProperty('--story-consult-x', `${(420 - progress * 840).toFixed(2)}px`);
-      story.style.setProperty('--story-record-x', `${(840 - progress * 840).toFixed(2)}px`);
-      const nextStage = Math.min(2, Math.floor(progress * 3));
-      setActiveStory((current) => current === nextStage ? current : nextStage);
-      frame = 0;
-    };
-    const requestUpdate = () => {
-      if (!frame) frame = window.requestAnimationFrame(updateStory);
-    };
-    updateStory();
-    window.addEventListener('scroll', requestUpdate, { passive: true });
-    window.addEventListener('resize', requestUpdate);
-    return () => {
-      window.removeEventListener('scroll', requestUpdate);
-      window.removeEventListener('resize', requestUpdate);
-      if (frame) window.cancelAnimationFrame(frame);
-    };
+    const stage = story.querySelector<HTMLElement>('.v10-story-stage');
+    const device = story.querySelector<HTMLElement>('.v10-device');
+    const grid = story.querySelector<HTMLElement>('.v10-device-grid');
+    const screens = gsap.utils.toArray<HTMLElement>('.v10-screen', story);
+    const copies = gsap.utils.toArray<HTMLElement>('.v10-story-copy article', story);
+    const progress = gsap.utils.toArray<HTMLElement>('.v10-story-progress i', story);
+    if (!stage || !device || !grid || screens.length !== 3 || copies.length !== 3) return;
+
+    const media = gsap.matchMedia();
+    media.add('(min-width: 901px) and (prefers-reduced-motion: no-preference)', () => {
+      let previousStep = 0;
+      const context = gsap.context(() => {
+        gsap.set([screens[1], screens[2], copies[1], copies[2]], { autoAlpha: 0, y: 34, scale: 0.985 });
+        gsap.set([screens[0], copies[0]], { autoAlpha: 1, y: 0, scale: 1 });
+        gsap.set(progress, { scaleX: 0.25, transformOrigin: 'left center' });
+        gsap.set(progress[0], { scaleX: 1 });
+
+        const timeline = gsap.timeline({
+          defaults: { ease: 'none' },
+          scrollTrigger: {
+            trigger: story,
+            start: 'top top',
+            end: '+=220%',
+            pin: stage,
+            scrub: 0.45,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
+            onUpdate: (self) => {
+              const nextStep = Math.min(2, Math.floor(self.progress * 3));
+              if (nextStep !== previousStep) {
+                previousStep = nextStep;
+                setActiveStory(nextStep);
+              }
+            },
+          },
+        });
+
+        timeline
+          .to(device, { rotateX: -1.6, y: -10, duration: 0.18 }, 0)
+          .to(grid, { y: -20, duration: 0.28 }, 0)
+          .to([screens[0], copies[0]], { autoAlpha: 0, y: -30, duration: 0.12 }, 0.25)
+          .to([screens[1], copies[1]], { autoAlpha: 1, y: 0, scale: 1, duration: 0.15 }, 0.33)
+          .to(progress[1], { scaleX: 1, duration: 0.1 }, 0.4)
+          .to(device, { rotateX: 1.2, y: 8, duration: 0.22 }, 0.5)
+          .to([screens[1], copies[1]], { autoAlpha: 0, y: -30, duration: 0.12 }, 0.63)
+          .to([screens[2], copies[2]], { autoAlpha: 1, y: 0, scale: 1, duration: 0.15 }, 0.71)
+          .to(progress[2], { scaleX: 1, duration: 0.1 }, 0.77)
+          .to(device, { rotateX: 0, y: 0, duration: 0.23 }, 0.8);
+      }, story);
+      return () => context.revert();
+    });
+    return () => media.revert();
   }, []);
 
   if (clinicSlug) return <ClinicWebsitePage slug={clinicSlug} />;
@@ -95,7 +122,7 @@ export function LandingPage() {
     <section className="v6-manifesto"><p>Not another layer of telehealth.</p><h2>A single <em>clinical surface</em><br />for the whole conversation.</h2><span>01 / THE POINT</span></section>
 
     <section className="v10-story" ref={storyRef} aria-label="A scrolling Ventricura workflow story">
-      <div className="v10-story-sticky">
+      <div className="v10-story-stage">
         <div className="v10-story-meta"><span>02 / THE FLOW</span><span>{`0${activeStory + 1} / 03`}</span></div>
         <div className="v10-story-frame">
           <div className="v10-device" data-active-stage={activeStory}>

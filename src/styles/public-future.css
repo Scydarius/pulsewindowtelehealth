@@ -123,10 +123,6 @@ main.ventricura-public.home-v6,main.ventricura-public.clinicians-page,main.ventr
   }
 }
 
-/* The landing sequence is now a continuous horizontal instrument rail rather
-   than three elements taking turns fading in. */
-.v10-story{--story-invite-x:0px;--story-consult-x:420px;--story-record-x:840px}.v10-screen{opacity:1!important;transform:translateX(0) scale(1);transition:transform .11s linear}.v10-screen-invite{transform:translateX(var(--story-invite-x)) scale(1)!important}.v10-screen-consult{transform:translateX(var(--story-consult-x)) scale(1)!important}.v10-screen-record{transform:translateX(var(--story-record-x)) scale(1)!important}.v10-device[data-active-stage='1'] .v10-screen-consult path{animation:story-wave 1.15s ease forwards}.v10-device[data-active-stage='2'] .v10-record-lines i{animation:record-line .55s ease forwards}
-
 /* The motion is scroll-led, not a collection of looping effects. This avoids
    visual flicker and keeps the presentation comfortable in clinical settings. */
 .v10-device:before,.v11-flow-icon,.v12-hero-orbit,.v12-hero-orbit.orbit-two,.v12-hero-visual path{animation:none!important}
@@ -144,32 +140,11 @@ main.ventricura-public.home-v6,main.ventricura-public.clinicians-page,main.ventr
   .v10-story-steps b,.v11-flow-steps b,.v12-signal-steps b{display:none}
 }
 
-/* Landing workflow: one measured scroll track, one pinned scene. There are no
-   empty holder columns or fixed elements, so this remains stable at every
-   viewport height. The visual changes are driven by the story's scroll ratio. */
-@media(min-width:901px){
-  .v10-story{display:block!important;height:280svh;padding:0!important;background:#f4f4ef}
-  .v10-story-sticky{position:sticky!important;top:0;height:100svh;min-height:0;padding:68px max(36px,calc((100vw - 1440px)/2)) 38px!important;box-sizing:border-box;display:grid!important;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
-  .v10-story-frame{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(300px,.72fr);gap:clamp(48px,9vw,156px);min-height:0;padding:30px 0}
-  .v10-device{min-height:0;height:100%;box-shadow:16px 16px 0 #bdbdb7}
-  .v10-story-copy{position:relative;display:grid;min-height:0;align-items:center}
-  .v10-story-copy article{grid-area:1/1;max-width:410px;opacity:0;transform:translate3d(0,34px,0);transition:opacity .35s ease,transform .45s cubic-bezier(.2,.8,.2,1);pointer-events:none}
-  .v10-story-copy article.active{opacity:1;transform:translate3d(0,0,0)}
-  .v10-story-copy span,.v10-story-copy b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.63rem;font-weight:800;letter-spacing:.09em}
-  .v10-story-copy span{color:#5a5a55}.v10-story-copy h2{margin:28px 0 18px;font-size:clamp(3rem,5.4vw,6.2rem);font-weight:740;line-height:.8;letter-spacing:-.105em}.v10-story-copy p{margin:0;color:#565652;font-size:1rem;line-height:1.62}.v10-story-copy b{display:block;margin-top:32px;color:#363633}
-  .v10-story-progress{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.v10-story-progress i{height:2px;background:#c4c4be;transition:background .3s ease}.v10-story-progress i.active{background:#101010}
-  .v10-screen{opacity:0!important;transform:translate3d(0,28px,0) scale(.985)!important;transition:opacity .25s ease,transform .4s cubic-bezier(.2,.8,.2,1)!important}
-  .v10-device[data-active-stage='0'] .v10-screen-invite,.v10-device[data-active-stage='1'] .v10-screen-consult,.v10-device[data-active-stage='2'] .v10-screen-record{opacity:1!important;transform:translate3d(0,0,0) scale(1)!important}
-}
-@media(max-width:900px){
-  .v10-story{height:auto!important;padding:0 22px 72px!important}.v10-story-sticky{position:relative!important;height:auto;padding:72px 0 0!important}.v10-story-frame{display:grid;gap:28px}.v10-device{height:440px;min-height:0}.v10-story-copy{position:relative;min-height:210px}.v10-story-copy article{display:none}.v10-story-copy article.active{display:block}.v10-story-copy h2{margin:18px 0 12px;font-size:2.7rem;line-height:.84;letter-spacing:-.08em}.v10-story-copy p{color:#565652;line-height:1.55}.v10-story-progress{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:28px}.v10-story-progress i{height:2px;background:#c4c4be}.v10-story-progress i.active{background:#101010}.v10-story-steps{display:none}
-}
-@media(max-width:620px){.v10-story{padding-right:16px!important;padding-left:16px!important}.v10-device{height:380px}.v10-story-copy h2{font-size:2.35rem}}
-
-/* Fail-safe landing layout. This intentionally does not pin anything: a
-   product page must always keep content in the document flow before it earns
-   more elaborate scroll choreography. */
-.v10-story{display:block!important;height:auto!important;padding:88px max(36px,calc((100vw - 1440px)/2)) 96px!important;background:#f4f4ef!important}
-.v10-story-sticky{position:relative!important;top:auto!important;height:auto!important;min-height:0!important;padding:0!important;overflow:visible!important;display:block!important}
-.v10-story-meta{margin-bottom:28px}.v10-story-frame{display:grid!important;grid-template-columns:minmax(0,1.1fr) minmax(300px,.72fr);gap:clamp(42px,8vw,136px);align-items:center;padding:0!important}.v10-device{height:clamp(440px,52vw,580px)!important;min-height:0!important}.v10-story-copy{display:grid!important;grid-template-columns:1fr;gap:0;position:relative!important;min-height:0!important}.v10-story-copy article{display:block!important;position:relative!important;grid-area:auto!important;max-width:410px;opacity:1!important;transform:none!important;pointer-events:auto!important;padding:25px 0;border-top:1px solid #aaa9a4}.v10-story-copy article:last-child{border-bottom:1px solid #aaa9a4}.v10-story-copy h2{margin:14px 0 10px!important;font-size:clamp(1.65rem,2.5vw,2.8rem)!important;line-height:.9!important;letter-spacing:-.075em!important}.v10-story-copy p{font-size:.92rem!important;line-height:1.55!important}.v10-story-copy b{display:none!important}.v10-story-progress{display:none!important}.v10-screen{transition:none!important}.v10-device[data-active-stage='0'] .v10-screen-invite,.v10-device[data-active-stage='1'] .v10-screen-consult,.v10-device[data-active-stage='2'] .v10-screen-record{opacity:1!important;transform:translate3d(0,0,0) scale(1)!important}
-@media(max-width:900px){.v10-story{padding:72px 22px!important}.v10-story-frame{grid-template-columns:1fr!important;gap:34px}.v10-device{height:440px!important}.v10-story-copy article{padding:21px 0}.v10-story-copy h2{font-size:1.8rem!important}}@media(max-width:620px){.v10-story{padding-right:16px!important;padding-left:16px!important}.v10-device{height:380px!important}}
+/* GSAP owns the only pinned product scene on the landing page. Pinning and the
+   spacer are calculated together; only children of the stage are animated. */
+.v10-story{display:block!important;padding:0!important;background:#f4f4ef!important}
+.v10-story-stage{min-height:100svh;padding:68px max(36px,calc((100vw - 1440px)/2)) 38px;box-sizing:border-box;display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
+.v10-story-meta{margin:0;color:#555550;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.65rem;font-weight:800;letter-spacing:.09em;display:flex;justify-content:space-between}
+.v10-story-frame{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(300px,.72fr);gap:clamp(48px,9vw,156px);min-height:0;padding:30px 0;align-items:center}
+.v10-story .v10-device{height:100%;min-height:0;will-change:transform;box-shadow:16px 16px 0 #bdbdb7}.v10-story .v10-device:after{display:none}.v10-story .v10-device-grid{transform:none!important}.v10-story .v10-screen{transition:none!important}.v10-story-copy{position:relative;display:grid;min-height:0;align-items:center}.v10-story-copy article{grid-area:1/1;max-width:410px}.v10-story-copy span,.v10-story-copy b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.63rem;font-weight:800;letter-spacing:.09em}.v10-story-copy span{color:#5a5a55}.v10-story-copy h2{margin:28px 0 18px;font-size:clamp(3rem,5.4vw,6.2rem);font-weight:740;line-height:.8;letter-spacing:-.105em}.v10-story-copy p{margin:0;color:#565652;font-size:1rem;line-height:1.62}.v10-story-copy b{display:block;margin-top:32px;color:#363633}.v10-story-progress{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.v10-story-progress i{height:2px;background:#101010;transform:scaleX(.25);transform-origin:left center}
+@media(max-width:900px){.v10-story{padding:72px 22px 0!important}.v10-story-stage{min-height:0;padding:0;display:block;overflow:visible}.v10-story-meta{margin-bottom:28px}.v10-story-frame{grid-template-columns:1fr;gap:34px;padding:0}.v10-story .v10-device{height:440px;min-height:0}.v10-story-copy{display:block}.v10-story-copy article{display:block;margin:0;padding:21px 0;border-top:1px solid #aaa9a4;opacity:1!important;transform:none!important;visibility:visible!important}.v10-story-copy article:last-child{border-bottom:1px solid #aaa9a4}.v10-story-copy h2{margin:14px 0 10px;font-size:1.8rem;line-height:.9;letter-spacing:-.075em}.v10-story-copy p{font-size:.92rem;line-height:1.55}.v10-story-copy b,.v10-story-progress{display:none}.v10-story .v10-screen{transition:none!important}}@media(max-width:620px){.v10-story{padding-right:16px!important;padding-left:16px!important}.v10-story .v10-device{height:380px}.v10-story-copy h2{font-size:1.7rem}}
