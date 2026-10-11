@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Menu, X } from 'lucide-react';
+import '../styles/public-future.css';
 
 export function PublicHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -19,7 +20,8 @@ export function PublicHeader() {
   return (
     <header className="public-header">
       <Link to="/" className="public-brand" aria-label="Ventricura home">
-        <img src="/ventricura-logo-centred.png" alt="Ventricura" />
+        <img className="public-brand-mark" src="/ventricura-mark.svg" alt="" />
+        <span className="public-brand-word">VENTRICURA</span>
       </Link>
       <nav className="desktop-public-nav" aria-label="Public navigation">
         <Link to="/technology">Technology</Link>
@@ -107,7 +109,7 @@ export function Seo({ title, description, path, jsonLd }: SeoProps) {
 
 export function PublicFooter() {
   return <footer className="public-footer public-footer-expanded">
-    <div><img src="/ventricura-logo-centred.png" alt="Ventricura" /><span>Contactless telehealth technology.</span></div>
+    <div><span className="public-footer-brand"><img className="public-brand-mark" src="/ventricura-mark.svg" alt="" /><span className="public-brand-word">VENTRICURA</span></span><span>Contactless telehealth technology.</span></div>
     <nav aria-label="Footer navigation"><Link to="/clinicians">For clinicians</Link><Link to="/technology">Technology</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/security">Security</Link></nav>
   </footer>;
 }
@@ -117,7 +119,7 @@ export const organizationSchema = {
   '@type': 'Organization',
   name: 'Ventricura',
   url: 'https://www.ventricura.com/',
-  logo: 'https://www.ventricura.com/ventricura-logo-centred.png',
+  logo: 'https://www.ventricura.com/ventricura-mark.svg',
   email: 'admin@ventricura.com',
   description: 'Contactless rPPG technology for telehealth and remote care.',
   contactPoint: [{ '@type': 'ContactPoint', contactType: 'business enquiries', email: 'admin@ventricura.com', url: 'https://www.ventricura.com/contact' }],

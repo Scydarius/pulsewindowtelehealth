@@ -31,12 +31,22 @@ export function LandingPage() {
     <PublicHeader />
 
     <section className="v5-hero">
-      <div className="v5-hero-top"><span>Ventricura / Adelaide</span><span>Clinician-led telehealth</span></div>
-      <div className="v5-hero-headline"><h1>The call is only<br />part of the care.</h1><p>Ventricura gives clinicians a connected place to invite patients, run a video consultation, capture a reading and keep the story moving afterwards.</p></div>
+      <div className="v5-hero-top"><span>Ventricura / Adelaide</span><span>01 — Remote care, in sequence</span></div>
+      <div className="v5-hero-headline">
+        <div>
+          <p className="v5-hero-label">Telehealth, with a<br />clinical throughline.</p>
+          <h1>Care that<br /><em>continues</em><br />past the call.</h1>
+        </div>
+        <aside className="v5-pathway" aria-label="A simple consultation pathway">
+          <div className="v5-pathway-head"><span>Appointment pathway</span><b>LIVE / 01</b></div>
+          <div className="v5-pathway-line" aria-hidden="true"><i /><i /><i /></div>
+          <ol><li><span>01</span><b>Invite</b><small>Secure browser link</small></li><li><span>02</span><b>Consult</b><small>Video & guided capture</small></li><li><span>03</span><b>Continue</b><small>Record & follow-up</small></li></ol>
+        </aside>
+      </div>
       <div className="v5-hero-foot"><Link to="/contact">Talk to our team <ArrowRight size={17} /></Link><Link to="/demo">Open the live demo <ArrowRight size={17} /></Link><span>One browser link for patients. One protected workspace for clinicians.</span></div>
     </section>
 
-    <section className="v5-statement"><p>Remote care often fractures into booking systems, video tools and follow-up notes.</p><h2>We’re building the bit that <em>joins it back up.</em></h2></section>
+    <section className="v5-statement"><p>Remote care often fractures into booking systems, video tools and follow-up notes.</p><h2>We’re building the bit that <em>keeps it together.</em></h2></section>
 
     <section className="v5-sequence" aria-label="The Ventricura workflow">
       <header><span>How it works</span><p>A connected pathway for the appointment—not a new patient app.</p></header>
@@ -46,7 +56,7 @@ export function LandingPage() {
     </section>
 
     <section className="v5-record">
-      <div className="v5-record-title"><span>Inside the workspace</span><h2>Everything a clinician needs<br />is <em>already in the room.</em></h2></div>
+      <div className="v5-record-title"><span>Inside the workspace</span><h2>Everything a clinician needs<br />is <em>part of the record.</em></h2></div>
       <div className="v5-record-list"><article><span>Appointments</span><p>Schedule, send a patient link, join a consultation and resend access when needed.</p></article><article><span>Patient history</span><p>Keep consultations, notes and previous readings together under the same patient.</p></article><article><span>Session review</span><p>Review a waveform, document follow-up and export a concise PDF summary.</p></article></div>
       <Link to={clinicianSignedIn ? '/clinician' : '/clinician/sign-in'} className="v5-workspace-link">{clinicianSignedIn ? 'Open clinician workspace' : 'Explore clinician access'} <ArrowRight size={17} /></Link>
     </section>
