@@ -22,6 +22,7 @@ export function PublicHeader() {
       <Link to="/" className="public-brand" aria-label="Ventricura home">
         <img className="public-brand-mark" src="/ventricura-mark.svg" alt="" />
         <span className="public-brand-word">VENTRICURA</span>
+        <span className="public-brand-index">/ SYSTEM 01</span>
       </Link>
       <nav className="desktop-public-nav" aria-label="Public navigation">
         <Link to="/technology">Technology</Link>
@@ -109,7 +110,7 @@ export function Seo({ title, description, path, jsonLd }: SeoProps) {
 
 export function PublicFooter() {
   return <footer className="public-footer public-footer-expanded">
-    <div><span className="public-footer-brand"><img className="public-brand-mark" src="/ventricura-mark.svg" alt="" /><span className="public-brand-word">VENTRICURA</span></span><span>Contactless telehealth technology.</span></div>
+    <div><span className="public-footer-brand"><img className="public-brand-mark" src="/ventricura-mark.svg" alt="" /><span className="public-brand-word">VENTRICURA</span></span><span className="public-footer-strap">Contactless telehealth technology.</span></div>
     <nav aria-label="Footer navigation"><Link to="/clinicians">For clinicians</Link><Link to="/technology">Technology</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/security">Security</Link></nav>
   </footer>;
 }
