@@ -74,7 +74,7 @@ function ClinicianFaq() {
   );
 }
 
-function ClinicianFlow() {
+function LegacyClinicianFlow() {
   const [activeStep, setActiveStep] = useState(0);
   const flowRef = useRef<HTMLElement>(null);
 
@@ -126,6 +126,13 @@ function ClinicianFlow() {
       <p className="v11-flow-caption">A patient has one simple path in. The clinician retains context at every point.</p>
     </div>
     <div className="v11-flow-steps">{steps.map(({ title, text }, index) => <article key={title} className={index === activeStep ? 'active' : ''}><span>{`0${index + 1}`}</span><h3>{title}</h3><p>{text}</p><b>{index === activeStep ? 'On screen' : 'Continue'}</b></article>)}</div>
+  </section>;
+}
+
+function ClinicianFlow() {
+  return <section className="clinician-flow-public" aria-label="The Ventricura clinical workflow">
+    <header><div><p className="mono-kicker">02 / CLINICAL FLOW</p><h2>One appointment.<br />One secure flow.</h2></div><p>From an invitation to a saved record, the clinician stays in control without asking patients to create an account.</p></header>
+    <div className="clinician-flow-track">{steps.map(({ icon: Icon, title, text }, index) => <article key={title}><div className="clinician-flow-number">0{index + 1}</div><Icon size={25} strokeWidth={1.6} /><h3>{title}</h3><p>{text}</p></article>)}</div>
   </section>;
 }
 
