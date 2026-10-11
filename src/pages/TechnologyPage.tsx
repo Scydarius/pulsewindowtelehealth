@@ -1,5 +1,7 @@
 import { ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Link } from 'react-router-dom';
 import { PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
 
@@ -9,7 +11,9 @@ const signalSteps = [
   ['03', 'Clinical context', 'The clinician sees the signal in the same workspace as the consultation and record.'],
 ] as const;
 
-function SignalStory() {
+gsap.registerPlugin(ScrollTrigger);
+
+function LegacySignalStory() {
   const [activeStep, setActiveStep] = useState(0);
   const storyRef = useRef<HTMLElement>(null);
 
@@ -64,6 +68,88 @@ function SignalStory() {
       <div className="v12-signal-copy"><h2>{signalSteps[activeStep][1]}</h2><p>{signalSteps[activeStep][2]}</p></div>
     </div>
     <div className="v12-signal-steps">{signalSteps.map(([number, title, text], index) => <article key={number} className={activeStep === index ? 'active' : ''}><span>{number}</span><h3>{title}</h3><p>{text}</p><b>{activeStep === index ? 'In view' : 'Keep scrolling'}</b></article>)}</div>
+  </section>;
+}
+
+function SignalStory() {
+  const [activeStep, setActiveStep] = useState(0);
+  const storyRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const story = storyRef.current;
+    if (!story) return;
+    const stage = story.querySelector<HTMLElement>('.v12-signal-sticky');
+    const machine = story.querySelector<HTMLElement>('.v12-signal-machine');
+    const grid = story.querySelector<HTMLElement>('.v12-machine-grid');
+    const camera = story.querySelector<HTMLElement>('.v12-camera-card');
+    const record = story.querySelector<HTMLElement>('.v12-record-card');
+    const waveform = story.querySelector<SVGElement>('.v12-waveform');
+    const particles = gsap.utils.toArray<HTMLElement>('.v12-signal-particles i', story);
+    const copies = gsap.utils.toArray<HTMLElement>('.v12-signal-copy article', story);
+    if (!stage || !machine || !grid || !camera || !record || !waveform || copies.length !== 3) return;
+
+    const media = gsap.matchMedia();
+    media.add('(min-width: 901px) and (prefers-reduced-motion: no-preference)', () => {
+      let previousStep = 0;
+      const context = gsap.context(() => {
+        gsap.set(record, { x: 260, scale: .72, autoAlpha: 0 });
+        gsap.set(waveform, { scaleX: .12, autoAlpha: .08, transformOrigin: 'center' });
+        gsap.set(particles, { autoAlpha: 0, scale: .35, transformOrigin: 'center' });
+        gsap.set(copies, { autoAlpha: 0, y: 30 });
+        gsap.set(copies[0], { autoAlpha: 1, y: 0 });
+
+        const timeline = gsap.timeline({
+          defaults: { ease: 'none' },
+          scrollTrigger: {
+            trigger: story,
+            start: 'top top',
+            end: '+=280%',
+            pin: stage,
+            scrub: .55,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
+            onUpdate: (self) => {
+              const next = self.progress < .34 ? 0 : self.progress < .72 ? 1 : 2;
+              if (next !== previousStep) { previousStep = next; setActiveStep(next); }
+            },
+          },
+        });
+        timeline
+          .to(machine, { rotateX: -1.4, y: -8, duration: .18 }, 0)
+          .to(grid, { y: -32, duration: .33 }, 0)
+          .to(waveform, { scaleX: .58, autoAlpha: 1, duration: .32 }, .13)
+          .to(particles, { autoAlpha: .8, scale: 1, stagger: .015, duration: .25 }, .22)
+          .to([copies[0]], { autoAlpha: 0, y: -24, duration: .12 }, .31)
+          .to([copies[1]], { autoAlpha: 1, y: 0, duration: .15 }, .37)
+          .to(camera, { x: -185, scale: .82, duration: .48 }, .36)
+          .to(waveform, { scaleX: 1, x: 18, duration: .45 }, .4)
+          .to(record, { x: 170, scale: .88, autoAlpha: 1, duration: .36 }, .48)
+          .to(machine, { rotateX: 1.2, y: 8, duration: .25 }, .55)
+          .to([copies[1]], { autoAlpha: 0, y: -24, duration: .12 }, .69)
+          .to([copies[2]], { autoAlpha: 1, y: 0, duration: .15 }, .75)
+          .to(camera, { x: -230, scale: .73, duration: .25 }, .76)
+          .to(record, { x: 215, scale: 1, duration: .25 }, .76)
+          .to(machine, { rotateX: 0, y: 0, duration: .2 }, .82);
+      }, story);
+      return () => context.revert();
+    });
+    return () => media.revert();
+  }, []);
+
+  return <section className="v12-signal-story" ref={storyRef} aria-label="How the Ventricura signal moves through a consultation">
+    <div className="v12-signal-sticky">
+      <div className="v12-signal-heading"><span>02 / SIGNAL PATH</span><span>{`${signalSteps[activeStep][0]} / 03`}</span></div>
+      <div className="v12-signal-machine">
+        <div className="v12-machine-grid" aria-hidden="true" /><div className="v12-machine-topline"><span>VENTRICURA / SIGNAL SESSION</span><b>LIVE</b></div>
+        <div className="v12-camera-card"><span>CAMERA</span><div className="v12-face"><i /><i /><b /></div><small>FACE TRACKED</small></div>
+        <div className="v12-signal-particles" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} />)}</div>
+        <svg className="v12-waveform" viewBox="0 0 620 190" aria-hidden="true"><path d="M0 102h58l30-25 35 53 58-103 58 143 58-70 57 5 35-27 35 58 51-98 54 104 42-40h68" /></svg>
+        <div className="v12-record-card"><span>SESSION RECORD</span><strong>74 <em>BPM</em></strong><i /><i /><i /><small>REVIEW READY</small></div>
+        <div className="v12-machine-footer"><span>INPUT</span><span>OPTICAL SIGNAL</span><span>CLINICIAN VIEW</span></div>
+      </div>
+      <div className="v12-signal-copy">{signalSteps.map(([number, title, text]) => <article key={number}><span>{number} / 03</span><h2>{title}</h2><p>{text}</p></article>)}</div>
+      <div className="v12-signal-progress" aria-hidden="true"><i className={activeStep >= 0 ? 'active' : ''} /><i className={activeStep >= 1 ? 'active' : ''} /><i className={activeStep >= 2 ? 'active' : ''} /></div>
+    </div>
   </section>;
 }
 
