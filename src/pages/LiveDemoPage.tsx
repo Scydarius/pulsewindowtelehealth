@@ -63,7 +63,7 @@ export function LiveDemoPage() {
     intervalRef.current = null; sessionTimerRef.current = null; displayTimerRef.current = null; socketRef.current?.close(); socketRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop()); streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
-    finishedRef.current = true; measurementStartedRef.current = null; setSeconds(50); setStage('complete'); setStatus('Session complete — your camera has been turned off.');
+    finishedRef.current = true; measurementStartedRef.current = null; setSeconds(30); setStage('complete'); setStatus('30-second reading complete — your camera has been turned off.');
     if (latestSessionBpmRef.current !== null || latestSessionBrpmRef.current !== null) {
       setReading((prev) => ({
         ...prev,
@@ -134,11 +134,12 @@ export function LiveDemoPage() {
 
     if (!isCalibrated) {
       setStage('calibrating');
-      const secondsLeft = Math.max(0, 50 - seconds);
       setStatus(
         motionDetected
-          ? `Movement detected (${secondsLeft}s left) — hold still while baseline settles.`
-          : `Calibrating your signal (${secondsLeft}s remaining) — keep still & breathe naturally.`
+          ? 'Movement detected — hold still while the signal settles.'
+          : calibRemaining > 0
+          ? `Calibrating your signal (${Math.ceil(calibRemaining)}s remaining) — keep still & breathe naturally.`
+          : 'Calibrating your signal — keep still & breathe naturally.'
       );
       return;
     }
@@ -146,15 +147,20 @@ export function LiveDemoPage() {
     if (!measurementStartedRef.current) {
       measurementStartedRef.current = Date.now();
       sessionTimerRef.current = window.setTimeout(finishSession, 30_000);
+      displayTimerRef.current = window.setInterval(() => {
+        const startedAt = measurementStartedRef.current;
+        if (startedAt) setSeconds(Math.min(30, Math.floor((Date.now() - startedAt) / 1000)));
+      }, 250);
     }
+    const captureElapsed = measurementStartedRef.current ? Math.floor((Date.now() - measurementStartedRef.current) / 1000) : 0;
     setStage('measuring');
-    setStatus(`Live signal connected — completing the reading (${Math.max(0, 50 - seconds)}s remaining).`);
-  }, [finishSession, seconds]);
+    setStatus(`Live signal connected — completing the 30-second reading (${Math.max(0, 30 - captureElapsed)}s remaining).`);
+  }, [finishSession]);
 
   const start = async () => {
     if (!navigator.mediaDevices?.getUserMedia) { setStage('error'); setStatus('This browser does not provide camera access.'); return; }
     try {
-      finishedRef.current = false; latestSessionBpmRef.current = null; latestSessionBrpmRef.current = null; measurementStartedRef.current = null; setStage('permission'); setStatus('This guided reading takes about 50 seconds. Approve camera access to begin.'); setReading(emptyReading); setSeconds(0);
+      finishedRef.current = false; latestSessionBpmRef.current = null; latestSessionBrpmRef.current = null; measurementStartedRef.current = null; setStage('permission'); setStatus('This starts a 30-second reading once your signal is ready. Approve camera access to begin.'); setReading(emptyReading); setSeconds(0);
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false });
       streamRef.current = stream; if (!videoRef.current) throw new Error('Camera preview is unavailable.'); videoRef.current.srcObject = stream; await videoRef.current.play();
       setStage('connecting'); setStatus('Opening a short-lived, secure signal session…');
@@ -162,23 +168,23 @@ export function LiveDemoPage() {
       const ticket = await response.json().catch(() => ({})) as { websocketUrl?: string; error?: string };
       if (!response.ok || !ticket.websocketUrl) throw new Error(ticket.error ?? 'The live demo is not configured.');
       const socket = new WebSocket(ticket.websocketUrl); socketRef.current = socket;
-      socket.addEventListener('message', (event) => { try { const data = JSON.parse(event.data) as Record<string, unknown>; if (data.type === 'ready') { measurementStartedRef.current = Date.now(); displayTimerRef.current = window.setInterval(() => setSeconds(Math.min(50, Math.round((Date.now() - (measurementStartedRef.current ?? Date.now())) / 1000))), 500); setStage('positioning'); setStatus('Camera connected — position your face in the guide. Your 50-second reading has started.'); intervalRef.current = window.setInterval(transmit, 1000 / 30); } else if (data.type === 'telemetry') receive(data); else if (data.type === 'error') { stop(String(data.message ?? 'The live signal session could not start.')); setStage('error'); } } catch { /* Ignore non-telemetry socket data. */ } });
+      socket.addEventListener('message', (event) => { try { const data = JSON.parse(event.data) as Record<string, unknown>; if (data.type === 'ready') { setStage('positioning'); setStatus('Camera connected — position your face in the guide. The 30-second reading will begin once your signal is ready.'); intervalRef.current = window.setInterval(transmit, 1000 / 30); } else if (data.type === 'telemetry') receive(data); else if (data.type === 'error') { stop(String(data.message ?? 'The live signal session could not start.')); setStage('error'); } } catch { /* Ignore non-telemetry socket data. */ } });
       socket.addEventListener('error', () => { stop('The live signal service could not be opened.'); setStage('error'); });
     } catch (error) {
       streamRef.current?.getTracks().forEach((track) => track.stop()); streamRef.current = null; setStage('error');
       setStatus(error instanceof DOMException && error.name === 'NotAllowedError' ? 'Camera permission was blocked. Allow it in the address bar, then try again.' : error instanceof Error ? error.message : 'The camera could not start.');
     }
   };
-  const progress = Math.min(100, (seconds / 50) * 100); const waveform = chartPath(reading.waveform); const spectrum = chartPath(reading.spectrum);
+  const progress = Math.min(100, (seconds / 30) * 100); const waveform = chartPath(reading.waveform); const spectrum = chartPath(reading.spectrum);
   const stageLabel =
     stage === 'idle'
       ? 'OFF'
       : stage === 'permission' || stage === 'connecting'
       ? 'CONNECTING'
       : stage === 'calibrating'
-      ? `CALIBRATING (${Math.max(0, 50 - seconds)}s remaining)`
+      ? 'CALIBRATING SIGNAL'
       : stage === 'measuring'
-      ? 'LIVE MONITORING'
+      ? `READING (${Math.max(0, 30 - seconds)}s remaining)`
       : stage === 'complete'
       ? 'COMPLETE'
       : stage === 'error'
@@ -186,22 +192,22 @@ export function LiveDemoPage() {
       : 'POSITIONING';
 
   return <main className="ventricura-public demo-page-v2"><Seo title="Live rPPG demo | Ventricura" description="Try Ventricura’s contactless rPPG demo using a guided camera session." path="/demo" /><PublicHeader />
-    <section className="demo-intro"><div><p className="mono-kicker">VENTRICURA LIVE SIGNAL DEMO</p><h1>See the signal in motion.</h1><p>This public demo opens a short-lived session to the rPPG signal service. It is a technology demonstration, not a medical assessment.</p></div><div className={`demo-state state-${stage.toLowerCase()}`}><i /><span>{stageLabel}</span><strong>{status}</strong></div></section>
+    <section className="demo-intro"><div><p className="mono-kicker">VENTRICURA LIVE SIGNAL DEMO</p><h1>See the signal in motion.</h1><p>This public demo opens a short-lived session to the rPPG signal service. Once the signal is ready, it runs one 30-second capture.</p></div><div className={`demo-state state-${stage.toLowerCase()}`}><i /><span>{stageLabel}</span><strong>{status}</strong></div></section>
     <section className="demo-console">
       <div className="demo-camera-stage"><video ref={videoRef} autoPlay muted playsInline />{!running && <div className="demo-face-guide"><ScanFace /><strong>Position your face here</strong><span>Keep your forehead and cheeks inside the frame.</span></div>}{running && <div className="demo-live-overlay"><span className={reading.faceDetected ? 'face-found' : ''} /><small>{reading.faceDetected ? 'FACE TRACKED' : 'FINDING FACE'}</small></div>}<canvas ref={canvasRef} hidden /></div>
       <aside className="demo-sidepanel"><div className="demo-cta">{running ? <button type="button" onClick={() => stop()}><CircleStop size={17} /> End live demo</button> : <button type="button" onClick={() => void start()}><Play size={17} /> {stage === 'complete' ? 'Run another demo' : stage === 'error' ? 'Try again' : 'Start live demo'}</button>}<span><Camera size={14} /> Browser camera required</span></div>
         <div className="demo-progress">
           <div>
             <span>{reading.isCalibrated ? 'STABLE MONITORING' : 'CALIBRATING BASELINE'}</span>
-            <strong>{seconds}/50 s</strong>
+            <strong>{reading.isCalibrated || stage === 'complete' ? `${seconds}/30 s` : 'Waiting for signal'}</strong>
           </div>
           <i><b style={{ width: `${progress}%` }} /></i>
           <small>
             {stage === 'complete'
               ? 'Complete. The camera and live session are off.'
               : !reading.isCalibrated
-              ? 'Your full reading takes about 50 seconds. Keep still and breathe naturally.'
-              : 'Signal locked. Completing the same 50-second guided reading.'}
+              ? 'The timer begins only after the API confirms a stable signal. Keep still and breathe naturally.'
+              : 'Signal locked. Completing one 30-second guided reading.'}
           </small>
         </div>
         <div className="demo-readings">
