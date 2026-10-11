@@ -97,17 +97,21 @@ export function LandingPage() {
     <section className="v10-story" ref={storyRef} aria-label="A scrolling Ventricura workflow story">
       <div className="v10-story-sticky">
         <div className="v10-story-meta"><span>02 / THE FLOW</span><span>{`0${activeStory + 1} / 03`}</span></div>
-        <div className="v10-device" data-active-stage={activeStory}>
-          <div className="v10-device-bar"><span>VENTRICURA / SESSION</span><i>LIVE WORKFLOW</i></div>
-          <div className="v10-device-grid" aria-hidden="true" />
-          <div className="v10-screen v10-screen-invite"><span>SECURE LINK</span><strong>Patient access,<br />kept simple.</strong><div className="v10-link-line"><i />VENTRICURA.COM/JOIN/••••</div></div>
-          <div className="v10-screen v10-screen-consult"><span>LIVE CONSULTATION</span><strong>Everything in<br />the same room.</strong><svg viewBox="0 0 310 62" aria-hidden="true"><path d="M0 32H41l14-12 16 24L98 6l27 51 27-25h40l18-13 17 25 26-38 24 46 18-20h35" /></svg></div>
-          <div className="v10-screen v10-screen-record"><span>SESSION RECORD</span><strong>Ready for<br />what comes next.</strong><div className="v10-record-lines"><i /><i /><i /></div></div>
-          <div className="v10-device-status"><span><i />PATIENT LINK</span><span><i />VIDEO</span><span><i />RECORD</span></div>
+        <div className="v10-story-frame">
+          <div className="v10-device" data-active-stage={activeStory}>
+            <div className="v10-device-bar"><span>VENTRICURA / SESSION</span><i>LIVE WORKFLOW</i></div>
+            <div className="v10-device-grid" aria-hidden="true" />
+            <div className="v10-screen v10-screen-invite"><span>SECURE LINK</span><strong>Patient access,<br />kept simple.</strong><div className="v10-link-line"><i />VENTRICURA.COM/JOIN/••••</div></div>
+            <div className="v10-screen v10-screen-consult"><span>LIVE CONSULTATION</span><strong>Everything in<br />the same room.</strong><svg viewBox="0 0 310 62" aria-hidden="true"><path d="M0 32H41l14-12 16 24L98 6l27 51 27-25h40l18-13 17 25 26-38 24 46 18-20h35" /></svg></div>
+            <div className="v10-screen v10-screen-record"><span>SESSION RECORD</span><strong>Ready for<br />what comes next.</strong><div className="v10-record-lines"><i /><i /><i /></div></div>
+            <div className="v10-device-status"><span><i />PATIENT LINK</span><span><i />VIDEO</span><span><i />RECORD</span></div>
+          </div>
+          <div className="v10-story-copy">
+            {workflow.map(([number, title, description], index) => <article key={number} className={activeStory === index ? 'active' : ''}><span>{number} / 03</span><h2>{title}</h2><p>{description}</p><b>{index === 2 ? 'Record complete' : 'Scroll to continue'}</b></article>)}
+          </div>
         </div>
-        <div className="v10-story-caption"><h2>{workflow[activeStory][1]}</h2><p>{workflow[activeStory][2]}</p></div>
+        <div className="v10-story-progress" aria-hidden="true"><i className={activeStory >= 0 ? 'active' : ''} /><i className={activeStory >= 1 ? 'active' : ''} /><i className={activeStory >= 2 ? 'active' : ''} /></div>
       </div>
-      <div className="v10-story-steps">{workflow.map(([number, title, description], index) => <article key={number} data-story-step={index} className={activeStory === index ? 'active' : ''}><span>{number}</span><h3>{title}</h3><p>{description}</p><b>{activeStory === index ? 'Now showing' : 'Scroll to explore'}</b></article>)}</div>
     </section>
 
     <section className="v6-workspace">
