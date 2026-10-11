@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { organizationSchema, PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
@@ -22,12 +22,28 @@ const workflow = [
 export function LandingPage() {
   const clinicSlug = clinicSlugFromHost();
   const [clinicianSignedIn, setClinicianSignedIn] = useState(false);
+  const [activeStory, setActiveStory] = useState(0);
+  const storyRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!supabase) return;
     void supabase.auth.getSession().then(({ data: { session } }) => setClinicianSignedIn(Boolean(session)));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setClinicianSignedIn(Boolean(session)));
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const story = storyRef.current;
+    if (!story) return;
+    const steps = Array.from(story.querySelectorAll<HTMLElement>('[data-story-step]'));
+    const observer = new IntersectionObserver(
+      (entries) => entries.forEach((entry) => {
+        if (entry.isIntersecting) setActiveStory(Number((entry.target as HTMLElement).dataset.storyStep));
+      }),
+      { rootMargin: '-38% 0px -45% 0px', threshold: 0 },
+    );
+    steps.forEach((step) => observer.observe(step));
+    return () => observer.disconnect();
   }, []);
 
   if (clinicSlug) return <ClinicWebsitePage slug={clinicSlug} />;
@@ -58,9 +74,20 @@ export function LandingPage() {
 
     <section className="v6-manifesto"><p>Not another layer of telehealth.</p><h2>A single <em>clinical surface</em><br />for the whole conversation.</h2><span>01 / THE POINT</span></section>
 
-    <section className="v6-workflow" aria-label="The Ventricura workflow">
-      <header><p>THE FLOW</p><h2>The appointment is<br />a <em>throughline.</em></h2><span>02 / BEFORE → DURING → AFTER</span></header>
-      <div className="v6-flow-grid">{workflow.map(([number, title, description]) => <article key={number}><span>{number}</span><div className="v6-flow-node" /><h3>{title}</h3><p>{description}</p><b>→</b></article>)}</div>
+    <section className="v10-story" ref={storyRef} aria-label="A scrolling Ventricura workflow story">
+      <div className="v10-story-sticky">
+        <div className="v10-story-meta"><span>02 / THE FLOW</span><span>{`0${activeStory + 1} / 03`}</span></div>
+        <div className="v10-device" data-active-stage={activeStory}>
+          <div className="v10-device-bar"><span>VENTRICURA / SESSION</span><i>LIVE WORKFLOW</i></div>
+          <div className="v10-device-grid" aria-hidden="true" />
+          <div className="v10-screen v10-screen-invite"><span>SECURE LINK</span><strong>Patient access,<br />kept simple.</strong><div className="v10-link-line"><i />VENTRICURA.COM/JOIN/••••</div></div>
+          <div className="v10-screen v10-screen-consult"><span>LIVE CONSULTATION</span><strong>Everything in<br />the same room.</strong><svg viewBox="0 0 310 62" aria-hidden="true"><path d="M0 32H41l14-12 16 24L98 6l27 51 27-25h40l18-13 17 25 26-38 24 46 18-20h35" /></svg></div>
+          <div className="v10-screen v10-screen-record"><span>SESSION RECORD</span><strong>Ready for<br />what comes next.</strong><div className="v10-record-lines"><i /><i /><i /></div></div>
+          <div className="v10-device-status"><span><i />PATIENT LINK</span><span><i />VIDEO</span><span><i />RECORD</span></div>
+        </div>
+        <div className="v10-story-caption"><h2>{workflow[activeStory][1]}</h2><p>{workflow[activeStory][2]}</p></div>
+      </div>
+      <div className="v10-story-steps">{workflow.map(([number, title, description], index) => <article key={number} data-story-step={index} className={activeStory === index ? 'active' : ''}><span>{number}</span><h3>{title}</h3><p>{description}</p><b>{activeStory === index ? 'Now showing' : 'Scroll to explore'}</b></article>)}</div>
     </section>
 
     <section className="v6-workspace">
