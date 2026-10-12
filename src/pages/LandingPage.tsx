@@ -101,7 +101,6 @@ export function LandingPage() {
 
     <section className="v6-hero">
       <div className="v6-grid" aria-hidden="true" />
-      <div className="v6-hero-meta"><span>VENTRICURA / 01</span><span>CLINICAL TELEPRESENCE</span></div>
       <div className="v6-hero-copy">
         <p className="v6-kicker">Remote care should feel<br />closer, not smaller.</p>
         <h1>PATIENT CARE,<br />WITHOUT THE<br /><em>EXTRA SYSTEMS.</em></h1>

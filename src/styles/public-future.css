@@ -200,12 +200,79 @@ main.home-v6{background:#f4f4ef!important;color:#101010!important}.home-v6 .publ
   display: none !important;
   content: none !important;
 }
+/* Relaxed typography: open line-height and generous tracking for all bold titles and text */
+.ventricura-public h1,
+.ventricura-public h2,
+.ventricura-public h3,
+.ventricura-public h4,
+.ventricura-public strong,
+.ventricura-public b,
+.v6-hero h1,
+.v6-manifesto h2,
+.v6-workflow h2,
+.v6-workspace-title h2,
+.v6-demo h2,
+.v10-story-caption h2,
+.v10-story-steps h3,
+.v6-clinician-copy h1,
+.v12-technology-hero h1 {
+  letter-spacing: -0.015em !important;
+  word-spacing: 0.05em !important;
+}
+.ventricura-public h1,
+.v6-hero h1,
+.v6-clinician-copy h1,
+.v12-technology-hero h1 {
+  line-height: 0.98 !important;
+  margin-bottom: 24px !important;
+}
+.ventricura-public h2,
+.v6-manifesto h2,
+.v6-workflow h2,
+.v6-workspace-title h2,
+.v6-demo h2,
+.v10-story-caption h2 {
+  line-height: 1.05 !important;
+}
+.ventricura-public h3,
+.v10-story-steps h3 {
+  line-height: 1.15 !important;
+}
+.ventricura-public em,
+.v6-hero h1 em,
+.v6-manifesto h2 em,
+.v6-workflow h2 em,
+.v6-workspace h2 em {
+  letter-spacing: -0.01em !important;
+}
 .v6-hero {
-  grid-template-rows: auto 1fr !important;
-  padding: 28px 0 60px !important;
+  grid-template-rows: 1fr !important;
+  padding: 40px 0 60px !important;
+}
+.v6-hero-copy {
+  padding: 40px 0 40px !important;
+}
+.v6-hero-copy h1 {
+  font-size: clamp(3.8rem, 7.8vw, 8.8rem) !important;
+  line-height: 0.98 !important;
+  letter-spacing: -0.015em !important;
+  word-spacing: 0.06em !important;
+}
+.v6-kicker {
+  margin: 0 0 22px !important;
+  font-size: 0.76rem !important;
+  letter-spacing: 0.07em !important;
+  line-height: 1.55 !important;
+}
+.v6-intro {
+  margin: 28px 0 0 !important;
+  max-width: 460px !important;
+  font-size: 1.1rem !important;
+  line-height: 1.65 !important;
+  letter-spacing: 0.005em !important;
 }
 .v6-hero-meta {
-  margin-bottom: 24px !important;
+  display: none !important;
 }
 @media(max-width: 900px) {
   .ventricura-public .public-header,
