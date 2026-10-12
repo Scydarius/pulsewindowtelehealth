@@ -117,7 +117,7 @@ export function LandingPage() {
       </aside>
     </section>
 
-    <section className="v6-manifesto"><p>Not another layer of telehealth.</p><h2>A single <em>clinical surface</em><br />for the whole conversation.</h2></section>
+    <section className="v6-manifesto"><p>Not another layer of telehealth.</p><h2>A single <em>platform</em><br />for all telehealth needs.</h2></section>
 
     <section className="v10-story" ref={storyRef} aria-label="A scrolling Ventricura workflow story">
       <div className="v10-story-stage">
