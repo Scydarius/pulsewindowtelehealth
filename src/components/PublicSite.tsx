@@ -20,9 +20,7 @@ export function PublicHeader() {
   return (
     <header className="public-header">
       <Link to="/" className="public-brand" aria-label="Ventricura home">
-        <img className="public-brand-mark" src="/ventricura-mark.svg" alt="" />
-        <span className="public-brand-word">VENTRICURA</span>
-        <span className="public-brand-index">/ SYSTEM 01</span>
+        <img src="/ventricura-logo-centred.png" alt="Ventricura" />
       </Link>
       <nav className="desktop-public-nav" aria-label="Public navigation">
         <Link to="/technology">Technology</Link>
@@ -31,7 +29,6 @@ export function PublicHeader() {
         <Link to="/contact">Contact</Link>
         <Link to="/clinician/sign-in" className="header-access">Clinician access <ArrowRight size={15} /></Link>
       </nav>
-      <div className="public-header-status" aria-hidden="true"><span>SYSTEM ONLINE</span><span>AU / CLINICAL TELEPRESENCE</span><i /></div>
       <button
         type="button"
         className="public-mobile-toggle"
@@ -111,7 +108,7 @@ export function Seo({ title, description, path, jsonLd }: SeoProps) {
 
 export function PublicFooter() {
   return <footer className="public-footer public-footer-expanded">
-    <div><span className="public-footer-brand"><img className="public-brand-mark" src="/ventricura-mark.svg" alt="" /><span className="public-brand-word">VENTRICURA</span></span><span className="public-footer-strap">Contactless telehealth technology.</span></div>
+    <div><img src="/ventricura-logo-centred.png" alt="Ventricura" /><span className="public-footer-strap">Contactless telehealth technology.</span></div>
     <nav aria-label="Footer navigation"><Link to="/clinicians">For clinicians</Link><Link to="/technology">Technology</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/security">Security</Link></nav>
   </footer>;
 }
@@ -121,7 +118,7 @@ export const organizationSchema = {
   '@type': 'Organization',
   name: 'Ventricura',
   url: 'https://www.ventricura.com/',
-  logo: 'https://www.ventricura.com/ventricura-mark.svg',
+  logo: 'https://www.ventricura.com/ventricura-logo-centred.png',
   email: 'admin@ventricura.com',
   description: 'Contactless rPPG technology for telehealth and remote care.',
   contactPoint: [{ '@type': 'ContactPoint', contactType: 'business enquiries', email: 'admin@ventricura.com', url: 'https://www.ventricura.com/contact' }],
