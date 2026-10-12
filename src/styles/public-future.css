@@ -590,3 +590,69 @@ main.ventricura-public.home-v6,main.ventricura-public.clinicians-page,main.ventr
 
 /* Product frames replace the earlier abstract face and text-card stand-ins. */
 .v12-camera-card{grid-template-rows:auto 1fr auto;padding:13px;background:#111!important;box-shadow:0 12px 30px rgba(0,0,0,.24)}.v12-camera-card>span{position:static!important;align-self:start}.v12-camera-preview{position:relative;display:grid;place-items:center;min-height:116px;margin:16px 10px 10px;border:1px solid #3e3e3a;background:radial-gradient(circle at 50% 28%,#565652 0 2px,transparent 3px),linear-gradient(145deg,#2b2b29,#151515 72%);overflow:hidden}.v12-camera-preview:before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px);background-size:18px 18px}.v12-frame{position:absolute;z-index:2;width:18px;height:18px;border-color:#ecece7;border-style:solid}.v12-frame.top-left{top:9px;left:9px;border-width:1px 0 0 1px}.v12-frame.top-right{top:9px;right:9px;border-width:1px 1px 0 0}.v12-frame.bottom-left{bottom:9px;left:9px;border-width:0 0 1px 1px}.v12-frame.bottom-right{right:9px;bottom:9px;border-width:0 1px 1px 0}.v12-person{position:relative;z-index:1;width:56px;height:78px}.v12-person i{position:absolute;top:0;left:50%;width:33px;height:38px;border-radius:50% 50% 43% 43%;background:linear-gradient(110deg,#bab9b0,#6f706b);transform:translateX(-50%)}.v12-person b{position:absolute;bottom:0;left:50%;width:66px;height:44px;border-radius:38px 38px 5px 5px;background:linear-gradient(100deg,#60615c,#292a28);transform:translateX(-50%)}.v12-camera-preview em{position:absolute;z-index:1;right:0;bottom:29%;left:0;height:1px;background:#f4f4ef;box-shadow:0 0 10px rgba(255,255,255,.55);opacity:.75}.v12-camera-card>small{position:static!important;display:flex;align-items:center;gap:5px;align-self:end;color:#cacac4}.v12-camera-card>small b{width:5px;height:5px;border-radius:50%;background:#d7e8df;box-shadow:0 0 7px #d7e8df}.v12-record-card{grid-template-rows:auto auto auto auto auto 1fr auto!important;gap:7px;padding:14px!important;background:#f4f4ef!important}.v12-record-card>span{position:static!important;color:#74746f!important}.v12-record-patient{display:grid;grid-template-columns:24px 1fr;column-gap:7px;align-items:center;margin-top:3px}.v12-record-patient i{grid-row:1/3;display:grid!important;place-items:center!important;width:24px!important;height:24px!important;border-radius:50%!important;background:#1c1c1a!important;color:#fff!important;font-family:"IBM Plex Mono",monospace!important;font-size:.5rem!important;font-style:normal}.v12-record-patient b{font-family:"Manrope",sans-serif!important;font-size:.58rem;line-height:1}.v12-record-patient small{position:static!important;color:#787873!important;font-size:.44rem!important}.v12-record-card strong{margin:7px 0 0!important;font-size:2.1rem!important}.v12-record-card svg{display:block;width:100%;height:28px;fill:none}.v12-record-card svg path{stroke:#171717;stroke-width:1.8}.v12-record-card>i{width:100%!important;background:#bcbcb5!important}.v12-record-card>i:nth-of-type(2){width:74%!important}.v12-record-card>small{position:static!important;align-self:end;color:#20201e!important;font-size:.45rem!important}.v12-record-card>small:before{content:'●';margin-right:5px;color:#44443f}.v12-face{display:none}
+
+/* High-contrast, clean trust strip across all public pages: avoids black-on-black text */
+.ventricura-public .public-trust-strip,
+.technology-page .public-trust-strip,
+main.ventricura-public .public-trust-strip {
+  width: min(1440px, calc(100% - 72px)) !important;
+  margin: 64px auto !important;
+  padding: 32px 36px !important;
+  display: grid !important;
+  grid-template-columns: auto 1fr auto !important;
+  gap: 24px !important;
+  align-items: center !important;
+  background: #ffffff !important;
+  border: 1px solid #d5d5cf !important;
+  box-shadow: 12px 12px 0 #d0d0c9 !important;
+  color: #101010 !important;
+  box-sizing: border-box !important;
+}
+.ventricura-public .public-trust-strip strong,
+.technology-page .public-trust-strip strong,
+main.ventricura-public .public-trust-strip strong {
+  display: block !important;
+  color: #101010 !important;
+  font-size: 1.05rem !important;
+  font-weight: 750 !important;
+  letter-spacing: -0.02em !important;
+}
+.ventricura-public .public-trust-strip span,
+.technology-page .public-trust-strip span,
+main.ventricura-public .public-trust-strip span {
+  display: block !important;
+  margin-top: 6px !important;
+  color: #4a4a45 !important;
+  font-size: 0.92rem !important;
+  line-height: 1.55 !important;
+}
+.ventricura-public .public-trust-strip svg,
+.technology-page .public-trust-strip svg,
+main.ventricura-public .public-trust-strip svg {
+  color: #181816 !important;
+  width: 28px !important;
+  height: 28px !important;
+  flex-shrink: 0 !important;
+}
+@media (max-width: 900px) {
+  .ventricura-public .public-trust-strip,
+  .technology-page .public-trust-strip,
+  main.ventricura-public .public-trust-strip {
+    width: min(100% - 40px, 720px) !important;
+    padding: 24px 20px !important;
+    gap: 16px !important;
+  }
+}
+@media (max-width: 620px) {
+  .ventricura-public .public-trust-strip,
+  .technology-page .public-trust-strip,
+  main.ventricura-public .public-trust-strip {
+    width: calc(100% - 32px) !important;
+    grid-template-columns: 1fr !important;
+    padding: 22px 18px !important;
+  }
+  .ventricura-public .public-trust-strip svg:last-child,
+  .technology-page .public-trust-strip svg:last-child {
+    display: none !important;
+  }
+}
