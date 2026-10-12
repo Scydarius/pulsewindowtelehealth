@@ -101,7 +101,7 @@ export function LandingPage() {
 
     <section className="v6-hero">
       <div className="v6-grid" aria-hidden="true" />
-      <div className="v6-hero-meta"><span>VENTRICURA / 01</span><span>CLINICAL TELEPRESENCE</span><span>ADELAIDE, AU</span></div>
+      <div className="v6-hero-meta"><span>VENTRICURA / 01</span><span>CLINICAL TELEPRESENCE</span></div>
       <div className="v6-hero-copy">
         <p className="v6-kicker">Remote care should feel<br />closer, not smaller.</p>
         <h1>PATIENT CARE,<br />WITHOUT THE<br /><em>EXTRA SYSTEMS.</em></h1>
@@ -116,7 +116,6 @@ export function LandingPage() {
         </div>
         <div className="v6-module-data"><span><i />PATIENT LINK</span><span><i />VIDEO ROOM</span><span><i />RECORD READY</span></div>
       </aside>
-      <div className="v6-hero-bottom"><span>ONE LINK FOR THE PATIENT</span><span>ONE PROTECTED WORKSPACE FOR THE CLINIC</span><b>SCROLL TO ENTER ↓</b></div>
     </section>
 
     <section className="v6-manifesto"><p>Not another layer of telehealth.</p><h2>A single <em>clinical surface</em><br />for the whole conversation.</h2><span>01 / THE POINT</span></section>
