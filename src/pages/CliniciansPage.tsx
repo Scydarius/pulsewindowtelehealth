@@ -111,7 +111,7 @@ function LegacyClinicianFlow() {
   const ActiveIcon = steps[activeStep].icon;
   return <section className="v11-clinician-flow" ref={flowRef} aria-label="The Ventricura clinical workflow">
     <div className="v11-flow-sticky">
-      <div className="v11-flow-heading"><span>02 / CLINICAL FLOW</span><span>{`0${activeStep + 1} / 0${steps.length}`}</span></div>
+      <div className="v11-flow-heading"><span>CLINICAL FLOW</span><span>{`0${activeStep + 1} / 0${steps.length}`}</span></div>
       <div className="v11-flow-stage" data-active-stage={activeStep}>
         <div className="v11-flow-grid" aria-hidden="true" />
         <div className="v11-flow-topline"><span>VENTRICURA / CLINIC WORKSPACE</span><b>ACTIVE</b></div>
@@ -131,7 +131,7 @@ function LegacyClinicianFlow() {
 
 function ClinicianFlow() {
   return <section className="clinician-flow-public" aria-label="The Ventricura clinical workflow">
-    <header><div><p className="mono-kicker">02 / CLINICAL FLOW</p><h2>One appointment.<br />One secure flow.</h2></div><p>From an invitation to a saved record, the clinician stays in control without asking patients to create an account.</p></header>
+    <header><div><p className="mono-kicker">CLINICAL FLOW</p><h2>One appointment.<br />One secure flow.</h2></div><p>From an invitation to a saved record, the clinician stays in control without asking patients to create an account.</p></header>
     <div className="clinician-flow-track">{steps.map(({ icon: Icon, title, text }, index) => <article key={title}><div className="clinician-flow-number">0{index + 1}</div><Icon size={25} strokeWidth={1.6} /><h3>{title}</h3><p>{text}</p></article>)}</div>
   </section>;
 }
@@ -139,7 +139,7 @@ function ClinicianFlow() {
 export function CliniciansPage() {
   return <main className="ventricura-public clinicians-page"><Seo title="For clinicians | Ventricura" description="A clinician-controlled telehealth workflow with contactless rPPG signals and patient history." path="/clinicians" /><PublicHeader />
     <section className="v6-clinician-hero">
-      <div className="v6-clinician-copy"><p className="mono-kicker">CLINIC WORKSPACE / 02</p><h1>Keep the<br /><em>care moving.</em></h1><p>Appointments, video, patient history and private follow-up live in the same protected clinical workspace—without turning the patient experience into another app.</p><div className="public-actions"><Link to="/contact" className="dark-action">Book a pilot conversation <ArrowRight size={17} /></Link><Link to="/clinician/sign-in" className="quiet-action">Clinician sign in</Link></div></div>
+      <div className="v6-clinician-copy"><p className="mono-kicker">CLINIC WORKSPACE</p><h1>Keep the<br /><em>care moving.</em></h1><p>Appointments, video, patient history and private follow-up live in the same protected clinical workspace—without turning the patient experience into another app.</p><div className="public-actions"><Link to="/contact" className="dark-action">Book a pilot conversation <ArrowRight size={17} /></Link><Link to="/clinician/sign-in" className="quiet-action">Clinician sign in</Link></div></div>
       <aside className="v6-clinician-field" aria-label="Illustration of the clinician workspace"><header><span>VENTRICURA / CLINIC SYSTEM</span><b>NODE / READY</b></header><div className="v6-field-center"><i /><div><small>SESSION CONTEXT</small><strong>One record.<br />Every next step.</strong></div></div><div className="v6-field-columns"><span>INVITE<br /><b>Patient access</b></span><span>CONSULT<br /><b>Video & capture</b></span><span>CONTINUE<br /><b>Notes & review</b></span></div><footer><span>CLINICIAN CONTROLLED</span><span>PROTECTED ACCESS</span></footer></aside>
     </section>
     <ClinicianFlow />

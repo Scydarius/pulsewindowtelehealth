@@ -274,6 +274,11 @@ main.home-v6{background:#f4f4ef!important;color:#101010!important}.home-v6 .publ
 .v6-hero-meta {
   display: none !important;
 }
+.technology-page .technology-hero:after,
+.v12-technology-hero:after {
+  display: none !important;
+  content: none !important;
+}
 @media(max-width: 900px) {
   .ventricura-public .public-header,
   .home-v6 .public-header {

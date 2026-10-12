@@ -117,11 +117,10 @@ export function LandingPage() {
       </aside>
     </section>
 
-    <section className="v6-manifesto"><p>Not another layer of telehealth.</p><h2>A single <em>clinical surface</em><br />for the whole conversation.</h2><span>01 / THE POINT</span></section>
+    <section className="v6-manifesto"><p>Not another layer of telehealth.</p><h2>A single <em>clinical surface</em><br />for the whole conversation.</h2></section>
 
     <section className="v10-story" ref={storyRef} aria-label="A scrolling Ventricura workflow story">
       <div className="v10-story-stage">
-        <div className="v10-story-meta"><span>02 / THE FLOW</span><span>{`0${activeStory + 1} / 03`}</span></div>
         <div className="v10-story-frame">
           <div className="v10-device" data-active-stage={activeStory}>
             <div className="v10-device-bar"><span>VENTRICURA / SESSION</span><i>LIVE WORKFLOW</i></div>
@@ -132,7 +131,7 @@ export function LandingPage() {
             <div className="v10-device-status"><span><i />PATIENT LINK</span><span><i />VIDEO</span><span><i />RECORD</span></div>
           </div>
           <div className="v10-story-copy">
-            {workflow.map(([number, title, description], index) => <article key={number} className={activeStory === index ? 'active' : ''}><span>{number} / 03</span><h2>{title}</h2><p>{description}</p><b>{index === 2 ? 'Record complete' : 'Scroll to continue'}</b></article>)}
+            {workflow.map(([number, title, description], index) => <article key={number} className={activeStory === index ? 'active' : ''}><h2>{title}</h2><p>{description}</p><b>{index === 2 ? 'Record complete' : 'Scroll to continue'}</b></article>)}
           </div>
         </div>
         <div className="v10-story-progress" aria-hidden="true"><i className={activeStory >= 0 ? 'active' : ''} /><i className={activeStory >= 1 ? 'active' : ''} /><i className={activeStory >= 2 ? 'active' : ''} /></div>
@@ -140,7 +139,7 @@ export function LandingPage() {
     </section>
 
     <section className="v6-workspace">
-      <div className="v6-workspace-title"><span>03 / THE WORKSPACE</span><h2>Less switching.<br /><em>More attention.</em></h2><p>Appointments, patient history, consultation notes and session review are designed to sit together—rather than get lost across separate tools.</p></div>
+      <div className="v6-workspace-title"><h2>Less switching.<br /><em>More attention.</em></h2><p>Appointments, patient history, consultation notes and session review are designed to sit together—rather than get lost across separate tools.</p></div>
       <div className="v6-workspace-surface">
         <div className="v6-surface-bar"><span>VENTRICURA / CLINIC WORKSPACE</span><i>SECURE SESSION</i></div>
         <div className="v6-surface-main"><div><small>PATIENT HISTORY</small><strong>Every appointment.<br />One continuous record.</strong></div><ul><li><span>APPOINTMENT</span><b>Booking & access</b></li><li><span>CONSULTATION</span><b>Notes & video session</b></li><li><span>REVIEW</span><b>Waveform & PDF export</b></li></ul></div>
@@ -148,7 +147,7 @@ export function LandingPage() {
       </div>
     </section>
 
-    <section className="v6-demo"><span>LIVE CAPTURE / 04</span><h2>Your camera.<br /><em>The actual flow.</em></h2><p>The public demo uses the same live signal-processing pathway as Ventricura. Nothing from the demo is retained.</p><Link to="/demo">Try the live demo <ArrowRight size={20} /></Link></section>
+    <section className="v6-demo"><h2>Your camera.<br /><em>The actual flow.</em></h2><p>The public demo uses the same live signal-processing pathway as Ventricura. Nothing from the demo is retained.</p><Link to="/demo">Try the live demo <ArrowRight size={20} /></Link></section>
 
     <section className="v6-close"><span>Ventricura is for practices ready to try a more connected way to consult remotely.</span><Link to="/contact">Start a clinic conversation <ArrowRight size={22} /></Link></section>
     <PublicFooter />

@@ -55,7 +55,7 @@ function LegacySignalStory() {
 
   return <section className="v12-signal-story" ref={storyRef} aria-label="How the Ventricura signal moves through a consultation">
     <div className="v12-signal-sticky">
-      <div className="v12-signal-heading"><span>02 / SIGNAL PATH</span><span>{`${signalSteps[activeStep][0]} / 03`}</span></div>
+      <div className="v12-signal-heading"><span>SIGNAL PATH</span><span>{`${signalSteps[activeStep][0]} / 03`}</span></div>
       <div className="v12-signal-machine">
         <div className="v12-machine-grid" aria-hidden="true" />
         <div className="v12-machine-topline"><span>VENTRICURA / SIGNAL SESSION</span><b>LIVE</b></div>
@@ -138,7 +138,7 @@ function SignalStory() {
 
   return <section className="v12-signal-story" ref={storyRef} aria-label="How the Ventricura signal moves through a consultation">
     <div className="v12-signal-sticky">
-      <div className="v12-signal-heading"><span>02 / SIGNAL PATH</span><span>{`${signalSteps[activeStep][0]} / 03`}</span></div>
+      <div className="v12-signal-heading"><span>SIGNAL PATH</span><span>{`${signalSteps[activeStep][0]} / 03`}</span></div>
       <div className="v12-signal-machine">
         <div className="v12-machine-grid" aria-hidden="true" /><div className="v12-machine-topline"><span>VENTRICURA / SIGNAL SESSION</span><b>LIVE</b></div>
         <div className="v12-camera-card"><span>CAMERA / LIVE</span><div className="v12-camera-preview"><i className="v12-frame top-left" /><i className="v12-frame top-right" /><i className="v12-frame bottom-left" /><i className="v12-frame bottom-right" /><div className="v12-person"><i /><b /></div><em /></div><small><b /> FACE TRACKED</small></div>
@@ -157,7 +157,7 @@ export function TechnologyPage() {
   return <main className="ventricura-public technology-page"><Seo title="Contactless rPPG technology | Ventricura" description="How Ventricura connects guided camera checks, rPPG signals, and clinician review in a telehealth workflow." path="/technology" />
     <PublicHeader />
     <section className="v12-technology-hero">
-      <div><p className="mono-kicker">VENTRICURA SIGNAL SYSTEM / 01</p><h1>A clearer view,<br /><em>without another device.</em></h1><p>Ventricura connects a guided camera check, secure telehealth consultation, and clinician-facing signal context in one workflow.</p><div className="public-actions"><Link to="/demo" className="dark-action">Open live demo <ArrowRight size={17} /></Link><Link to="/clinician/sign-in" className="quiet-action">Clinician sign in</Link></div></div>
+      <div><p className="mono-kicker">VENTRICURA SIGNAL SYSTEM</p><h1>A clearer view,<br /><em>without another device.</em></h1><p>Ventricura connects a guided camera check, secure telehealth consultation, and clinician-facing signal context in one workflow.</p><div className="public-actions"><Link to="/demo" className="dark-action">Open live demo <ArrowRight size={17} /></Link><Link to="/clinician/sign-in" className="quiet-action">Clinician sign in</Link></div></div>
       <aside className="v12-hero-visual" aria-label="Illustration of an optical signal"><div className="v12-hero-orbit" /><div className="v12-hero-orbit orbit-two" /><div className="v12-hero-capture"><span>CAPTURE</span><i /><b>OPTICAL<br />INPUT</b></div><svg viewBox="0 0 380 90" aria-hidden="true"><path d="M0 46h47l20-15 20 31 36-56 41 76 42-35 40 3 30-18 25 35 34-54 29 43 37-30h51" /></svg><small>CAMERA → SIGNAL → CLINICIAN</small></aside>
     </section>
     <SignalStory />
