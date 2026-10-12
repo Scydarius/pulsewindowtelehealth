@@ -399,9 +399,9 @@ main.ventricura-public .public-footer {
   isolation: isolate !important;
   width: 100% !important;
   max-width: 100% !important;
-  min-height: 330px !important;
+  min-height: 380px !important;
   margin: 0 !important;
-  padding: 72px max(36px, calc((100vw - 1440px) / 2)) 36px !important;
+  padding: 44px max(36px, calc((100vw - 1440px) / 2)) 40px !important;
   box-sizing: border-box !important;
   border: 0 !important;
   border-top: 1px solid #292926 !important;
@@ -409,19 +409,42 @@ main.ventricura-public .public-footer {
   color: #f2f2ed !important;
   overflow: hidden !important;
 }
+.ventricura-public .public-footer:before,
+.home-v6 .public-footer:before,
+main.ventricura-public .public-footer:before {
+  content: 'VENTRICURA' !important;
+  position: absolute !important;
+  z-index: 0 !important;
+  right: -0.02em !important;
+  bottom: -0.06em !important;
+  color: transparent !important;
+  -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.13) !important;
+  text-stroke: 1.5px rgba(255, 255, 255, 0.13) !important;
+  font-family: Arial Black, Arial, sans-serif !important;
+  font-size: clamp(6.5rem, 18.5vw, 21rem) !important;
+  font-weight: 900 !important;
+  line-height: 0.8 !important;
+  letter-spacing: -0.09em !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
 .ventricura-public .public-footer > div,
 .home-v6 .public-footer > div {
+  position: relative !important;
+  z-index: 1 !important;
   width: 100% !important;
   max-width: 100% !important;
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
-  padding-bottom: 48px !important;
-  border-bottom: 1px solid #333330 !important;
+  padding-bottom: 36px !important;
+  border-bottom: 1px solid #2a2a27 !important;
   box-sizing: border-box !important;
 }
 .ventricura-public .public-footer-expanded nav,
 .home-v6 .public-footer-expanded nav {
+  position: relative !important;
+  z-index: 1 !important;
   display: flex !important;
   justify-content: flex-end !important;
   align-items: center !important;
