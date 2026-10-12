@@ -279,6 +279,77 @@ main.home-v6{background:#f4f4ef!important;color:#101010!important}.home-v6 .publ
   display: none !important;
   content: none !important;
 }
+/* Clean, readable closing banner */
+.ventricura-public .v6-close,
+.home-v6 .v6-close {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: auto !important;
+  margin: 0 !important;
+  padding: 120px max(36px, calc((100vw - 1440px) / 2)) !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 56px !important;
+  background: #f4f4ef !important;
+  color: #101010 !important;
+  border-top: 1px solid #d5d5d0 !important;
+}
+.ventricura-public .v6-close > span,
+.home-v6 .v6-close > span {
+  max-width: 760px !important;
+  font-size: clamp(2rem, 3.4vw, 3.6rem) !important;
+  font-weight: 650 !important;
+  line-height: 1.22 !important;
+  letter-spacing: -0.015em !important;
+  word-spacing: 0.04em !important;
+  color: #101010 !important;
+}
+.ventricura-public .v6-close a,
+.home-v6 .v6-close a {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 15px 28px !important;
+  background: #101010 !important;
+  color: #f4f4ef !important;
+  border: 1px solid #101010 !important;
+  border-radius: 4px !important;
+  font-size: 0.92rem !important;
+  font-weight: 650 !important;
+  letter-spacing: 0.01em !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+  transition: background 0.2s ease, border-color 0.2s ease !important;
+}
+.ventricura-public .v6-close a:hover,
+.home-v6 .v6-close a:hover {
+  background: #2a2a2a !important;
+  border-color: #2a2a2a !important;
+  color: #ffffff !important;
+}
+@media(max-width: 900px) {
+  .ventricura-public .v6-close,
+  .home-v6 .v6-close {
+    padding: 72px 24px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 32px !important;
+  }
+  .ventricura-public .v6-close > span,
+  .home-v6 .v6-close > span {
+    font-size: clamp(1.75rem, 5.5vw, 2.5rem) !important;
+    line-height: 1.25 !important;
+  }
+}
+@media(max-width: 620px) {
+  .ventricura-public .v6-close,
+  .home-v6 .v6-close {
+    padding: 56px 16px !important;
+  }
+}
 @media(max-width: 900px) {
   .ventricura-public .public-header,
   .home-v6 .public-header {
