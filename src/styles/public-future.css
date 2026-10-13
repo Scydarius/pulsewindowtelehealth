@@ -446,18 +446,34 @@ main.ventricura-public .public-footer:before {
   content: 'VENTRICURA' !important;
   position: absolute !important;
   z-index: 0 !important;
-  right: -0.02em !important;
+  left: max(36px, calc((100vw - 1440px) / 2)) !important;
+  right: auto !important;
   bottom: -0.06em !important;
   color: transparent !important;
   -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.13) !important;
   text-stroke: 1.5px rgba(255, 255, 255, 0.13) !important;
   font-family: Arial Black, Arial, sans-serif !important;
-  font-size: clamp(6.5rem, 18.5vw, 21rem) !important;
+  font-size: clamp(3.2rem, 12.2vw, 16.5rem) !important;
   font-weight: 900 !important;
   line-height: 0.8 !important;
-  letter-spacing: -0.09em !important;
+  letter-spacing: -0.08em !important;
+  white-space: nowrap !important;
   pointer-events: none !important;
   user-select: none !important;
+}
+@media(max-width: 900px) {
+  .ventricura-public .public-footer:before,
+  .home-v6 .public-footer:before,
+  main.ventricura-public .public-footer:before {
+    left: 24px !important;
+  }
+}
+@media(max-width: 620px) {
+  .ventricura-public .public-footer:before,
+  .home-v6 .public-footer:before,
+  main.ventricura-public .public-footer:before {
+    left: 16px !important;
+  }
 }
 .ventricura-public .public-footer > div,
 .home-v6 .public-footer > div {
