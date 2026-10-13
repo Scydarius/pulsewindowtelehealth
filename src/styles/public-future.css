@@ -784,3 +784,99 @@ main.ventricura-public .public-trust-strip svg {
     display: none !important;
   }
 }
+
+/* FAQ question and answer spacing: generous breathing room */
+.clinicians-page .faq-accordion,
+.ventricura-public .faq-accordion {
+  display: grid !important;
+  gap: 16px !important;
+  margin-top: 36px !important;
+}
+.clinicians-page .faq-item,
+.ventricura-public .faq-item {
+  border: 1px solid #bcbcb5 !important;
+  background: #f5f5f1 !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+.clinicians-page .faq-item.open,
+.ventricura-public .faq-item.open {
+  border-color: #1a1a18 !important;
+  box-shadow: 6px 6px 0 #d8d8d0 !important;
+}
+.clinicians-page .faq-question,
+.ventricura-public .faq-question {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 24px !important;
+  padding: 26px 32px !important;
+  border: 0 !important;
+  background: #f5f5f1 !important;
+  color: #171717 !important;
+  font-family: "Manrope", ui-sans-serif, -apple-system, sans-serif !important;
+  font-size: 1.05rem !important;
+  font-weight: 750 !important;
+  letter-spacing: -0.015em !important;
+  line-height: 1.35 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: background 0.2s ease, color 0.2s ease !important;
+}
+.clinicians-page .faq-question:hover,
+.ventricura-public .faq-question:hover {
+  background: #ebebe5 !important;
+}
+.clinicians-page .faq-item.open .faq-question,
+.ventricura-public .faq-item.open .faq-question {
+  padding-bottom: 22px !important;
+  border-bottom: 1px solid #dfdfd7 !important;
+}
+.clinicians-page .faq-answer,
+.ventricura-public .faq-answer {
+  padding: 28px 32px 32px !important;
+  background: #f5f5f1 !important;
+  border: 0 !important;
+  box-sizing: border-box !important;
+}
+.clinicians-page .faq-answer p,
+.ventricura-public .faq-answer p {
+  margin: 0 !important;
+  max-width: 960px !important;
+  color: #44443f !important;
+  font-family: "Manrope", ui-sans-serif, -apple-system, sans-serif !important;
+  font-size: 0.98rem !important;
+  line-height: 1.75 !important;
+}
+@media (max-width: 900px) {
+  .clinicians-page .faq-question,
+  .ventricura-public .faq-question {
+    padding: 22px 24px !important;
+    font-size: 0.98rem !important;
+  }
+  .clinicians-page .faq-item.open .faq-question,
+  .ventricura-public .faq-item.open .faq-question {
+    padding-bottom: 18px !important;
+  }
+  .clinicians-page .faq-answer,
+  .ventricura-public .faq-answer {
+    padding: 22px 24px 26px !important;
+  }
+}
+@media (max-width: 620px) {
+  .clinicians-page .faq-question,
+  .ventricura-public .faq-question {
+    padding: 18px 20px !important;
+    font-size: 0.92rem !important;
+  }
+  .clinicians-page .faq-item.open .faq-question,
+  .ventricura-public .faq-item.open .faq-question {
+    padding-bottom: 14px !important;
+  }
+  .clinicians-page .faq-answer,
+  .ventricura-public .faq-answer {
+    padding: 18px 20px 22px !important;
+  }
+}
