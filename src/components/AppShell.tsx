@@ -50,9 +50,7 @@ export function AppShell() {
               <LayoutDashboard size={18} /> Overview
             </Link>
             <Link to="/clinician?view=patients" className={workspaceNavClass('patients')}><UserRound size={18} /> Patients</Link>
-            <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments')}><CalendarDays size={18} /> Appointments</Link>
-            <Link to="/clinician?view=calendar" className={workspaceNavClass('calendar')}><CalendarDays size={18} /> Calendar</Link>
-            <Link to="/clinician?view=availability" className={workspaceNavClass('availability')}><CalendarDays size={18} /> Availability</Link>
+            <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments') || workspaceNavClass('calendar') || workspaceNavClass('availability')}><CalendarDays size={18} /> Schedule & Bookings</Link>
             <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}><Stethoscope size={18} /> Measurements</Link>
             <Link to="/clinician/profile" className={location.pathname === '/clinician/profile' ? 'active' : undefined}><UserRound size={18} /> My profile</Link>
             {isAdmin && <Link to="/admin" className={isAdminPage ? 'active' : undefined}><ShieldCheck size={18} /> Admin</Link>}
@@ -73,9 +71,7 @@ export function AppShell() {
         <nav className="clinician-mobile-nav" aria-label="Mobile workspace navigation">
           <Link to="/clinician" className={workspaceNavClass('overview')}>Overview</Link>
           <Link to="/clinician?view=patients" className={workspaceNavClass('patients')}>Patients</Link>
-          <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments')}>Appointments</Link>
-          <Link to="/clinician?view=calendar" className={workspaceNavClass('calendar')}>Calendar</Link>
-          <Link to="/clinician?view=availability" className={workspaceNavClass('availability')}>Availability</Link>
+          <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments') || workspaceNavClass('calendar') || workspaceNavClass('availability')}>Schedule</Link>
           <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}>Measurements</Link>
           <Link to="/clinician/profile" className={location.pathname === '/clinician/profile' ? 'active' : undefined}>Profile</Link>
           {isAdmin && <Link to="/admin" className={isAdminPage ? 'active' : undefined}>Admin</Link>}

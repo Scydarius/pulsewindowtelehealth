@@ -989,3 +989,63 @@ main.ventricura-public .public-trust-strip svg {
 .contact-page .contact-social-link:hover svg {
   transform: scale(1.1) !important;
 }
+
+/* Unified Clinician Schedule & Bookings navigation */
+.schedule-unified-container {
+  display: grid;
+  gap: 20px;
+}
+.schedule-tab-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #d7d7d0;
+  padding: 6px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.schedule-tab-nav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #555550;
+  font-family: "Manrope", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+.schedule-tab-nav button svg {
+  color: #777770;
+  transition: color 0.18s ease;
+}
+.schedule-tab-nav button:hover {
+  background: #f4f4ef;
+  color: #101010;
+}
+.schedule-tab-nav button.active {
+  background: #101010;
+  color: #ffffff;
+  border-color: #101010;
+}
+.schedule-tab-nav button.active svg {
+  color: #ffffff;
+}
+@media (max-width: 760px) {
+  .schedule-tab-nav {
+    width: 100%;
+    overflow-x: auto;
+    padding: 4px;
+    gap: 4px;
+  }
+  .schedule-tab-nav button {
+    padding: 8px 12px;
+    font-size: 0.76rem;
+  }
+}

@@ -21,9 +21,13 @@ const appointmentState = (appointment: ClinicAppointment, now = new Date()) => {
 };
 const shortDate = (value: Date) => new Intl.DateTimeFormat('en-AU', { weekday: 'short', day: 'numeric' }).format(value);
 
+type ScheduleSubTab = 'appointments' | 'calendar' | 'availability';
+
 export function ClinicianPage() {
-  const [params] = useSearchParams();
-  const view = workspaceView(params.get('view'));
+  const [params, setParams] = useSearchParams();
+  const rawView = params.get('view');
+  const view: WorkspaceView = rawView === 'patients' || rawView === 'measurements' ? rawView : rawView === 'calendar' || rawView === 'availability' || rawView === 'appointments' ? 'appointments' : 'overview';
+  const [scheduleTab, setScheduleTab] = useState<ScheduleSubTab>(() => rawView === 'calendar' ? 'calendar' : rawView === 'availability' ? 'availability' : 'appointments');
   const [profile, setProfile] = useState<ClinicianProfile>();
   const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
   const [error, setError] = useState('');
@@ -39,6 +43,19 @@ export function ClinicianPage() {
   const [claimingAccess, setClaimingAccess] = useState(false);
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
+
+  // Keep sub-tab in sync if URL query changes
+  useEffect(() => {
+    const v = params.get('view');
+    if (v === 'calendar') setScheduleTab('calendar');
+    else if (v === 'availability') setScheduleTab('availability');
+    else if (v === 'appointments') setScheduleTab('appointments');
+  }, [params]);
+
+  const selectScheduleTab = (tab: ScheduleSubTab) => {
+    setScheduleTab(tab);
+    setParams({ view: tab === 'appointments' ? 'appointments' : tab });
+  };
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -128,18 +145,52 @@ export function ClinicianPage() {
     </article>;
   };
   const commandAppointmentRow = (appointment: ClinicAppointment) => <article key={appointment.id} className="command-appointment command-appointment-with-access"><div className="command-time"><strong>{new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit' }).format(new Date(appointment.starts_at))}</strong><span>{shortDate(new Date(appointment.starts_at))}</span></div><div><strong>{appointment.patient?.display_name ?? 'Patient'}</strong><span>{reasonSummary(appointment.reason) || 'Consultation'}</span></div><span className={`appointment-state state-${appointmentState(appointment).toLowerCase().replaceAll(' ', '-')}`}>{appointmentState(appointment)}</span><div className="command-appointment-actions"><Link className="button button-primary button-small" to={`/consultation/${appointment.id}?role=clinician${appointment.patient?.display_name ? `&patientName=${encodeURIComponent(appointment.patient.display_name)}` : ''}${profile?.display_name ? `&clinicianName=${encodeURIComponent(profile.display_name)}` : ''}`}><Video size={15} /> Join</Link><label className="meeting-link-email-choice"><input type="checkbox" checked={emailReplacementLink[appointment.id] !== false} onChange={(event) => setEmailReplacementLink((current) => ({ ...current, [appointment.id]: event.target.checked }))} /> Email patient</label><button className="text-button command-regenerate-link" onClick={() => void createReplacementLink(appointment.id)} disabled={creatingLink === appointment.id}>{creatingLink === appointment.id ? <LoaderCircle className="spin" size={15} /> : <RotateCcw size={15} />}{replacementLinks[appointment.id] ? 'Regenerate again' : 'Regenerate link'}</button></div>{replacementLinks[appointment.id] && <div className="command-new-link"><span>{replacementEmailStatus[appointment.id]}</span><CopyButton text={replacementLinks[appointment.id]} label="Copy patient link" copiedLabel="Link copied" className="text-button" /></div>}</article>;
-  const title = view === 'patients' ? ['Patients', 'Active patients and their longitudinal records'] : view === 'appointments' ? ['Appointments', 'Schedule, call access, and secure links'] : view === 'measurements' ? ['Review queue', 'Readings received from patient sessions'] : view === 'availability' ? ['Booking availability', 'Publish a secure link so patients can choose from your available times.'] : view === 'calendar' ? ['Calendar', 'Your next seven days at a glance.'] : ['Today', 'Your appointments, follow-up work, and patient activity in one place.'];
+  const title = view === 'patients' ? ['Patients', 'Active patients and their longitudinal records'] : view === 'appointments' ? ['Schedule & Bookings', 'Manage appointments, seven-day calendar, and patient self-booking availability.'] : view === 'measurements' ? ['Review queue', 'Readings received from patient sessions'] : ['Today', 'Your appointments, follow-up work, and patient activity in one place.'];
 
   return <div className="dashboard-page">
-    <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search name, email, or reason" /></label></div></section>
-    <section className="summary-strip workspace-summary"><Link to="/clinician?view=appointments"><div><CalendarClock /></div><span><strong>{todayAppointments.length}</strong>Appointments today</span><ArrowRight size={16} /></Link><Link to="/clinician?view=patients"><div><UsersRound /></div><span><strong>{patientGroups.length}</strong>Active patients</span><ArrowRight size={16} /></Link><Link to="/clinician?view=measurements"><div><Activity /></div><span><strong>{reviewQueue.length}</strong>Needs review</span><ArrowRight size={16} /></Link><Link to="/clinician?view=calendar"><div><CalendarDays /></div><span><strong>Calendar</strong>Week at a glance</span><ArrowRight size={16} /></Link></section>
+    <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view === 'appointments' ? 'Schedule' : view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search name, email, or reason" /></label></div></section>
+    <section className="summary-strip workspace-summary">
+      <Link to="/clinician?view=appointments"><div><CalendarClock /></div><span><strong>{todayAppointments.length}</strong>Appointments today</span><ArrowRight size={16} /></Link>
+      <Link to="/clinician?view=patients"><div><UsersRound /></div><span><strong>{patientGroups.length}</strong>Active patients</span><ArrowRight size={16} /></Link>
+      <Link to="/clinician?view=measurements"><div><Activity /></div><span><strong>{reviewQueue.length}</strong>Needs review</span><ArrowRight size={16} /></Link>
+      <Link to="/clinician?view=calendar"><div><CalendarDays /></div><span><strong>{scheduled.length}</strong>Upcoming calls</span><ArrowRight size={16} /></Link>
+    </section>
 
-    {view === 'overview' && <><section className="command-centre"><div className="command-centre-main"><div className="section-heading"><div><p className="eyebrow">Today / schedule</p><h2>Your next appointments</h2><p>Join a call, check the patient record, or manage access without leaving this view.</p></div><Link className="text-button" to="/clinician?view=calendar">Open calendar <ArrowRight size={16} /></Link></div><div className="command-list">{scheduled.slice(0, 3).map(commandAppointmentRow)}{scheduled.length === 0 && <EmptyAppointments />}</div></div><aside className="command-centre-action"><p className="eyebrow">Quick action</p><h2>Create an appointment</h2><p>Add a new patient or schedule a follow-up for an existing patient.</p><InvitePatientForm patients={patientOptions} onCreated={() => void load()} /></aside></section><section className="panel review-queue-panel"><div className="section-heading"><div><p className="eyebrow">Review queue</p><h2>Patient readings ready</h2><p>Open the session record, review measurements, and document follow-up.</p></div><Link className="text-button" to="/clinician?view=measurements">View all <ArrowRight size={16} /></Link></div><MeasurementList appointments={reviewQueue.slice(0, 4)} /></section></>}
+    {view === 'overview' && <><section className="command-centre"><div className="command-centre-main"><div className="section-heading"><div><p className="eyebrow">Today / schedule</p><h2>Your next appointments</h2><p>Join a call, check the patient record, or manage access without leaving this view.</p></div><button className="text-button" onClick={() => selectScheduleTab('calendar')}>Open calendar <ArrowRight size={16} /></button></div><div className="command-list">{scheduled.slice(0, 3).map(commandAppointmentRow)}{scheduled.length === 0 && <EmptyAppointments />}</div></div><aside className="command-centre-action"><p className="eyebrow">Quick action</p><h2>Create an appointment</h2><p>Add a new patient or schedule a follow-up for an existing patient.</p><InvitePatientForm patients={patientOptions} onCreated={() => void load()} /></aside></section><section className="panel review-queue-panel"><div className="section-heading"><div><p className="eyebrow">Review queue</p><h2>Patient readings ready</h2><p>Open the session record, review measurements, and document follow-up.</p></div><Link className="text-button" to="/clinician?view=measurements">View all <ArrowRight size={16} /></Link></div><MeasurementList appointments={reviewQueue.slice(0, 4)} /></section></>}
     {view === 'patients' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Patient directory</p><h2>Active patients</h2><p>Every appointment for the same email is grouped under one patient card.</p></div><InvitePatientForm patients={patientOptions} onCreated={() => void load()} /></div><div className="patient-directory">{patientGroups.filter((group) => !search.trim() || [group.patient.display_name, group.patient.email].some((value) => value.toLowerCase().includes(search.trim().toLowerCase()))).map((group) => <article key={group.patient.email} className="patient-directory-card patient-directory-card-grouped"><div className="patient-avatar">{group.patient.display_name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><strong>{group.patient.display_name}</strong><span>{group.patient.email}</span><small>{group.records.length} appointment{group.records.length === 1 ? '' : 's'} · latest {new Date(group.records[0].starts_at).toLocaleDateString()}</small></div><Link className="button button-secondary button-small" to={`/clinician/patient?id=${encodeURIComponent(group.patient.id)}`}>Open profile <ArrowRight size={15} /></Link></article>)}{patientGroups.length === 0 && <EmptyAppointments />}</div></section>}
-    {view === 'appointments' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Schedule and access</p><h2>All appointments</h2><p>Join any appointment directly, then manage its secure patient link from the same record.</p></div><InvitePatientForm patients={patientOptions} onCreated={() => void load()} /></div><div className="appointment-table">{visibleAppointments.map(appointmentRow)}{visibleAppointments.length === 0 && <EmptyAppointments />}</div></section>}
+    {view === 'appointments' && <div className="schedule-unified-container">
+      <nav className="schedule-tab-nav" aria-label="Schedule views">
+        <button className={scheduleTab === 'appointments' ? 'active' : ''} onClick={() => selectScheduleTab('appointments')}>
+          <CalendarClock size={16} /> All appointments ({visibleAppointments.length})
+        </button>
+        <button className={scheduleTab === 'calendar' ? 'active' : ''} onClick={() => selectScheduleTab('calendar')}>
+          <CalendarDays size={16} /> 7-Day calendar
+        </button>
+        <button className={scheduleTab === 'availability' ? 'active' : ''} onClick={() => selectScheduleTab('availability')}>
+          <Activity size={16} /> Booking availability & sync
+        </button>
+      </nav>
+
+      {scheduleTab === 'appointments' && <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Schedule and access</p>
+            <h2>All appointments</h2>
+            <p>Join any appointment directly, then manage its secure patient link from the same record.</p>
+          </div>
+          <InvitePatientForm patients={patientOptions} onCreated={() => void load()} />
+        </div>
+        <div className="appointment-table">
+          {visibleAppointments.map(appointmentRow)}
+          {visibleAppointments.length === 0 && <EmptyAppointments />}
+        </div>
+      </section>}
+
+      {scheduleTab === 'calendar' && <CalendarWeek appointments={appointments} onEditAvailability={() => selectScheduleTab('availability')} />}
+
+      {scheduleTab === 'availability' && <ClinicianAvailabilityPanel />}
+    </div>}
     {view === 'measurements' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Measurement record</p><h2>Readings to review</h2><p>Open the patient call to review live signal context, saved data and private notes.</p></div></div><MeasurementList appointments={readingsToReview.filter(matchesPatient)} /></section>}
-    {view === 'calendar' && <CalendarWeek appointments={appointments} />}
-    {view === 'availability' && <ClinicianAvailabilityPanel />}
     {notice && <div className="workspace-toast"><CheckCircle2 size={17} /> {notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}{linkError && <p className="form-error">{linkError}</p>}
   </div>;
 }
@@ -150,7 +201,7 @@ function MeasurementList({ appointments }: { appointments: ClinicAppointment[] }
   return <div className="measurement-review-list">{appointments.map((appointment) => { const reading = appointment.latestMeasurement!; return <div className="review-card" key={appointment.id}><div className="patient-avatar alert">{(appointment.patient?.display_name ?? '?').split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div className="review-patient"><strong>{appointment.patient?.display_name ?? 'Patient'}</strong><span>Captured {new Date(reading.measured_at).toLocaleString()}</span></div><div className="review-reading-summary"><span><strong>{Math.round(reading.heart_rate_bpm)}</strong> BPM</span><span><strong>{Math.round(reading.respiratory_rate_bpm)}</strong> breaths/min</span><span><strong>{Math.round(reading.signal_quality)}%</strong> signal quality</span></div><span className="appointment-state state-ready-for-review">Ready</span><Link className="review-record-action" to={`/clinician/review?appointment=${encodeURIComponent(appointment.id)}&patient=${encodeURIComponent(appointment.patient?.id ?? '')}`}>Review <ArrowRight size={16} /></Link></div>; })}</div>;
 }
 
-function CalendarWeek({ appointments }: { appointments: ClinicAppointment[] }) {
+function CalendarWeek({ appointments, onEditAvailability }: { appointments: ClinicAppointment[]; onEditAvailability?: () => void }) {
   const days = Array.from({ length: 7 }, (_, offset) => { const day = new Date(); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() + offset); return day; });
-  return <section className="panel calendar-week-panel"><div className="section-heading"><div><p className="eyebrow">Next seven days</p><h2>Your schedule</h2><p>Select an appointment to open its patient record or join the consultation.</p></div><Link className="button button-secondary button-small" to="/clinician?view=availability">Edit availability</Link></div><div className="calendar-week-grid">{days.map((day) => { const entries = appointments.filter((appointment) => new Date(appointment.starts_at).toDateString() === day.toDateString()); return <section key={day.toISOString()} className="calendar-day"><header><span>{new Intl.DateTimeFormat('en-AU', { weekday: 'short' }).format(day)}</span><strong>{day.getDate()}</strong></header>{entries.length ? entries.map((appointment) => <Link key={appointment.id} to={`/clinician/patient?id=${encodeURIComponent(appointment.patient?.id ?? '')}`} className="calendar-entry"><time>{new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit' }).format(new Date(appointment.starts_at))}</time><strong>{appointment.patient?.display_name ?? 'Patient'}</strong><span>{reasonSummary(appointment.reason) || 'Consultation'}</span></Link>) : <span className="calendar-empty">No appointments</span>}</section>; })}</div></section>;
+  return <section className="panel calendar-week-panel"><div className="section-heading"><div><p className="eyebrow">Next seven days</p><h2>Your schedule</h2><p>Select an appointment to open its patient record or join the consultation.</p></div>{onEditAvailability ? <button type="button" className="button button-secondary button-small" onClick={onEditAvailability}>Edit availability</button> : <Link className="button button-secondary button-small" to="/clinician?view=availability">Edit availability</Link>}</div><div className="calendar-week-grid">{days.map((day) => { const entries = appointments.filter((appointment) => new Date(appointment.starts_at).toDateString() === day.toDateString()); return <section key={day.toISOString()} className="calendar-day"><header><span>{new Intl.DateTimeFormat('en-AU', { weekday: 'short' }).format(day)}</span><strong>{day.getDate()}</strong></header>{entries.length ? entries.map((appointment) => <Link key={appointment.id} to={`/clinician/patient?id=${encodeURIComponent(appointment.patient?.id ?? '')}`} className="calendar-entry"><time>{new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit' }).format(new Date(appointment.starts_at))}</time><strong>{appointment.patient?.display_name ?? 'Patient'}</strong><span>{reasonSummary(appointment.reason) || 'Consultation'}</span></Link>) : <span className="calendar-empty">No appointments</span>}</section>; })}</div></section>;
 }
