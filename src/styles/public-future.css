@@ -962,3 +962,30 @@ main.ventricura-public .public-trust-strip svg {
     padding: 20px 18px !important;
   }
 }
+
+/* Contact page social links */
+.contact-page .contact-social-link {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  color: #101010 !important;
+  font-family: "Manrope", sans-serif !important;
+  font-size: 0.84rem !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  padding: 8px 12px 8px 0 !important;
+  width: fit-content !important;
+  transition: color 0.2s ease, transform 0.2s ease !important;
+}
+.contact-page .contact-social-link svg {
+  color: #101010 !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.2s ease !important;
+}
+.contact-page .contact-social-link:hover {
+  color: #555550 !important;
+  transform: translateX(2px) !important;
+}
+.contact-page .contact-social-link:hover svg {
+  transform: scale(1.1) !important;
+}

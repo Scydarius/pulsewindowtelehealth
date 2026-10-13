@@ -109,7 +109,15 @@ export function Seo({ title, description, path, jsonLd }: SeoProps) {
 export function PublicFooter() {
   return <footer className="public-footer public-footer-expanded">
     <div><img src="/ventricura-logo-centred.png" alt="Ventricura" /><span className="public-footer-strap">Contactless telehealth technology.</span></div>
-    <nav aria-label="Footer navigation"><Link to="/clinicians">For clinicians</Link><Link to="/technology">Technology</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/security">Security</Link></nav>
+    <nav aria-label="Footer navigation">
+      <Link to="/clinicians">For clinicians</Link>
+      <Link to="/technology">Technology</Link>
+      <Link to="/contact">Contact</Link>
+      <Link to="/privacy">Privacy</Link>
+      <Link to="/terms">Terms</Link>
+      <Link to="/security">Security</Link>
+      <a href="https://instagram.com/ventricura" target="_blank" rel="noopener noreferrer">Instagram</a>
+    </nav>
   </footer>;
 }
 
@@ -122,4 +130,5 @@ export const organizationSchema = {
   email: 'admin@ventricura.com',
   description: 'Contactless rPPG technology for telehealth and remote care.',
   contactPoint: [{ '@type': 'ContactPoint', contactType: 'business enquiries', email: 'admin@ventricura.com', url: 'https://www.ventricura.com/contact' }],
+  sameAs: ['https://instagram.com/ventricura'],
 };
