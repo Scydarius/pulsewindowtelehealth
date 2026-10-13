@@ -28,8 +28,8 @@ const faqs = [
     a: 'Rather than outputting instantaneous raw frequency peaks that might jump during patient motion or noise, Ventricura stabilizes readings across a continuous 30-second rolling window weighted by signal quality and signal-to-noise ratio (SNR), providing dependable clinical-grade values.',
   },
   {
-    q: 'How does our clinic onboard for a clinical evaluation trial?',
-    a: 'Selected GP practices and telehealth clinics receive pre-configured clinician accounts, custom booking calendars, staff training walkthroughs, and direct engineering support throughout their trial. Contact our team to initiate a clinic pilot.',
+    q: 'How does our clinic onboard for a pilot?',
+    a: 'Selected GP practices and telehealth clinics receive pre-configured clinician accounts, custom booking calendars, staff training walkthroughs, and direct engineering support throughout their pilot. Contact our team to start a conversation.',
   },
 ];
 
@@ -44,7 +44,7 @@ function ClinicianFaq() {
     <section className="clinician-faq-section">
       <div className="section-caption">
         <p className="mono-kicker">FREQUENTLY ASKED QUESTIONS</p>
-        <h2>Clinical trial & pilot FAQ.</h2>
+        <h2>Clinic pilot FAQ.</h2>
         <p>Key information regarding hardware prerequisites, data privacy, and clinical integration.</p>
       </div>
       <div className="faq-accordion" role="region" aria-label="Frequently Asked Questions">
@@ -147,7 +147,7 @@ export function CliniciansPage() {
     <section className="clinician-pilot-cta">
       <div>
         <p className="mono-kicker">PILOT OPPORTUNITIES</p>
-        <h2>Trial contactless vitals in your clinic.</h2>
+        <h2>Explore contactless care in your clinic.</h2>
         <p>We are currently onboarding selected general practices, cardiology clinics, and remote telehealth providers for structured clinical pilots.</p>
       </div>
       <Link to="/contact" className="dark-action">
