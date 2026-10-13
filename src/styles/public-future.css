@@ -477,10 +477,12 @@ main.ventricura-public .public-footer:before {
   position: relative !important;
   z-index: 1 !important;
   display: flex !important;
-  justify-content: flex-end !important;
+  justify-content: flex-start !important;
   align-items: center !important;
-  gap: 28px !important;
-  margin-top: 24px !important;
+  flex-wrap: nowrap !important;
+  gap: 32px !important;
+  margin-top: 28px !important;
+  width: 100% !important;
 }
 .ventricura-public .public-footer-expanded nav a,
 .home-v6 .public-footer-expanded nav a {
@@ -490,6 +492,7 @@ main.ventricura-public .public-footer:before {
   font-weight: 600 !important;
   letter-spacing: 0.01em !important;
   text-decoration: none !important;
+  white-space: nowrap !important;
   transition: color 0.2s ease !important;
 }
 .ventricura-public .public-footer-expanded nav a:hover,
@@ -519,8 +522,15 @@ main.ventricura-public .public-footer:before {
   .ventricura-public .public-footer-expanded nav,
   .home-v6 .public-footer-expanded nav {
     justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+    gap: 24px !important;
+  }
+}
+@media(max-width: 680px) {
+  .ventricura-public .public-footer-expanded nav,
+  .home-v6 .public-footer-expanded nav {
     flex-wrap: wrap !important;
-    gap: 18px !important;
+    gap: 16px 20px !important;
   }
 }
 @media(max-width: 620px) {
