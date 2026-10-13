@@ -102,7 +102,7 @@ export function LandingPage() {
     <section className="v6-hero">
       <div className="v6-grid" aria-hidden="true" />
       <div className="v6-hero-copy">
-        <p className="v6-kicker">Remote care should feel<br />closer, not smaller.</p>
+        <p className="v6-kicker">Remote care should feel<br />enabling, not limiting.</p>
         <h1>PATIENT CARE,<br />WITHOUT THE<br /><em>EXTRA SYSTEMS.</em></h1>
         <p className="v6-intro">Ventricura is a clinician-led telehealth workspace for the parts of care that happen before, during and after a video call.</p>
         <div className="v6-actions"><Link to="/contact">Talk to our team <ArrowRight size={17} /></Link><Link to="/demo">Open live demo <ArrowRight size={17} /></Link></div>
