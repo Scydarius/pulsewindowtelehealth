@@ -18,6 +18,8 @@ export function AppShell() {
   const [signedInEmail, setSignedInEmail] = useState('');
   const [signingOut, setSigningOut] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const signOut = async () => {
     setSigningOut(true);
     await supabase?.auth.signOut({ scope: 'local' });
@@ -30,7 +32,22 @@ export function AppShell() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setEmail(session));
     return () => subscription.unsubscribe();
   }, []);
-  useEffect(() => { let active = true; if (!isClinician) return; void verifyClinicianAccess().then((clinician) => { if (active) setIsAdmin(clinician.isAdmin); }).catch(() => { if (active) setIsAdmin(false); }); return () => { active = false; }; }, [isClinician]);
+  useEffect(() => {
+    let active = true;
+    if (!isClinician) return;
+    void verifyClinicianAccess()
+      .then((clinician) => {
+        if (active) {
+          setIsAdmin(clinician.isAdmin);
+          if (clinician.photoUrl) setProfilePhoto(clinician.photoUrl);
+          if (clinician.displayName) setDisplayName(clinician.displayName);
+        }
+      })
+      .catch(() => {
+        if (active) setIsAdmin(false);
+      });
+    return () => { active = false; };
+  }, [isClinician]);
 
   return (
     <div className="app-shell">
@@ -52,17 +69,39 @@ export function AppShell() {
             <Link to="/clinician?view=patients" className={workspaceNavClass('patients')}><UserRound size={18} /> Patients</Link>
             <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments') || workspaceNavClass('calendar') || workspaceNavClass('availability')}><CalendarDays size={18} /> Schedule & Bookings</Link>
             <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}><Stethoscope size={18} /> Measurements</Link>
-            <Link to="/clinician/profile" className={location.pathname === '/clinician/profile' ? 'active' : undefined}><UserRound size={18} /> My profile</Link>
             {isAdmin && <Link to="/admin" className={isAdminPage ? 'active' : undefined}><ShieldCheck size={18} /> Admin</Link>}
           </nav>
         )}
 
         <div className="header-user">
-          <div className="avatar"><UserRound size={19} /></div>
-          <div className="header-user-copy">
-            <strong>{isAdminPage ? 'Administrator portal' : isClinician ? 'Clinician workspace' : 'Secure appointment'}</strong>
-            <span>{isClinician ? (signedInEmail || 'Restoring sign-in…') : 'Patient access'}</span>
-          </div>
+          {isClinician ? (
+            <Link
+              to="/clinician/profile"
+              className={`header-user-profile-link ${location.pathname === '/clinician/profile' ? 'active' : ''}`}
+              title="My profile"
+              aria-label="Clinician profile"
+            >
+              <div className="avatar">
+                {profilePhoto ? (
+                  <img src={profilePhoto} alt={displayName || 'Clinician profile'} className="avatar-img" />
+                ) : (
+                  <UserRound size={19} />
+                )}
+              </div>
+              <div className="header-user-copy">
+                <strong>{isAdminPage ? 'Administrator portal' : (displayName || 'Clinician workspace')}</strong>
+                <span>{signedInEmail || 'Restoring sign-in…'}</span>
+              </div>
+            </Link>
+          ) : (
+            <>
+              <div className="avatar"><UserRound size={19} /></div>
+              <div className="header-user-copy">
+                <strong>Secure appointment</strong>
+                <span>Patient access</span>
+              </div>
+            </>
+          )}
           {isClinician && <button className="header-sign-out" onClick={() => void signOut()} disabled={signingOut}><LogOut size={16} /> {signingOut ? 'Signing out…' : 'Sign out'}</button>}
         </div>
       </header>
@@ -73,7 +112,6 @@ export function AppShell() {
           <Link to="/clinician?view=patients" className={workspaceNavClass('patients')}>Patients</Link>
           <Link to="/clinician?view=appointments" className={workspaceNavClass('appointments') || workspaceNavClass('calendar') || workspaceNavClass('availability')}>Schedule</Link>
           <Link to="/clinician?view=measurements" className={workspaceNavClass('measurements')}>Measurements</Link>
-          <Link to="/clinician/profile" className={location.pathname === '/clinician/profile' ? 'active' : undefined}>Profile</Link>
           {isAdmin && <Link to="/admin" className={isAdminPage ? 'active' : undefined}>Admin</Link>}
         </nav>
       )}

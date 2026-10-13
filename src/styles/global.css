@@ -98,7 +98,11 @@ h1, h2, h3, p { margin-top: 0; }
 .primary-nav a { display: inline-flex; align-items: center; gap: 7px; padding: 10px 13px; color: var(--muted); border-radius: 10px; font-size: .86rem; font-weight: 700; }
 .primary-nav a:hover, .primary-nav a.active { color: var(--ink-strong); background: var(--surface-soft); }
 .header-user { justify-self: end; display: flex; align-items: center; gap: 10px; }
-.avatar { width: 38px; height: 38px; border-radius: 12px; background: var(--surface-soft); color: var(--accent); display: grid; place-items: center; }
+.header-user-profile-link { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; padding: 4px 8px; margin: -4px -8px; border-radius: 12px; transition: background 0.15s ease, opacity 0.15s ease; cursor: pointer; }
+.header-user-profile-link:hover { background: var(--surface-soft); }
+.header-user-profile-link:hover .avatar, .header-user-profile-link.active .avatar { outline: 2px solid var(--accent); outline-offset: 1px; }
+.avatar { width: 38px; height: 38px; border-radius: 12px; background: var(--surface-soft); color: var(--accent); display: grid; place-items: center; overflow: hidden; transition: outline 0.15s ease; }
+.avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
 .header-user-copy strong, .header-user-copy span { display: block; }
 .header-user-copy strong { font-size: .84rem; }
 .header-user-copy span { color: var(--muted); font-size: .72rem; margin-top: 2px; }

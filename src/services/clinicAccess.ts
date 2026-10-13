@@ -15,7 +15,7 @@ export async function getClinicianAccessToken() {
   return session.access_token;
 }
 
-export type ApprovedClinician = { id: string; displayName: string; isAdmin: boolean; isPlatformAdmin?: boolean; clinicId?: string | null };
+export type ApprovedClinician = { id: string; displayName: string; isAdmin: boolean; isPlatformAdmin?: boolean; clinicId?: string | null; photoUrl?: string | null };
 
 /** Confirm that an authenticated account is an administrator-approved clinician. */
 export async function verifyClinicianAccess(accessToken?: string): Promise<ApprovedClinician> {
