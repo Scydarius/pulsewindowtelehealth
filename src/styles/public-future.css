@@ -906,3 +906,59 @@ main.ventricura-public .public-trust-strip svg {
     padding: 18px 20px 22px !important;
   }
 }
+
+/* Demo disclosure: clean editorial card with clear distinction and strong typography */
+.demo-page-v2 .demo-security {
+  width: min(1440px, calc(100% - 72px)) !important;
+  margin: 64px auto !important;
+  padding: 28px 32px !important;
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+  gap: 20px !important;
+  align-items: flex-start !important;
+  background: #ffffff !important;
+  border: 1px solid #d5d5cf !important;
+  box-shadow: 10px 10px 0 #d8d8d0 !important;
+  color: #1a1a18 !important;
+  box-sizing: border-box !important;
+}
+.demo-page-v2 .demo-security > svg {
+  color: #1a1a18 !important;
+  width: 24px !important;
+  height: 24px !important;
+  margin-top: 2px !important;
+  flex-shrink: 0 !important;
+}
+.demo-security-copy {
+  display: grid !important;
+  gap: 6px !important;
+}
+.demo-security-copy strong {
+  display: block !important;
+  font-family: "Manrope", sans-serif !important;
+  font-size: 0.95rem !important;
+  font-weight: 750 !important;
+  letter-spacing: -0.01em !important;
+  color: #101010 !important;
+}
+.demo-security-copy span {
+  display: block !important;
+  font-family: "Manrope", sans-serif !important;
+  font-size: 0.88rem !important;
+  line-height: 1.6 !important;
+  color: #4f4f4a !important;
+}
+@media (max-width: 900px) {
+  .demo-page-v2 .demo-security {
+    width: min(100% - 40px, 720px) !important;
+    padding: 22px 20px !important;
+    gap: 16px !important;
+  }
+}
+@media (max-width: 620px) {
+  .demo-page-v2 .demo-security {
+    width: calc(100% - 32px) !important;
+    grid-template-columns: 1fr !important;
+    padding: 20px 18px !important;
+  }
+}

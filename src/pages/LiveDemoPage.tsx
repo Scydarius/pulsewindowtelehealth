@@ -1,4 +1,4 @@
-import { Camera, CircleStop, LoaderCircle, Play, ScanFace, ShieldCheck, Waves } from 'lucide-react';
+import { Camera, CircleStop, LoaderCircle, Play, ScanFace, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
 
@@ -224,7 +224,14 @@ export function LiveDemoPage() {
         </div><dl><div><dt>Tracking</dt><dd>{reading.state}</dd></div><div><dt>Signal quality</dt><dd>{Math.round(Math.max(0, reading.quality) * 100)}%</dd></div><div><dt>SNR</dt><dd>{reading.snr === null ? '—' : `${reading.snr.toFixed(1)} dB`}</dd></div><div><dt>Latency</dt><dd>{reading.latency === null ? '—' : `${Math.round(reading.latency)} ms`}</dd></div></dl></aside>
       <section className="demo-plots"><SignalPlot title="OPTICAL PLETHYSMOGRAM" unit="Normalised amplitude (a.u.)" path={waveform} status={reading.waveform.length ? 'Live trace' : 'Awaiting signal'} /><SignalPlot title="CARDIAC POWER SPECTRUM" unit="Normalised power" path={spectrum} status={reading.spectrum.length ? 'Live spectrum' : 'Awaiting signal'} tone="spectrum" /></section>
     </section>
-    <section className="demo-security"><ShieldCheck /><span>Camera frames are sent during this active session only. The browser receives a short-lived ticket; no permanent rPPG key is exposed here.</span><Waves /></section><PublicFooter />
+    <section className="demo-security">
+      <ShieldCheck />
+      <div className="demo-security-copy">
+        <strong>Technology disclosure & session privacy</strong>
+        <span>This browser demonstration runs a lightweight client-side evaluation build designed for live web testing—it does not represent the full fidelity, sensitivity, or diagnostic performance of Ventricura’s clinical rPPG model. Camera frames are processed strictly in-memory during this active session; no video is recorded, retained, or stored.</span>
+      </div>
+    </section>
+    <PublicFooter />
   </main>;
 }
 
