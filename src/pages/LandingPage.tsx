@@ -19,7 +19,7 @@ function clinicSlugFromHost() {
 
 const workflow = [
   ['01', 'A link with a purpose', 'Invite a patient directly or share a booking link. They join in a browser, with no patient account to manage.'],
-  ['02', 'A consultation with context', 'Bring video, an optional camera capture and the patient’s reason for visit into one focused session.'],
+  ['02', 'A consultation with context', 'Video consultation and contactless vitals on one screen—no separate devices or apps needed.'],
   ['03', 'A record that stays useful', 'Keep notes, measurements, appointments and an exportable summary together after the call ends.'],
 ];
 
