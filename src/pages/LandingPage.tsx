@@ -147,7 +147,11 @@ export function LandingPage() {
       </div>
     </section>
 
-    <section className="v6-demo"><h2>Your camera.<br /><em>The actual flow.</em></h2><p>The public demo uses the same live signal-processing pathway as Ventricura. Nothing from the demo is retained.</p><Link to="/demo">Try the live demo <ArrowRight size={20} /></Link></section>
+    <section className="v6-demo">
+      <h2>See contactless care<br /><em>in motion.</em></h2>
+      <p>Experience how browser-based optical capture measures vitals in real time—with zero external devices or downloads required.</p>
+      <Link to="/demo">Try the live demo <ArrowRight size={20} /></Link>
+    </section>
 
     <section className="v6-close"><span>Ventricura is for practices ready to try a more connected way to consult remotely.</span><Link to="/contact">Start a clinic conversation <ArrowRight size={22} /></Link></section>
     <PublicFooter />
