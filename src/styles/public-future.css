@@ -1056,3 +1056,609 @@ main.ventricura-public .public-trust-strip svg {
     font-size: 0.76rem;
   }
 }
+
+/* ==========================================================================
+   V10 - Realistic 3-Screen Consultation Walkthrough
+   ========================================================================== */
+
+.v10-step-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.v10-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid #c8c8c2;
+  background: #ffffff;
+  color: #555550;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.v10-tab-btn span {
+  opacity: 0.6;
+}
+.v10-tab-btn:hover {
+  background: #eaeae5;
+  color: #101010;
+  border-color: #101010;
+}
+.v10-tab-btn.active {
+  background: #101010;
+  color: #ffffff;
+  border-color: #101010;
+}
+.v10-tab-btn.active span {
+  color: #10b981;
+  opacity: 1;
+}
+
+.v10-pill-list {
+  list-style: none;
+  padding: 0;
+  margin: 22px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.v10-pill-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #383834;
+  letter-spacing: 0.03em;
+}
+.v10-pill-list li svg {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.v10-screen {
+  position: absolute;
+  inset: 52px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.v10-screen-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* Screen 1: Patient Invite */
+.v10-sms-card {
+  padding: 14px 16px;
+  border: 1px solid #333330;
+  background: #1c1c19;
+  border-radius: 4px;
+}
+.v10-sms-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #8c8c85;
+  letter-spacing: 0.06em;
+}
+.v10-sms-sender {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.v10-sms-sender svg {
+  color: #10b981;
+}
+.v10-sms-bubble p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: #e5e5df;
+}
+.v10-sms-link {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: #282824;
+  color: #10b981;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 2px;
+}
+
+.v10-browser-box {
+  padding: 14px 16px;
+  border: 1px solid #383834;
+  background: #141412;
+  border-radius: 4px;
+}
+.v10-browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #282824;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.64rem;
+  color: #a0a09a;
+}
+.v10-browser-url-text {
+  flex: 1;
+}
+.v10-secure-badge {
+  color: #10b981;
+  font-weight: 700;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 2px;
+}
+.v10-browser-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.v10-check-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: #1c1c19;
+  border-radius: 3px;
+  font-size: 0.74rem;
+  color: #d8d8d2;
+}
+.v10-check-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.v10-check-indicator svg {
+  color: #10b981;
+}
+.v10-status-chip {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #10b981;
+}
+.v10-join-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px;
+  background: #f4f4ef;
+  color: #101010;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+.v10-join-btn:hover {
+  background: #ffffff;
+}
+.v10-frictionless-footnote {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #72726b;
+  letter-spacing: 0.06em;
+}
+
+/* Screen 2: Consultation & Real-time Vitals */
+.v10-consult-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 0.9fr;
+  gap: 14px;
+  align-items: stretch;
+}
+.v10-tele-video {
+  padding: 12px;
+  border: 1px solid #333330;
+  background: #0f1011;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.v10-tele-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.v10-live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #10b981;
+}
+.v10-live-indicator i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: v10-pulse-dot 1.4s ease-in-out infinite;
+}
+.v10-tele-elapsed {
+  color: #777770;
+}
+.v10-patient-video-mock {
+  position: relative;
+  height: 125px;
+  background: #17191d;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.v10-face-silhouette {
+  position: relative;
+  width: 58px;
+  height: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 38% 38% 46% 46%;
+  background: rgba(255, 255, 255, 0.04);
+}
+.v10-roi-target {
+  position: absolute;
+  inset: 10px 6px 20px;
+  border: 1px dashed rgba(16, 185, 129, 0.85);
+  box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.2);
+}
+.v10-roi-tag {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.48rem;
+  font-weight: 800;
+  color: #10b981;
+  letter-spacing: 0.05em;
+  background: #0f1011;
+  padding: 1px 4px;
+}
+.v10-tele-waveform {
+  position: relative;
+  height: 38px;
+  margin: 8px 0;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 2px;
+}
+.v10-live-pulse-svg {
+  width: 100%;
+  height: 100%;
+}
+.v10-live-pulse-svg path {
+  fill: none;
+  stroke: #10b981;
+  stroke-width: 1.8;
+  stroke-dasharray: 600;
+  stroke-dashoffset: 0;
+  animation: v10-pulse-scroll 3s linear infinite;
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.5));
+}
+.v10-tele-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px solid #242528;
+}
+.v10-metric-cell {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+.v10-metric-cell small {
+  display: block;
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: #7d7d76;
+  letter-spacing: 0.06em;
+}
+.v10-metric-cell strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #f4f4ef;
+  line-height: 1.1;
+}
+.v10-metric-cell strong em {
+  font-size: 0.52rem;
+  font-style: normal;
+  color: #8c8c85;
+}
+.v10-highlight-metric {
+  color: #10b981 !important;
+}
+
+.v10-tele-notes {
+  padding: 12px;
+  border: 1px solid #333330;
+  background: #141412;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.v10-notes-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #282824;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #a5a59e;
+}
+.v10-sync-tag {
+  color: #10b981;
+  font-size: 0.52rem;
+}
+.v10-notes-content {
+  flex: 1;
+  padding: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.v10-note-line {
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #d0d0c8;
+}
+.v10-note-line b {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  color: #ffffff;
+  margin-right: 4px;
+}
+.v10-notes-averaging {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #1f1f1c;
+  border-radius: 2px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.56rem;
+  font-weight: 700;
+  color: #a5a59e;
+}
+.v10-averaging-pulse {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: v10-pulse-dot 1.5s infinite;
+}
+
+/* Screen 3: 1-Click EHR Export */
+.v10-record-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.v10-encounter-card {
+  padding: 12px 14px;
+  border: 1px solid #333330;
+  background: #161614;
+  border-radius: 4px;
+}
+.v10-enc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.v10-enc-kicker {
+  display: block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: #8c8c85;
+  letter-spacing: 0.08em;
+}
+.v10-enc-header h4 {
+  margin: 2px 0;
+  font-size: 0.88rem;
+  color: #f4f4ef;
+}
+.v10-enc-header small {
+  font-size: 0.68rem;
+  color: #8c8c85;
+}
+.v10-enc-badge {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.54rem;
+  font-weight: 800;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 3px 6px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.v10-enc-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #282824;
+}
+.v10-stat-box small {
+  display: block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.52rem;
+  color: #7d7d76;
+}
+.v10-stat-box b {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  color: #f4f4ef;
+}
+.v10-high-conf {
+  color: #10b981 !important;
+}
+
+.v10-record-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.v10-soap-copy-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid #f4f4ef;
+  background: #f4f4ef;
+  color: #101010;
+  font-family: "Manrope", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.v10-soap-copy-btn:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+.v10-soap-copy-btn.copied {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+.v10-pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid #3d3d38;
+  background: #181815;
+  color: #d0d0c8;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.v10-pdf-btn:hover {
+  border-color: #666660;
+  color: #ffffff;
+}
+
+.v10-ehr-preview {
+  border: 1px solid #2b2b28;
+  background: #10100e;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.v10-ehr-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: #191917;
+  border-bottom: 1px solid #2b2b28;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.54rem;
+  font-weight: 800;
+  color: #7e7e77;
+}
+.v10-copied-alert {
+  color: #10b981;
+  font-weight: 800;
+}
+.v10-ehr-snippet {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.62rem;
+  line-height: 1.45;
+  color: #a4a49c;
+  white-space: pre-wrap;
+}
+
+@keyframes v10-pulse-dot {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@keyframes v10-pulse-scroll {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -300; }
+}
+
+@media (max-width: 900px) {
+  .v10-story .v10-device {
+    height: auto !important;
+    min-height: 480px !important;
+  }
+  .v10-screen {
+    position: relative !important;
+    inset: auto !important;
+    padding: 24px 16px !important;
+    display: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
+  }
+  .v10-device[data-active-stage="0"] .v10-screen-invite,
+  .v10-device[data-active-stage="1"] .v10-screen-consult,
+  .v10-device[data-active-stage="2"] .v10-screen-record {
+    display: flex !important;
+  }
+  .v10-step-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .v10-tab-btn {
+    padding: 6px 10px;
+    font-size: 0.62rem;
+  }
+  .v10-consult-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
