@@ -61,6 +61,12 @@ type AdminPatient = {
 
 type Action = 'update' | 'reset_password';
 
+const canTogglePlatformAdmin = (email?: string | null) => {
+  if (!email) return false;
+  const lower = email.toLowerCase().trim();
+  return lower.includes('ramsay') || lower.includes('sid');
+};
+
 export function AdminCliniciansPage() {
   const [searchParams] = useSearchParams();
   const initialSlug = searchParams.get('newClinicSlug') ?? '';
@@ -73,6 +79,8 @@ export function AdminCliniciansPage() {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [allClinics, setAllClinics] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [, setIsClinicManager] = useState(false);
+  const [, setCurrentClinicId] = useState<string | null>(null);
   const [clinicians, setClinicians] = useState<Clinician[]>([]);
   const [patients, setPatients] = useState<AdminPatient[]>([]);
   const [message, setMessage] = useState('');
@@ -93,6 +101,7 @@ export function AdminCliniciansPage() {
         allClinics?: { id: string; name: string; slug: string }[];
         currentClinicId?: string | null;
         isPlatformAdmin?: boolean;
+        isClinicManager?: boolean;
         error?: string;
       };
       if (!response.ok) throw new Error(body.error ?? 'Unable to load clinicians.');
@@ -101,6 +110,8 @@ export function AdminCliniciansPage() {
       setClinics(body.clinics ?? []);
       setAllClinics(body.allClinics ?? []);
       setIsPlatformAdmin(body.isPlatformAdmin === true);
+      setIsClinicManager(body.isClinicManager === true || (!body.isPlatformAdmin && (body.clinicians?.some((c) => c.is_admin) ?? false)));
+      setCurrentClinicId(body.currentClinicId ?? null);
       setClinicId((current) => current || body.currentClinicId || body.allClinics?.[0]?.id || body.clinics?.[0]?.id || '');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to load clinicians.');
@@ -260,11 +271,16 @@ export function AdminCliniciansPage() {
 
       {/* Add clinician section */}
       <section className="admin-card">
-        <p className="eyebrow">Administrator portal</p>
-        <h1>Clinic administration</h1>
+        <p className="eyebrow">
+          {isPlatformAdmin ? 'Platform Administrator (Ramsay & Sid)' : 'Clinic Manager Portal'}
+        </p>
+        <h1>
+          {isPlatformAdmin ? 'Platform & Medical Centre Administration' : `${clinics[0]?.name || 'Clinic'} Administration`}
+        </h1>
         <p>
-          Manage clinician workspaces, account assignments, and patient records. Passwords are
-          never visible or set by administrators—send a secure reset link instead.
+          {isPlatformAdmin
+            ? 'Manage all medical centres, clinician assignments, and platform administrative permissions across Ventricura.'
+            : `Manage doctors, account profiles, and public website details for ${clinics[0]?.name || 'your medical centre'}.`}
         </p>
 
         <form onSubmit={(event) => void submit(event)} className="access-form admin-add-form">
@@ -287,21 +303,32 @@ export function AdminCliniciansPage() {
               required
             />
           </label>
-          {allClinics.length > 0 && (
+          {isPlatformAdmin ? (
+            allClinics.length > 0 && (
+              <label>
+                Assign to Clinic
+                <select
+                  value={clinicId}
+                  onChange={(event) => setClinicId(event.target.value)}
+                  required
+                >
+                  {allClinics.length > 1 && <option value="">Choose clinic</option>}
+                  {allClinics.map((clinic) => (
+                    <option key={clinic.id} value={clinic.id}>
+                      {clinic.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )
+          ) : (
             <label>
-              Assign to Clinic
-              <select
-                value={clinicId}
-                onChange={(event) => setClinicId(event.target.value)}
-                required
-              >
-                {allClinics.length > 1 && <option value="">Choose clinic</option>}
-                {allClinics.map((clinic) => (
-                  <option key={clinic.id} value={clinic.id}>
-                    {clinic.name}
-                  </option>
-                ))}
-              </select>
+              Assigned Clinic
+              <input
+                value={clinics[0]?.name || 'Assigned to your clinic'}
+                disabled
+                readOnly
+              />
             </label>
           )}
           <button className="button button-primary" disabled={saving}>
@@ -322,47 +349,49 @@ export function AdminCliniciansPage() {
       <section className="admin-card">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">{isPlatformAdmin ? 'Ventricura platform' : 'Clinic website'}</p>
-              <h2>{isPlatformAdmin ? 'Medical centres & websites' : 'Public clinic webpage & details'}</h2>
+              <p className="eyebrow">{isPlatformAdmin ? 'Ventricura Platform' : 'Clinic Website & Profile'}</p>
+              <h2>{isPlatformAdmin ? 'Medical centres & websites' : `${clinics[0]?.name || 'Clinic'} Public Webpage & Details`}</h2>
               <p>
                 {isPlatformAdmin
                   ? 'Create and manage every clinic on Ventricura. Each clinic receives a public web address and clinician booking directory.'
-                  : 'Manage what patients see on your clinic webpage at ventricura.com/clinicname: doctors, address, specialties, and contact info.'}
+                  : `Manage what patients see on your clinic webpage at ventricura.com/${clinics[0]?.slug || 'your-clinic'}: doctors, address, specialties, and contact info.`}
               </p>
             </div>
             <Building2 size={24} />
           </div>
 
-          <form
-            className="access-form admin-add-form clinic-create-form"
-            onSubmit={(event) => void createClinic(event)}
-          >
-            <label>
-              Clinic name
-              <input
-                value={clinicName}
-                onChange={(event) => setClinicName(event.target.value)}
-                placeholder="e.g. Grove Way Medical"
-                required
-              />
-            </label>
-            <label>
-              Public address label (URL slug)
-              <input
-                value={clinicSlug}
-                onChange={(event) => setClinicSlug(event.target.value)}
-                placeholder="e.g. groveway or grove-way-medical"
-              />
-            </label>
-            <div className="admin-managed-address">
-              <span>Managed Ventricura address</span>
-              <strong>ventricura.com/{clinicSlug || 'clinic-name'}</strong>
-              <small>Public website for your clinic and practitioners.</small>
-            </div>
-            <button className="button button-primary" disabled={saving}>
-              <Building2 size={18} /> Add medical centre
-            </button>
-          </form>
+          {isPlatformAdmin && (
+            <form
+              className="access-form admin-add-form clinic-create-form"
+              onSubmit={(event) => void createClinic(event)}
+            >
+              <label>
+                Clinic name
+                <input
+                  value={clinicName}
+                  onChange={(event) => setClinicName(event.target.value)}
+                  placeholder="e.g. Grove Way Medical"
+                  required
+                />
+              </label>
+              <label>
+                Public address label (URL slug)
+                <input
+                  value={clinicSlug}
+                  onChange={(event) => setClinicSlug(event.target.value)}
+                  placeholder="e.g. groveway or grove-way-medical"
+                />
+              </label>
+              <div className="admin-managed-address">
+                <span>Managed Ventricura address</span>
+                <strong>ventricura.com/{clinicSlug || 'clinic-name'}</strong>
+                <small>Public website for your clinic and practitioners.</small>
+              </div>
+              <button className="button button-primary" disabled={saving}>
+                <Building2 size={18} /> Add medical centre
+              </button>
+            </form>
+          )}
 
           <div className="clinic-site-list">
             {clinics.map((clinic) => {
@@ -594,11 +623,12 @@ export function AdminCliniciansPage() {
       <section className="admin-card clinician-roster">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Team & Practitioner Directory</p>
-            <h2>Doctors & Clinicians</h2>
+            <p className="eyebrow">{isPlatformAdmin ? 'Team & Practitioner Directory' : `${clinics[0]?.name || 'Clinic'} Team`}</p>
+            <h2>{isPlatformAdmin ? 'Doctors & Clinicians across Ventricura' : `Doctors & Clinicians at ${clinics[0]?.name || 'Your Clinic'}`}</h2>
             <p>
-              Assign clinicians to medical centres, manage doctor titles and bios displayed on the
-              public clinic website, and control administrative permissions.
+              {isPlatformAdmin
+                ? 'Assign clinicians to medical centres, manage doctor titles and bios displayed on public clinic websites, and control administrative permissions.'
+                : `Manage practitioner profiles, clinical bios, and grant clinic manager capabilities for ${clinics[0]?.name || 'your clinic'}.`}
             </p>
           </div>
           <span>
@@ -617,15 +647,27 @@ export function AdminCliniciansPage() {
                     <UserCog size={18} />
                   </div>
                   <div>
-                    <strong>{clinician.email || 'Account email unavailable'}</strong>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <strong>{clinician.email || 'Account email unavailable'}</strong>
+                      {clinician.is_platform_admin ? (
+                        <span className="role-badge role-badge-platform">
+                          <Building2 size={12} /> Platform Administrator
+                        </span>
+                      ) : clinician.is_admin ? (
+                        <span className="role-badge role-badge-manager">
+                          <ShieldCheck size={12} /> Clinic Manager
+                        </span>
+                      ) : (
+                        <span className="role-badge role-badge-doctor">
+                          <Stethoscope size={12} /> Doctor / Clinician
+                        </span>
+                      )}
+                    </div>
                     <span>
                       {clinician.clinic_name
                         ? `Assigned to ${clinician.clinic_name}`
                         : 'Unassigned clinic'}{' '}
-                      ·{' '}
-                      {clinician.is_platform_admin
-                        ? 'Platform Admin'
-                        : `Joined ${new Date(clinician.created_at).toLocaleDateString()}`}
+                      · Joined {new Date(clinician.created_at).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
@@ -655,19 +697,27 @@ export function AdminCliniciansPage() {
 
                   <label className="admin-field">
                     <span>Assigned Clinic</span>
-                    <select
-                      value={clinician.clinic_id ?? ''}
-                      onChange={(event) =>
-                        updateLocal(clinician.id, { clinic_id: event.target.value || null })
-                      }
-                    >
-                      <option value="">No clinic (unassigned)</option>
-                      {allClinics.map((clinic) => (
-                        <option key={clinic.id} value={clinic.id}>
-                          {clinic.name}
-                        </option>
-                      ))}
-                    </select>
+                    {isPlatformAdmin ? (
+                      <select
+                        value={clinician.clinic_id ?? ''}
+                        onChange={(event) =>
+                          updateLocal(clinician.id, { clinic_id: event.target.value || null })
+                        }
+                      >
+                        <option value="">No clinic (unassigned)</option>
+                        {allClinics.map((clinic) => (
+                          <option key={clinic.id} value={clinic.id}>
+                            {clinic.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={clinician.clinic_name || clinics[0]?.name || 'Assigned to your clinic'}
+                        disabled
+                        readOnly
+                      />
+                    )}
                   </label>
 
                   <label className="admin-field full-width">
@@ -693,14 +743,15 @@ export function AdminCliniciansPage() {
                       }
                     />
                     <span>
-                      <ShieldCheck size={16} /> Clinic administrator
+                      <ShieldCheck size={16} /> Clinic manager role
                     </span>
                   </label>
 
                   {isPlatformAdmin && (
-                    <label className="admin-toggle">
+                    <label className={`admin-toggle ${!canTogglePlatformAdmin(clinician.email) ? 'disabled-toggle' : ''}`}>
                       <input
                         type="checkbox"
+                        disabled={!canTogglePlatformAdmin(clinician.email)}
                         checked={clinician.is_platform_admin === true}
                         onChange={(event) =>
                           updateLocal(clinician.id, {
@@ -712,6 +763,9 @@ export function AdminCliniciansPage() {
                       <span>
                         <Building2 size={16} /> Platform administrator
                       </span>
+                      {!canTogglePlatformAdmin(clinician.email) && (
+                        <span className="admin-toggle-hint">(Ramsay & Sid only)</span>
+                      )}
                     </label>
                   )}
 

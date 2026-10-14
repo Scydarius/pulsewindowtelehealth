@@ -40,11 +40,23 @@ export async function requireClinician(request: Request) {
       // Ignore count errors if table or rls limits
     }
 
+    const isPlatformSuperAdminEmail = (email?: string | null) => {
+      if (!email) return false;
+      const normalized = email.toLowerCase().trim();
+      return (
+        normalized.includes('ramsay') ||
+        normalized.includes('sid') ||
+        normalized === 'ramsay@ventricura.com' ||
+        normalized === 'sid@ventricura.com'
+      );
+    };
+
     const isApprovedBootstrap = isFirstAccount
       || (initialEmails.length > 0 && initialEmails.includes(userEmail))
       || userEmail.endsWith('@ventricura.com')
       || userEmail.includes('admin')
-      || userEmail.includes('ramsay');
+      || userEmail.includes('ramsay')
+      || userEmail.includes('sid');
 
     if (isApprovedBootstrap && userEmail) {
       let { data: defaultClinic } = await db.from('clinics').select('id').order('created_at').limit(1).maybeSingle();
@@ -53,11 +65,12 @@ export async function requireClinician(request: Request) {
         defaultClinic = createdClinic;
       }
 
+      const isSuper = isPlatformSuperAdminEmail(userEmail);
       const newProfile = {
         id: userData.user.id,
         display_name: userData.user.user_metadata?.full_name?.trim() || userData.user.email?.split('@')[0] || 'Clinician',
         is_admin: true,
-        is_platform_admin: true,
+        is_platform_admin: isSuper,
         clinic_id: defaultClinic?.id ?? null,
       };
 

@@ -9,6 +9,17 @@ const originFor = (request: Request) => (process.env.APP_URL || new URL(request.
 const appUrl = (request: Request, path: string) => `${originFor(request)}${path}`;
 const slugify = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 63);
 
+const isPlatformSuperAdminEmail = (email?: string | null) => {
+  if (!email) return false;
+  const normalized = email.toLowerCase().trim();
+  return (
+    normalized.includes('ramsay') ||
+    normalized.includes('sid') ||
+    normalized === 'ramsay@ventricura.com' ||
+    normalized === 'sid@ventricura.com'
+  );
+};
+
 async function signedIn(request: Request) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, ''); if (!token) throw new Error('Sign in is required.');
   const db = database(); const { data, error } = await db.auth.getUser(token); if (error || !data.user) throw new Error('Your sign-in session is invalid.');
@@ -36,7 +47,8 @@ async function signedIn(request: Request) {
       || (initialEmails.length > 0 && initialEmails.includes(userEmail))
       || userEmail.endsWith('@ventricura.com')
       || userEmail.includes('admin')
-      || userEmail.includes('ramsay');
+      || userEmail.includes('ramsay')
+      || userEmail.includes('sid');
 
     if (isApprovedBootstrap && userEmail) {
       let { data: defaultClinic } = await db.from('clinics').select('id').order('created_at').limit(1).maybeSingle();
@@ -44,11 +56,12 @@ async function signedIn(request: Request) {
         const { data: createdClinic } = await db.from('clinics').insert({ name: 'Ventricura Telehealth', slug: 'ventricura' }).select('id').single();
         defaultClinic = createdClinic;
       }
+      const isSuper = isPlatformSuperAdminEmail(userEmail);
       const newProfile = {
         id: data.user.id,
         display_name: data.user.user_metadata?.full_name?.trim() || userEmail.split('@')[0],
         is_admin: true,
-        is_platform_admin: true,
+        is_platform_admin: isSuper,
         clinic_id: defaultClinic?.id ?? null,
       };
       const { data: created } = await db.from('clinician_profiles').upsert(newProfile, { onConflict: 'id' }).select('id, display_name, is_admin, is_platform_admin, clinic_id').single();
@@ -59,7 +72,14 @@ async function signedIn(request: Request) {
 }
 async function administrator(request: Request) { const access = await signedIn(request); if (!access.profile.is_admin && !access.profile.is_platform_admin) throw new Error('Administrator access is required to manage clinicians.'); return access; }
 async function userById(db: ReturnType<typeof database>, id: string) { const { data, error } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 }); if (error) throw new Error('Unable to load clinician accounts.'); return data.users.find((user) => user.id === id); }
-function canManage(actor: Profile, _target: Profile) { return Boolean(actor.is_platform_admin || actor.is_admin); }
+function canManage(actor: Profile, target: Profile) {
+  if (actor.is_platform_admin) return true;
+  if (actor.is_admin) {
+    // Clinic manager can only manage clinicians in their own clinic
+    return Boolean(actor.clinic_id && target.clinic_id === actor.clinic_id);
+  }
+  return false;
+}
 
 async function handle(request: Request) {
   try {
@@ -84,7 +104,8 @@ async function handle(request: Request) {
         || allowedEmails.includes(user.email.toLowerCase())
         || user.email.toLowerCase().endsWith('@ventricura.com')
         || user.email.toLowerCase().includes('admin')
-        || user.email.toLowerCase().includes('ramsay');
+        || user.email.toLowerCase().includes('ramsay')
+        || user.email.toLowerCase().includes('sid');
 
       if (!isAllowed) throw new Error('This signed-in email is not approved for administrator setup.');
 
@@ -94,11 +115,12 @@ async function handle(request: Request) {
         defaultClinic = createdClinic;
       }
 
+      const isSuper = isPlatformSuperAdminEmail(user.email);
       const { error: profileError } = await db.from('clinician_profiles').upsert({
         id: user.id,
         display_name: user.user_metadata?.full_name?.trim() || user.email.split('@')[0],
         is_admin: true,
-        is_platform_admin: true,
+        is_platform_admin: isSuper,
         clinic_id: defaultClinic?.id ?? null,
       }, { onConflict: 'id' });
 
@@ -112,24 +134,46 @@ async function handle(request: Request) {
     }
     if (request.method === 'GET') {
       const { db, profile } = await administrator(request);
+      const isSuperAdmin = Boolean(profile.is_platform_admin);
+
+      if (!profile.clinic_id && !isSuperAdmin) {
+        const { data: defaultClinic } = await db.from('clinics').select('id').order('created_at').limit(1).maybeSingle();
+        if (defaultClinic) {
+          profile.clinic_id = defaultClinic.id;
+          await db.from('clinician_profiles').update({ clinic_id: defaultClinic.id }).eq('id', profile.id);
+        }
+      }
+
       let clinicQuery = db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled, created_at').order('name');
+      let allClinicsQuery = db.from('clinics').select('id, name, slug').order('name');
+      let profileQuery = db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id, professional_title, about_me, photo_url, created_at').order('created_at');
+
+      if (!isSuperAdmin && profile.clinic_id) {
+        clinicQuery = clinicQuery.eq('id', profile.clinic_id);
+        allClinicsQuery = allClinicsQuery.eq('id', profile.clinic_id);
+        profileQuery = profileQuery.eq('clinic_id', profile.clinic_id);
+      }
 
       let [profileResult, userResult, patientResult, appointmentResult, clinicResult, allClinicsResult, bookingResult] = await Promise.all([
-        db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id, professional_title, about_me, photo_url, created_at').order('created_at'),
+        profileQuery,
         db.auth.admin.listUsers({ page: 1, perPage: 1000 }),
         db.from('patients').select('id, display_name, email, clinician_id, created_at').order('created_at', { ascending: false }),
         db.from('appointments').select('id, patient_id, starts_at'),
         clinicQuery,
-        db.from('clinics').select('id, name, slug').order('name'),
+        allClinicsQuery,
         db.from('clinician_booking_profiles').select('clinician_id, booking_token, booking_enabled'),
       ]);
 
       if (profileResult.error && profileResult.error.message?.includes('column')) {
-        profileResult = await db.from('clinician_profiles').select('id, display_name, is_admin, clinic_id, created_at').order('created_at');
+        let fallbackQuery = db.from('clinician_profiles').select('id, display_name, is_admin, clinic_id, created_at').order('created_at');
+        if (!isSuperAdmin && profile.clinic_id) fallbackQuery = fallbackQuery.eq('clinic_id', profile.clinic_id);
+        profileResult = await fallbackQuery;
       }
 
       if (clinicResult.error && clinicResult.error.message?.includes('column')) {
-        clinicResult = await db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name');
+        let fallbackClinicQuery = db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name');
+        if (!isSuperAdmin && profile.clinic_id) fallbackClinicQuery = fallbackClinicQuery.eq('id', profile.clinic_id);
+        clinicResult = await fallbackClinicQuery;
       }
 
       if (!clinicResult.error && (!clinicResult.data || clinicResult.data.length === 0)) {
@@ -161,6 +205,7 @@ async function handle(request: Request) {
 
       return Response.json({
         isPlatformAdmin: Boolean(profile.is_platform_admin),
+        isClinicManager: Boolean(profile.is_admin && !profile.is_platform_admin),
         currentClinicId: profile.clinic_id ?? null,
         clinics: clinicResult.data ?? [],
         allClinics: allClinicsResult.data ?? [],
@@ -192,10 +237,11 @@ async function handle(request: Request) {
     }
     if (request.method === 'POST') {
       const { db, profile } = await administrator(request);
+      const isSuperAdmin = Boolean(profile.is_platform_admin);
       const body = await request.json() as { email?: string; displayName?: string; clinicId?: string };
       if (!body.email?.trim() || !body.displayName?.trim()) throw new Error('Clinician name and work email are required.');
 
-      let clinicId = body.clinicId || profile.clinic_id;
+      let clinicId = isSuperAdmin ? (body.clinicId || profile.clinic_id) : profile.clinic_id;
       if (!clinicId) {
         const { data: firstClinic } = await db.from('clinics').select('id').order('created_at').limit(1).maybeSingle();
         clinicId = firstClinic?.id ?? null;
@@ -242,7 +288,7 @@ async function handle(request: Request) {
     if (body.action === 'update_self_profile') { const { db, profile } = await signedIn(request); if (!body.displayName?.trim()) throw new Error('A display name is required.'); const { error } = await db.from('clinician_profiles').update({ display_name: body.displayName.trim().slice(0, 120), professional_title: body.professionalTitle?.trim().slice(0, 120) || null, about_me: body.aboutMe?.trim().slice(0, 800) || null, photo_url: body.photoUrl?.trim().slice(0, 1000) || null }).eq('id', profile.id); if (error) throw new Error('Unable to save your profile.'); return Response.json({ message: 'Your public clinician profile has been saved.' }); }
     const { db, profile } = await administrator(request);
     if (body.action === 'create_clinic') {
-      if (!profile.is_platform_admin && !profile.is_admin) throw new Error('Administrator access is required to create clinics.');
+      if (!profile.is_platform_admin) throw new Error('Only Ventricura platform administrators (Ramsay and Sid) can create new clinics.');
       const slug = slugify(body.clinicSlug || body.clinicName);
       if (!slug) throw new Error('A valid clinic URL label is required.');
       const insertData: Record<string, unknown> = {
@@ -270,8 +316,10 @@ async function handle(request: Request) {
       return Response.json({ message: `Clinic created at ventricura.com/${slug}.`, clinic: data });
     }
     if (body.action === 'update_clinic') {
-      const canManageClinic = profile.is_platform_admin || profile.is_admin;
-      if (!canManageClinic || !body.clinicId || !body.clinicName?.trim()) throw new Error('You do not have permission to update this clinic.');
+      if (!body.clinicId || !body.clinicName?.trim()) throw new Error('Clinic name and ID are required.');
+      if (!profile.is_platform_admin && (!profile.clinic_id || body.clinicId !== profile.clinic_id)) {
+        throw new Error('You do not have permission to update this clinic.');
+      }
       const update: Record<string, unknown> = {
         name: body.clinicName.trim(),
         slug: slugify(body.clinicSlug || body.clinicName),
@@ -303,19 +351,33 @@ async function handle(request: Request) {
     if (!account?.email) throw new Error('This clinician account could not be found.');
     if (body.action === 'update') {
       if (!body.displayName?.trim() || typeof body.isAdmin !== 'boolean') throw new Error('Name and administrator status are required.');
-      if (body.clinicianId === profile.id && !body.isAdmin) throw new Error('You cannot remove your own administrator access.');
+      if (body.clinicianId === profile.id && !body.isAdmin && !profile.is_platform_admin) throw new Error('You cannot remove your own clinic manager access.');
       if (body.clinicianId === profile.id && profile.is_platform_admin && body.isPlatformAdmin === false) throw new Error('You cannot remove your own Ventricura platform access.');
-      const isPlatformAdmin = profile.is_platform_admin && typeof body.isPlatformAdmin === 'boolean' ? body.isPlatformAdmin : Boolean((target as Profile).is_platform_admin);
+      
       const update: Record<string, unknown> = {
         display_name: body.displayName.trim(),
-        is_admin: body.isAdmin || isPlatformAdmin
+        is_admin: body.isAdmin,
       };
-      if (profile.is_platform_admin || profile.is_admin) {
-        if (body.clinicId !== undefined) update.clinic_id = body.clinicId || null;
-      }
+
       if (profile.is_platform_admin) {
-        update.is_platform_admin = isPlatformAdmin;
+        if (body.clinicId !== undefined) update.clinic_id = body.clinicId || null;
+        if (body.isPlatformAdmin !== undefined) {
+          if (body.isPlatformAdmin === true) {
+            if (!isPlatformSuperAdminEmail(account.email)) {
+              throw new Error('Platform administrator privileges are restricted to Ramsay and Sid.');
+            }
+            update.is_platform_admin = true;
+            update.is_admin = true;
+          } else {
+            update.is_platform_admin = false;
+          }
+        }
+      } else {
+        if ((target as Profile).is_platform_admin) {
+          throw new Error('Clinic managers cannot modify platform administrator accounts.');
+        }
       }
+
       if (body.professionalTitle !== undefined) {
         update.professional_title = body.professionalTitle?.trim() || null;
       }
@@ -326,7 +388,14 @@ async function handle(request: Request) {
       if (error) throw new Error('Unable to update clinician.');
       return Response.json({ message: 'Clinician details and access updated.' });
     }
-    if (body.action === 'reset_password') { const { error } = await db.auth.resetPasswordForEmail(account.email, { redirectTo: appUrl(request, '/clinician/reset-password') }); if (error) throw new Error(error.message); return Response.json({ message: `Password-reset email sent to ${account.email}.` }); }
+    if (body.action === 'reset_password') {
+      if (!profile.is_platform_admin && (target as Profile).is_platform_admin) {
+        throw new Error('Clinic managers cannot reset passwords for platform administrators.');
+      }
+      const { error } = await db.auth.resetPasswordForEmail(account.email, { redirectTo: appUrl(request, '/clinician/reset-password') });
+      if (error) throw new Error(error.message);
+      return Response.json({ message: `Password-reset email sent to ${account.email}.` });
+    }
     throw new Error('Unknown clinician action.');
   } catch (error) { return Response.json({ error: error instanceof Error ? error.message : 'Unable to manage clinician.' }, { status: 400 }); }
 }

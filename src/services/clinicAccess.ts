@@ -28,7 +28,7 @@ export async function verifyClinicianAccess(accessToken?: string): Promise<Appro
 
 export async function claimInitialAdministratorAccess() {
   const token = await getClinicianAccessToken();
-  const response = await fetch('/api/claim-initial-admin', {
+  const response = await fetch('/api/admin-clinicians?action=claim-initial-admin', {
     method: 'POST', headers: { Authorization: `Bearer ${token}` },
   });
   const body = await response.json().catch(() => ({ error: 'The administrator setup service is temporarily unavailable.' })) as { error?: string };

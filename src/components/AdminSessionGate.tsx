@@ -16,7 +16,7 @@ export function AdminSessionGate({ children }: { children: ReactNode }) {
       if (!session) { if (active) { setMessage('Sign in is required to manage the clinic.'); setState('denied'); } return; }
       try {
         const clinician = await verifyClinicianAccess(session.access_token);
-        if (active) setState(clinician.isAdmin ? 'administrator' : 'setup');
+        if (active) setState(clinician.isAdmin || clinician.isPlatformAdmin ? 'administrator' : 'setup');
       } catch (error) {
         if (active) { setMessage(error instanceof Error ? error.message : 'Administrator access could not be verified.'); setState('denied'); }
       }
@@ -29,7 +29,7 @@ export function AdminSessionGate({ children }: { children: ReactNode }) {
     try {
       await claimInitialAdministratorAccess();
       const clinician = await verifyClinicianAccess();
-      if (!clinician.isAdmin) throw new Error('Administrator access was not applied.');
+      if (!clinician.isAdmin && !clinician.isPlatformAdmin) throw new Error('Administrator access was not applied.');
       setState('administrator');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Administrator setup could not be completed.');

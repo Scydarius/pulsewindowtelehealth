@@ -136,7 +136,7 @@ export default { async fetch(request: Request) {
         const slug = slugify(rawSlug);
         const db = database();
 
-        let isManager = false;
+        let staffProfile: { id: string; is_admin: boolean; is_platform_admin?: boolean; clinic_id?: string | null } | null = null;
         try {
           const rawAuth = request.headers.get('authorization');
           const token = rawAuth?.replace(/^Bearer\s+/i, '');
@@ -144,8 +144,8 @@ export default { async fetch(request: Request) {
             const { data: userAuth } = await db.auth.getUser(token);
             if (userAuth?.user) {
               const { data: staff } = await db.from('clinician_profiles').select('id, is_admin, is_platform_admin, clinic_id').eq('id', userAuth.user.id).maybeSingle();
-              if (staff && (staff.is_admin || staff.is_platform_admin)) {
-                isManager = true;
+              if (staff) {
+                staffProfile = staff;
               }
             }
           }
@@ -193,6 +193,7 @@ export default { async fetch(request: Request) {
 
         const clinic = clinicResult.data;
         if (clinicResult.error || !clinic) return Response.json({ error: 'Clinic page not found.' }, { status: 404 });
+        const isManager = Boolean(staffProfile && (staffProfile.is_platform_admin || (staffProfile.is_admin && staffProfile.clinic_id === clinic.id)));
         if (clinic.website_enabled === false && !isManager) return Response.json({ error: 'This clinic page is currently unpublished.' }, { status: 404 });
 
         const baseUrl = (process.env.APP_URL ?? url.origin).replace(/\/$/, '');

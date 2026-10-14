@@ -18,6 +18,7 @@ export function AppShell() {
   const [signedInEmail, setSignedInEmail] = useState('');
   const [signingOut, setSigningOut] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const signOut = async () => {
@@ -38,13 +39,17 @@ export function AppShell() {
     void verifyClinicianAccess()
       .then((clinician) => {
         if (active) {
-          setIsAdmin(clinician.isAdmin);
+          setIsAdmin(clinician.isAdmin || clinician.isPlatformAdmin === true);
+          setIsPlatformAdmin(clinician.isPlatformAdmin === true);
           if (clinician.photoUrl) setProfilePhoto(clinician.photoUrl);
           if (clinician.displayName) setDisplayName(clinician.displayName);
         }
       })
       .catch(() => {
-        if (active) setIsAdmin(false);
+        if (active) {
+          setIsAdmin(false);
+          setIsPlatformAdmin(false);
+        }
       });
     return () => { active = false; };
   }, [isClinician]);
@@ -89,7 +94,7 @@ export function AppShell() {
                 )}
               </div>
               <div className="header-user-copy">
-                <strong>{isAdminPage ? 'Administrator portal' : (displayName || 'Clinician workspace')}</strong>
+                <strong>{isAdminPage ? (isPlatformAdmin ? 'Platform administration' : 'Clinic administration') : (displayName || 'Clinician workspace')}</strong>
                 <span>{signedInEmail || 'Restoring sign-in…'}</span>
               </div>
             </Link>
