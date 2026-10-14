@@ -24,11 +24,22 @@ export default async function clinicianAccess(request: VercelRequest, response: 
     if (authorization) headers.set('authorization', Array.isArray(authorization) ? authorization[0] : authorization);
     const authRequest = new Request('https://ventricura.internal/api/clinician-access', { headers });
     const { db, clinician } = await requireClinician(authRequest);
-    const { data: profile, error } = await db
+    let { data: profile, error } = await db
       .from('clinician_profiles')
       .select('display_name, is_admin, is_platform_admin, clinic_id, photo_url')
       .eq('id', clinician.id)
-      .single();
+      .maybeSingle();
+
+    if (error && error.message?.includes('column')) {
+      const fallback = await db
+        .from('clinician_profiles')
+        .select('display_name, is_admin')
+        .eq('id', clinician.id)
+        .maybeSingle();
+      profile = fallback.data as typeof profile;
+      error = fallback.error;
+    }
+
     if (error || !profile) throw new Error('This account is not an authorised clinician.');
     return response.status(200).json({ clinician: { id: clinician.id, displayName: profile.display_name, isAdmin: profile.is_admin === true, isPlatformAdmin: profile.is_platform_admin === true, clinicId: profile.clinic_id ?? null, photoUrl: profile.photo_url ?? null } });
   } catch (error) {

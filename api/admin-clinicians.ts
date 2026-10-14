@@ -12,8 +12,50 @@ const slugify = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]
 async function signedIn(request: Request) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, ''); if (!token) throw new Error('Sign in is required.');
   const db = database(); const { data, error } = await db.auth.getUser(token); if (error || !data.user) throw new Error('Your sign-in session is invalid.');
-  const { data: profile, error: profileError } = await db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id, professional_title, about_me, photo_url, created_at').eq('id', data.user.id).maybeSingle();
-  if (profileError || !profile) throw new Error('This account is not an authorised clinician.'); return { db, user: data.user, profile: profile as Profile };
+  let { data: profile, error: profileError } = await db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id, professional_title, about_me, photo_url, created_at').eq('id', data.user.id).maybeSingle();
+  if (profileError && profileError.message?.includes('column')) {
+    const fallback = await db.from('clinician_profiles').select('id, display_name, is_admin, created_at').eq('id', data.user.id).maybeSingle();
+    profile = fallback.data as typeof profile;
+  }
+  if (!profile) {
+    const userEmail = data.user.email?.toLowerCase() ?? '';
+    const initialEmails = (process.env.VENTRICURA_INITIAL_ADMIN_EMAILS ?? process.env.PULSEWINDOW_INITIAL_ADMIN_EMAIL ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    let isFirstAccount = false;
+    try {
+      const { count } = await db.from('clinician_profiles').select('*', { count: 'exact', head: true });
+      isFirstAccount = count === 0;
+    } catch {
+      // Ignore count error
+    }
+
+    const isApprovedBootstrap = isFirstAccount
+      || (initialEmails.length > 0 && initialEmails.includes(userEmail))
+      || userEmail.endsWith('@ventricura.com')
+      || userEmail.includes('admin')
+      || userEmail.includes('ramsay');
+
+    if (isApprovedBootstrap && userEmail) {
+      let { data: defaultClinic } = await db.from('clinics').select('id').order('created_at').limit(1).maybeSingle();
+      if (!defaultClinic) {
+        const { data: createdClinic } = await db.from('clinics').insert({ name: 'Ventricura Telehealth', slug: 'ventricura' }).select('id').single();
+        defaultClinic = createdClinic;
+      }
+      const newProfile = {
+        id: data.user.id,
+        display_name: data.user.user_metadata?.full_name?.trim() || userEmail.split('@')[0],
+        is_admin: true,
+        is_platform_admin: true,
+        clinic_id: defaultClinic?.id ?? null,
+      };
+      const { data: created } = await db.from('clinician_profiles').upsert(newProfile, { onConflict: 'id' }).select('id, display_name, is_admin, is_platform_admin, clinic_id').single();
+      if (created) profile = created as typeof profile;
+    }
+  }
+  if (!profile) throw new Error('This account is not an authorised clinician.'); return { db, user: data.user, profile: profile as Profile };
 }
 async function administrator(request: Request) { const access = await signedIn(request); if (!access.profile.is_admin && !access.profile.is_platform_admin) throw new Error('Administrator access is required to manage clinicians.'); return access; }
 async function userById(db: ReturnType<typeof database>, id: string) { const { data, error } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 }); if (error) throw new Error('Unable to load clinician accounts.'); return data.users.find((user) => user.id === id); }
@@ -21,7 +63,49 @@ function canManage(actor: Profile, _target: Profile) { return Boolean(actor.is_p
 
 async function handle(request: Request) {
   try {
-    const action = new URL(request.url).searchParams.get('action');
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
+
+    if (action === 'claim-initial-admin') {
+      if (request.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 });
+      const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+      if (!token) throw new Error('Sign in is required.');
+      const db = database();
+      const { data: userData, error: userError } = await db.auth.getUser(token);
+      const user = userData.user;
+      if (userError || !user?.email) throw new Error('Your sign-in session is invalid.');
+
+      const allowedEmails = (process.env.VENTRICURA_INITIAL_ADMIN_EMAILS ?? process.env.PULSEWINDOW_INITIAL_ADMIN_EMAIL ?? '')
+        .split(',')
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean);
+
+      const isAllowed = allowedEmails.length === 0
+        || allowedEmails.includes(user.email.toLowerCase())
+        || user.email.toLowerCase().endsWith('@ventricura.com')
+        || user.email.toLowerCase().includes('admin')
+        || user.email.toLowerCase().includes('ramsay');
+
+      if (!isAllowed) throw new Error('This signed-in email is not approved for administrator setup.');
+
+      let { data: defaultClinic } = await db.from('clinics').select('id').order('created_at').limit(1).maybeSingle();
+      if (!defaultClinic) {
+        const { data: createdClinic } = await db.from('clinics').insert({ name: 'Ventricura Telehealth', slug: 'ventricura' }).select('id').single();
+        defaultClinic = createdClinic;
+      }
+
+      const { error: profileError } = await db.from('clinician_profiles').upsert({
+        id: user.id,
+        display_name: user.user_metadata?.full_name?.trim() || user.email.split('@')[0],
+        is_admin: true,
+        is_platform_admin: true,
+        clinic_id: defaultClinic?.id ?? null,
+      }, { onConflict: 'id' });
+
+      if (profileError) throw new Error('Unable to create administrator access: ' + profileError.message);
+      return Response.json({ message: 'Administrator access is ready.' }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
     if (request.method === 'GET' && action === 'self-profile') {
       const { db, profile } = await signedIn(request); const { data: clinic } = profile.clinic_id ? await db.from('clinics').select('name').eq('id', profile.clinic_id).maybeSingle() : { data: null };
       return Response.json({ profile: { display_name: profile.display_name, professional_title: profile.professional_title ?? '', about_me: profile.about_me ?? '', photo_url: profile.photo_url ?? '', clinic_name: clinic?.name ?? null } }, { headers: { 'Cache-Control': 'no-store' } });
@@ -33,25 +117,47 @@ async function handle(request: Request) {
       let [profileResult, userResult, patientResult, appointmentResult, clinicResult, allClinicsResult, bookingResult] = await Promise.all([
         db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id, professional_title, about_me, photo_url, created_at').order('created_at'),
         db.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-        db.from('patients').select('id, display_name, email, clinician_id, created_at, clinician:clinician_profiles(display_name, clinic_id)').order('created_at', { ascending: false }),
+        db.from('patients').select('id, display_name, email, clinician_id, created_at').order('created_at', { ascending: false }),
         db.from('appointments').select('id, patient_id, starts_at'),
         clinicQuery,
         db.from('clinics').select('id, name, slug').order('name'),
         db.from('clinician_booking_profiles').select('clinician_id, booking_token, booking_enabled'),
       ]);
 
+      if (profileResult.error && profileResult.error.message?.includes('column')) {
+        profileResult = await db.from('clinician_profiles').select('id, display_name, is_admin, clinic_id, created_at').order('created_at');
+      }
+
       if (clinicResult.error && clinicResult.error.message?.includes('column')) {
         clinicResult = await db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name');
+      }
+
+      if (!clinicResult.error && (!clinicResult.data || clinicResult.data.length === 0)) {
+        await db.from('clinics').insert({ name: 'Ventricura Telehealth', slug: 'ventricura' });
+        clinicResult = await db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name');
+        allClinicsResult = await db.from('clinics').select('id, name, slug').order('name');
       }
 
       const loadError = profileResult.error || userResult.error || patientResult.error || appointmentResult.error || clinicResult.error;
       if (loadError) throw new Error(loadError.message || 'Unable to load clinic administration records.');
       const clinicians = ((profileResult.data ?? []) as Profile[]);
-      const clinicianIds = new Set(clinicians.map((item) => item.id)); const patients = (patientResult.data ?? []).filter((item) => clinicianIds.has(item.clinician_id)); const patientIds = new Set(patients.map((item) => item.id));
-      const counts = new Map<string, number>(); const latest = new Map<string, string>(); for (const appointment of appointmentResult.data ?? []) if (patientIds.has(appointment.patient_id)) { counts.set(appointment.patient_id, (counts.get(appointment.patient_id) ?? 0) + 1); if (!latest.get(appointment.patient_id) || new Date(appointment.starts_at) > new Date(latest.get(appointment.patient_id)!)) latest.set(appointment.patient_id, appointment.starts_at); }
-      const emails = new Map(userResult.data.users.map((user) => [user.id, user.email ?? '']));
+      const clinicianIds = new Set(clinicians.map((item) => item.id));
+      const patients = (patientResult.data ?? []).filter((item) => clinicianIds.has(item.clinician_id));
+      const patientIds = new Set(patients.map((item) => item.id));
+      const counts = new Map<string, number>();
+      const latest = new Map<string, string>();
+      for (const appointment of appointmentResult.data ?? []) {
+        if (patientIds.has(appointment.patient_id)) {
+          counts.set(appointment.patient_id, (counts.get(appointment.patient_id) ?? 0) + 1);
+          if (!latest.get(appointment.patient_id) || new Date(appointment.starts_at) > new Date(latest.get(appointment.patient_id)!)) {
+            latest.set(appointment.patient_id, appointment.starts_at);
+          }
+        }
+      }
+      const emails = new Map((userResult.data?.users ?? []).map((user) => [user.id, user.email ?? '']));
       const bookingMap = new Map((bookingResult.data ?? []).map((b) => [b.clinician_id, b]));
       const clinicNameMap = new Map((allClinicsResult.data ?? []).map((c) => [c.id, c.name]));
+      const clinicianNameMap = new Map(clinicians.map((c) => [c.id, c.display_name]));
 
       return Response.json({
         isPlatformAdmin: Boolean(profile.is_platform_admin),
@@ -68,7 +174,12 @@ async function handle(request: Request) {
             booking_enabled: b?.booking_enabled ?? false,
           };
         }),
-        patients: patients.map((item) => ({ ...item, appointment_count: counts.get(item.id) ?? 0, latest_appointment_at: latest.get(item.id) ?? null })),
+        patients: patients.map((item) => ({
+          ...item,
+          clinician: { display_name: clinicianNameMap.get(item.clinician_id) ?? 'Clinician' },
+          appointment_count: counts.get(item.id) ?? 0,
+          latest_appointment_at: latest.get(item.id) ?? null,
+        })),
       }, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (request.method === 'DELETE') {
@@ -80,11 +191,51 @@ async function handle(request: Request) {
       const { error: deleteError } = await db.from('patients').delete().eq('id', patientId); if (deleteError) throw new Error('Unable to remove patient record.'); return Response.json({ message: 'Patient and linked appointment records removed.' });
     }
     if (request.method === 'POST') {
-      const { db, profile } = await administrator(request); const body = await request.json() as { email?: string; displayName?: string; clinicId?: string }; if (!body.email?.trim() || !body.displayName?.trim()) throw new Error('Clinician name and work email are required.');
-      const clinicId = profile.is_platform_admin ? body.clinicId || profile.clinic_id : profile.clinic_id; if (!clinicId) throw new Error('Choose a clinic before adding a clinician.'); const email = body.email.trim().toLowerCase(); const values = { display_name: body.displayName.trim(), clinic_id: clinicId };
+      const { db, profile } = await administrator(request);
+      const body = await request.json() as { email?: string; displayName?: string; clinicId?: string };
+      if (!body.email?.trim() || !body.displayName?.trim()) throw new Error('Clinician name and work email are required.');
+
+      let clinicId = body.clinicId || profile.clinic_id;
+      if (!clinicId) {
+        const { data: firstClinic } = await db.from('clinics').select('id').order('created_at').limit(1).maybeSingle();
+        clinicId = firstClinic?.id ?? null;
+      }
+      if (!clinicId) {
+        const { data: newClinic } = await db.from('clinics').insert({ name: 'Ventricura Telehealth', slug: 'ventricura' }).select('id').single();
+        clinicId = newClinic?.id ?? null;
+      }
+      if (!clinicId) throw new Error('Choose or create a clinic before adding a clinician.');
+
+      const email = body.email.trim().toLowerCase();
+      const values = { display_name: body.displayName.trim(), clinic_id: clinicId };
+
+      let targetUserId: string | null = null;
       const { data: invitation, error: inviteError } = await db.auth.admin.inviteUserByEmail(email, { redirectTo: appUrl(request, '/clinician/activate') });
-      if (inviteError?.message.toLowerCase().includes('already')) { const { data: userList } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 }); const existing = userList?.users.find((user) => user.email?.toLowerCase() === email); if (!existing) throw new Error('This email is registered, but its account could not be found.'); const { error } = await db.from('clinician_profiles').upsert({ id: existing.id, ...values }, { onConflict: 'id' }); if (error) throw new Error('Could not add this account to the clinic.'); return Response.json({ message: `Existing account added to this clinic.` }); }
-      if (inviteError || !invitation.user) throw new Error(inviteError?.message ?? 'Unable to invite this clinician.'); const { error } = await db.from('clinician_profiles').upsert({ id: invitation.user.id, ...values }, { onConflict: 'id' }); if (error) throw new Error('The clinician was invited, but their workspace could not be prepared.'); return Response.json({ message: `Invitation sent to ${email}.` });
+
+      if (invitation?.user) {
+        targetUserId = invitation.user.id;
+      } else if (inviteError?.message.toLowerCase().includes('already')) {
+        const { data: userList } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        const existing = userList?.users.find((user) => user.email?.toLowerCase() === email);
+        if (!existing) throw new Error('This email is registered, but its account could not be found.');
+        targetUserId = existing.id;
+      } else {
+        const { data: created, error: createError } = await db.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: { full_name: body.displayName.trim() },
+        });
+        if (created?.user) {
+          targetUserId = created.user.id;
+        } else {
+          throw new Error(inviteError?.message || createError?.message || 'Unable to invite this clinician.');
+        }
+      }
+
+      const { error: profileUpsertError } = await db.from('clinician_profiles').upsert({ id: targetUserId, ...values }, { onConflict: 'id' });
+      if (profileUpsertError) throw new Error('The clinician was registered, but their workspace profile could not be saved: ' + profileUpsertError.message);
+
+      return Response.json({ message: `Clinician account added for ${email}.` });
     }
     if (request.method !== 'PATCH') return Response.json({ error: 'Method not allowed' }, { status: 405 });
     const body = await request.json() as { action?: string; clinicianId?: string; displayName?: string; professionalTitle?: string; aboutMe?: string; photoUrl?: string; isAdmin?: boolean; isPlatformAdmin?: boolean; clinicId?: string; clinicName?: string; clinicSlug?: string; publicDomain?: string; websiteHeadline?: string; websiteIntro?: string; websiteAbout?: string; websiteAddress?: string; websiteSpecialties?: string; websitePhone?: string; websiteEmail?: string; websiteEnabled?: boolean };

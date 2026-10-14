@@ -101,7 +101,7 @@ export function AdminCliniciansPage() {
       setClinics(body.clinics ?? []);
       setAllClinics(body.allClinics ?? []);
       setIsPlatformAdmin(body.isPlatformAdmin === true);
-      setClinicId((current) => current || body.currentClinicId || body.clinics?.[0]?.id || '');
+      setClinicId((current) => current || body.currentClinicId || body.allClinics?.[0]?.id || body.clinics?.[0]?.id || '');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to load clinicians.');
     }
@@ -287,7 +287,7 @@ export function AdminCliniciansPage() {
               required
             />
           </label>
-          {(isPlatformAdmin || allClinics.length > 1) && (
+          {allClinics.length > 0 && (
             <label>
               Assign to Clinic
               <select
@@ -295,7 +295,7 @@ export function AdminCliniciansPage() {
                 onChange={(event) => setClinicId(event.target.value)}
                 required
               >
-                <option value="">Choose clinic</option>
+                {allClinics.length > 1 && <option value="">Choose clinic</option>}
                 {allClinics.map((clinic) => (
                   <option key={clinic.id} value={clinic.id}>
                     {clinic.name}
@@ -319,8 +319,7 @@ export function AdminCliniciansPage() {
       </section>
 
       {/* Clinics & Public Webpages management section */}
-      {(isPlatformAdmin || clinics.length > 0) && (
-        <section className="admin-card">
+      <section className="admin-card">
           <div className="section-heading">
             <div>
               <p className="eyebrow">{isPlatformAdmin ? 'Ventricura platform' : 'Clinic website'}</p>
@@ -590,7 +589,6 @@ export function AdminCliniciansPage() {
             })}
           </div>
         </section>
-      )}
 
       {/* Clinicians & Doctor Roster Section */}
       <section className="admin-card clinician-roster">
