@@ -101,7 +101,7 @@ export async function loadPatientProfile(patientId: string) {
 
 export async function loadPatientMedications(patientId: string): Promise<PatientMedication[]> {
   const token = await getClinicianAccessToken();
-  const response = await fetch(`/api/patient-medications?patientId=${encodeURIComponent(patientId)}`, {
+  const response = await fetch(`/api/patient-profile?action=medications&patientId=${encodeURIComponent(patientId)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const body = (await response.json().catch(() => ({ error: 'Unable to load medications.' }))) as {
@@ -127,7 +127,7 @@ export async function prescribePatientMedication(input: {
   notes?: string;
 }): Promise<PatientMedication> {
   const token = await getClinicianAccessToken();
-  const response = await fetch('/api/patient-medications', {
+  const response = await fetch('/api/patient-profile?action=medications', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(input),
@@ -153,7 +153,7 @@ export async function updatePatientMedication(input: {
   notes?: string;
 }): Promise<PatientMedication> {
   const token = await getClinicianAccessToken();
-  const response = await fetch('/api/patient-medications', {
+  const response = await fetch('/api/patient-profile?action=medications', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(input),
@@ -169,7 +169,7 @@ export async function updatePatientMedication(input: {
 
 export async function deletePatientMedication(medicationId: string): Promise<void> {
   const token = await getClinicianAccessToken();
-  const response = await fetch('/api/patient-medications', {
+  const response = await fetch('/api/patient-profile?action=medications', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ medicationId }),

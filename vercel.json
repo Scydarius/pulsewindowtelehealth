@@ -18,6 +18,7 @@
     { "source": "/api/google-calendar-callback", "destination": "/api/google-calendar?action=callback" },
     { "source": "/api/claim-initial-admin", "destination": "/api/admin-clinicians?action=claim-initial-admin" },
     { "source": "/api/patient-invitations", "destination": "/api/clinician-invitations?action=patient-invite" },
+    { "source": "/api/patient-medications", "destination": "/api/patient-profile?action=medications" },
     { "source": "/patient", "destination": "/index.html" },
     { "source": "/clinician", "destination": "/index.html" },
     { "source": "/clinician/sign-in", "destination": "/index.html" },
