@@ -20,9 +20,17 @@ const isSlotInPast = (dateStr: string, timeStr: string) => {
 };
 
 export type ExistingPatientOption = { id: string; displayName: string; email: string; appointmentCount: number };
-type InvitePatientFormProps = { patients?: ExistingPatientOption[]; onCreated?: () => void };
+type InvitePatientFormProps = {
+  patients?: ExistingPatientOption[];
+  onCreated?: () => void;
+  triggerVariant?: 'primary' | 'secondary';
+};
 
-export function InvitePatientForm({ patients = [], onCreated }: InvitePatientFormProps) {
+export function InvitePatientForm({
+  patients = [],
+  onCreated,
+  triggerVariant = 'primary',
+}: InvitePatientFormProps) {
   const [open, setOpen] = useState(false);
   const [patientEmail, setPatientEmail] = useState('');
   const [patientName, setPatientName] = useState('');
@@ -106,7 +114,17 @@ export function InvitePatientForm({ patients = [], onCreated }: InvitePatientFor
     }
   };
 
-  if (!open) return <button type="button" className="button button-secondary" onClick={() => setOpen(true)}><Plus size={17} /> New appointment</button>;
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className={`button button-${triggerVariant} invite-patient-trigger`}
+        onClick={() => setOpen(true)}
+      >
+        <Plus size={17} /> New appointment
+      </button>
+    );
+  }
 
   const todayStr = scheduleParts(new Date()).date;
   const isToday = appointmentDate === todayStr;
