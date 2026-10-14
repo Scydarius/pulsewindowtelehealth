@@ -37,6 +37,8 @@
     { "source": "/admin/clinicians", "destination": "/index.html" },
     { "source": "/join", "destination": "/index.html" },
     { "source": "/book/:path*", "destination": "/index.html" },
-    { "source": "/consultation/:path*", "destination": "/index.html" }
+    { "source": "/consultation/:path*", "destination": "/index.html" },
+    { "source": "/clinic/:path*", "destination": "/index.html" },
+    { "source": "/:clinicSlug((?!api|assets|favicon|robots|sitemap).*)", "destination": "/index.html" }
   ]
 }

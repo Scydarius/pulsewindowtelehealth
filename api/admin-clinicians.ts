@@ -28,20 +28,56 @@ async function handle(request: Request) {
     }
     if (request.method === 'GET') {
       const { db, profile } = await administrator(request);
-      const [profileResult, userResult, patientResult, appointmentResult, clinicResult] = await Promise.all([
+      let clinicQuery = profile.is_platform_admin
+        ? db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled, created_at').order('name')
+        : profile.clinic_id
+          ? db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled, created_at').eq('id', profile.clinic_id)
+          : Promise.resolve({ data: [], error: null });
+
+      let [profileResult, userResult, patientResult, appointmentResult, clinicResult, allClinicsResult, bookingResult] = await Promise.all([
         db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id, professional_title, about_me, photo_url, created_at').order('created_at'),
         db.auth.admin.listUsers({ page: 1, perPage: 1000 }),
         db.from('patients').select('id, display_name, email, clinician_id, created_at, clinician:clinician_profiles(display_name, clinic_id)').order('created_at', { ascending: false }),
         db.from('appointments').select('id, patient_id, starts_at'),
-        profile.is_platform_admin ? db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name') : Promise.resolve({ data: [], error: null }),
+        clinicQuery,
+        db.from('clinics').select('id, name, slug').order('name'),
+        db.from('clinician_booking_profiles').select('clinician_id, booking_token, booking_enabled'),
       ]);
+
+      if (clinicResult.error && clinicResult.error.message?.includes('column')) {
+        clinicResult = profile.is_platform_admin
+          ? await db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name')
+          : profile.clinic_id
+            ? await db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').eq('id', profile.clinic_id)
+            : { data: [], error: null };
+      }
+
       const loadError = profileResult.error || userResult.error || patientResult.error || appointmentResult.error || clinicResult.error;
       if (loadError) throw new Error(loadError.message || 'Unable to load clinic administration records.');
       const clinicians = ((profileResult.data ?? []) as Profile[]).filter((item) => profile.is_platform_admin || item.clinic_id === profile.clinic_id);
       const clinicianIds = new Set(clinicians.map((item) => item.id)); const patients = (patientResult.data ?? []).filter((item) => clinicianIds.has(item.clinician_id)); const patientIds = new Set(patients.map((item) => item.id));
       const counts = new Map<string, number>(); const latest = new Map<string, string>(); for (const appointment of appointmentResult.data ?? []) if (patientIds.has(appointment.patient_id)) { counts.set(appointment.patient_id, (counts.get(appointment.patient_id) ?? 0) + 1); if (!latest.get(appointment.patient_id) || new Date(appointment.starts_at) > new Date(latest.get(appointment.patient_id)!)) latest.set(appointment.patient_id, appointment.starts_at); }
       const emails = new Map(userResult.data.users.map((user) => [user.id, user.email ?? '']));
-      return Response.json({ isPlatformAdmin: Boolean(profile.is_platform_admin), currentClinicId: profile.clinic_id ?? null, clinics: clinicResult.data ?? [], clinicians: clinicians.map((item) => ({ ...item, email: emails.get(item.id) ?? '' })), patients: patients.map((item) => ({ ...item, appointment_count: counts.get(item.id) ?? 0, latest_appointment_at: latest.get(item.id) ?? null })) }, { headers: { 'Cache-Control': 'no-store' } });
+      const bookingMap = new Map((bookingResult.data ?? []).map((b) => [b.clinician_id, b]));
+      const clinicNameMap = new Map((allClinicsResult.data ?? []).map((c) => [c.id, c.name]));
+
+      return Response.json({
+        isPlatformAdmin: Boolean(profile.is_platform_admin),
+        currentClinicId: profile.clinic_id ?? null,
+        clinics: clinicResult.data ?? [],
+        allClinics: allClinicsResult.data ?? [],
+        clinicians: clinicians.map((item) => {
+          const b = bookingMap.get(item.id);
+          return {
+            ...item,
+            email: emails.get(item.id) ?? '',
+            clinic_name: item.clinic_id ? clinicNameMap.get(item.clinic_id) ?? null : null,
+            booking_token: b?.booking_token ?? null,
+            booking_enabled: b?.booking_enabled ?? false,
+          };
+        }),
+        patients: patients.map((item) => ({ ...item, appointment_count: counts.get(item.id) ?? 0, latest_appointment_at: latest.get(item.id) ?? null })),
+      }, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (request.method === 'DELETE') {
       const { db, profile } = await administrator(request); const { patientId } = await request.json() as { patientId?: string }; if (!patientId) throw new Error('Patient is required.');
@@ -59,13 +95,93 @@ async function handle(request: Request) {
       if (inviteError || !invitation.user) throw new Error(inviteError?.message ?? 'Unable to invite this clinician.'); const { error } = await db.from('clinician_profiles').upsert({ id: invitation.user.id, ...values }, { onConflict: 'id' }); if (error) throw new Error('The clinician was invited, but their workspace could not be prepared.'); return Response.json({ message: `Invitation sent to ${email}.` });
     }
     if (request.method !== 'PATCH') return Response.json({ error: 'Method not allowed' }, { status: 405 });
-    const body = await request.json() as { action?: string; clinicianId?: string; displayName?: string; professionalTitle?: string; aboutMe?: string; photoUrl?: string; isAdmin?: boolean; isPlatformAdmin?: boolean; clinicId?: string; clinicName?: string; clinicSlug?: string; publicDomain?: string; websiteHeadline?: string; websiteIntro?: string; websiteAbout?: string; websitePhone?: string; websiteEmail?: string; websiteEnabled?: boolean };
+    const body = await request.json() as { action?: string; clinicianId?: string; displayName?: string; professionalTitle?: string; aboutMe?: string; photoUrl?: string; isAdmin?: boolean; isPlatformAdmin?: boolean; clinicId?: string; clinicName?: string; clinicSlug?: string; publicDomain?: string; websiteHeadline?: string; websiteIntro?: string; websiteAbout?: string; websiteAddress?: string; websiteSpecialties?: string; websitePhone?: string; websiteEmail?: string; websiteEnabled?: boolean };
     if (body.action === 'update_self_profile') { const { db, profile } = await signedIn(request); if (!body.displayName?.trim()) throw new Error('A display name is required.'); const { error } = await db.from('clinician_profiles').update({ display_name: body.displayName.trim().slice(0, 120), professional_title: body.professionalTitle?.trim().slice(0, 120) || null, about_me: body.aboutMe?.trim().slice(0, 800) || null, photo_url: body.photoUrl?.trim().slice(0, 1000) || null }).eq('id', profile.id); if (error) throw new Error('Unable to save your profile.'); return Response.json({ message: 'Your public clinician profile has been saved.' }); }
     const { db, profile } = await administrator(request);
-    if (body.action === 'create_clinic') { if (!profile.is_platform_admin || !body.clinicName?.trim()) throw new Error('Only Ventricura platform administrators can create clinics.'); const slug = slugify(body.clinicSlug || body.clinicName); if (!slug) throw new Error('A valid clinic URL label is required.'); const { data, error } = await db.from('clinics').insert({ name: body.clinicName.trim(), slug, public_domain: null, website_headline: body.websiteHeadline?.trim(), website_intro: body.websiteIntro?.trim(), website_about: body.websiteAbout?.trim(), website_phone: body.websitePhone?.trim(), website_email: body.websiteEmail?.trim() }).select('id, name, slug, public_domain').single(); if (error) throw new Error(error.message.includes('unique') ? 'That clinic URL is already in use.' : 'Unable to create clinic.'); return Response.json({ message: `Clinic created at ${slug}.ventricura.com.`, clinic: data }); }
-    if (body.action === 'update_clinic') { if (!profile.is_platform_admin || !body.clinicId || !body.clinicName?.trim()) throw new Error('Only platform administrators can update a clinic.'); const update: Record<string, unknown> = { name: body.clinicName.trim(), slug: slugify(body.clinicSlug || body.clinicName), website_headline: body.websiteHeadline?.trim() || null, website_intro: body.websiteIntro?.trim() || null, website_about: body.websiteAbout?.trim() || null, website_phone: body.websitePhone?.trim() || null, website_email: body.websiteEmail?.trim() || null, website_enabled: body.websiteEnabled !== false, updated_at: new Date().toISOString() }; if (body.publicDomain !== undefined) update.public_domain = body.publicDomain.trim().toLowerCase() || null; const { error } = await db.from('clinics').update(update).eq('id', body.clinicId); if (error) throw new Error(error.message); return Response.json({ message: 'Clinic website updated.' }); }
-    if (!body.clinicianId) throw new Error('Clinician and action are required.'); const { data: target } = await db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id').eq('id', body.clinicianId).maybeSingle(); if (!target || !canManage(profile, target as Profile)) throw new Error('You can only manage clinicians in your own clinic.'); const account = await userById(db, body.clinicianId); if (!account?.email) throw new Error('This clinician account could not be found.');
-    if (body.action === 'update') { if (!body.displayName?.trim() || typeof body.isAdmin !== 'boolean') throw new Error('Name and administrator status are required.'); if (body.clinicianId === profile.id && !body.isAdmin) throw new Error('You cannot remove your own administrator access.'); if (body.clinicianId === profile.id && profile.is_platform_admin && body.isPlatformAdmin === false) throw new Error('You cannot remove your own Ventricura platform access.'); const isPlatformAdmin = profile.is_platform_admin && typeof body.isPlatformAdmin === 'boolean' ? body.isPlatformAdmin : Boolean((target as Profile).is_platform_admin); const update: Record<string, unknown> = { display_name: body.displayName.trim(), is_admin: body.isAdmin || isPlatformAdmin }; if (profile.is_platform_admin) { update.is_platform_admin = isPlatformAdmin; if (body.clinicId) update.clinic_id = body.clinicId; } const { error } = await db.from('clinician_profiles').update(update).eq('id', body.clinicianId); if (error) throw new Error('Unable to update clinician.'); return Response.json({ message: 'Clinician access updated.' }); }
+    if (body.action === 'create_clinic') {
+      if (!profile.is_platform_admin || !body.clinicName?.trim()) throw new Error('Only Ventricura platform administrators can create clinics.');
+      const slug = slugify(body.clinicSlug || body.clinicName);
+      if (!slug) throw new Error('A valid clinic URL label is required.');
+      const insertData: Record<string, unknown> = {
+        name: body.clinicName.trim(),
+        slug,
+        public_domain: null,
+        website_headline: body.websiteHeadline?.trim() || null,
+        website_intro: body.websiteIntro?.trim() || null,
+        website_about: body.websiteAbout?.trim() || null,
+        website_address: body.websiteAddress?.trim() || null,
+        website_specialties: body.websiteSpecialties?.trim() || null,
+        website_phone: body.websitePhone?.trim() || null,
+        website_email: body.websiteEmail?.trim() || null,
+      };
+      let { data, error } = await db.from('clinics').insert(insertData).select('id, name, slug, public_domain').single();
+      if (error && error.message?.includes('column')) {
+        delete insertData.website_address;
+        delete insertData.website_specialties;
+        const fallback = await db.from('clinics').insert(insertData).select('id, name, slug, public_domain').single();
+        data = fallback.data;
+        error = fallback.error;
+      }
+      if (error) throw new Error(error.message.includes('unique') ? 'That clinic URL is already in use.' : 'Unable to create clinic.');
+      return Response.json({ message: `Clinic created at ${slug}.`, clinic: data });
+    }
+    if (body.action === 'update_clinic') {
+      const canManageClinic = profile.is_platform_admin || (profile.is_admin && profile.clinic_id === body.clinicId);
+      if (!canManageClinic || !body.clinicId || !body.clinicName?.trim()) throw new Error('You do not have permission to update this clinic.');
+      const update: Record<string, unknown> = {
+        name: body.clinicName.trim(),
+        slug: slugify(body.clinicSlug || body.clinicName),
+        website_headline: body.websiteHeadline?.trim() || null,
+        website_intro: body.websiteIntro?.trim() || null,
+        website_about: body.websiteAbout?.trim() || null,
+        website_address: body.websiteAddress?.trim() || null,
+        website_specialties: body.websiteSpecialties?.trim() || null,
+        website_phone: body.websitePhone?.trim() || null,
+        website_email: body.websiteEmail?.trim() || null,
+        website_enabled: body.websiteEnabled !== false,
+        updated_at: new Date().toISOString()
+      };
+      if (body.publicDomain !== undefined && profile.is_platform_admin) update.public_domain = body.publicDomain.trim().toLowerCase() || null;
+      let { error } = await db.from('clinics').update(update).eq('id', body.clinicId);
+      if (error && error.message?.includes('column')) {
+        delete update.website_address;
+        delete update.website_specialties;
+        const fallback = await db.from('clinics').update(update).eq('id', body.clinicId);
+        error = fallback.error;
+      }
+      if (error) throw new Error(error.message);
+      return Response.json({ message: 'Clinic website updated.' });
+    }
+    if (!body.clinicianId) throw new Error('Clinician and action are required.');
+    const { data: target } = await db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id, professional_title, about_me').eq('id', body.clinicianId).maybeSingle();
+    if (!target || !canManage(profile, target as Profile)) throw new Error('You can only manage clinicians in your own clinic.');
+    const account = await userById(db, body.clinicianId);
+    if (!account?.email) throw new Error('This clinician account could not be found.');
+    if (body.action === 'update') {
+      if (!body.displayName?.trim() || typeof body.isAdmin !== 'boolean') throw new Error('Name and administrator status are required.');
+      if (body.clinicianId === profile.id && !body.isAdmin) throw new Error('You cannot remove your own administrator access.');
+      if (body.clinicianId === profile.id && profile.is_platform_admin && body.isPlatformAdmin === false) throw new Error('You cannot remove your own Ventricura platform access.');
+      const isPlatformAdmin = profile.is_platform_admin && typeof body.isPlatformAdmin === 'boolean' ? body.isPlatformAdmin : Boolean((target as Profile).is_platform_admin);
+      const update: Record<string, unknown> = {
+        display_name: body.displayName.trim(),
+        is_admin: body.isAdmin || isPlatformAdmin
+      };
+      if (profile.is_platform_admin) {
+        update.is_platform_admin = isPlatformAdmin;
+        if (body.clinicId !== undefined) update.clinic_id = body.clinicId || null;
+      } else if (profile.is_admin && profile.clinic_id && (body.clinicId === profile.clinic_id || body.clinicId === '')) {
+        update.clinic_id = body.clinicId || null;
+      }
+      if (body.professionalTitle !== undefined) {
+        update.professional_title = body.professionalTitle?.trim() || null;
+      }
+      if (body.aboutMe !== undefined) {
+        update.about_me = body.aboutMe?.trim() || null;
+      }
+      const { error } = await db.from('clinician_profiles').update(update).eq('id', body.clinicianId);
+      if (error) throw new Error('Unable to update clinician.');
+      return Response.json({ message: 'Clinician details and access updated.' });
+    }
     if (body.action === 'reset_password') { const { error } = await db.auth.resetPasswordForEmail(account.email, { redirectTo: appUrl(request, '/clinician/reset-password') }); if (error) throw new Error(error.message); return Response.json({ message: `Password-reset email sent to ${account.email}.` }); }
     throw new Error('Unknown clinician action.');
   } catch (error) { return Response.json({ error: error instanceof Error ? error.message : 'Unable to manage clinician.' }, { status: 400 }); }

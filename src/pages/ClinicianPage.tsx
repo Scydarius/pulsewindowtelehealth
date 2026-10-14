@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, CalendarClock, CalendarDays, CheckCircle2, CircleAlert, Copy, LoaderCircle, MessageSquareText, RotateCcw, Search, ShieldOff, Trash2, UsersRound, Video } from 'lucide-react';
+import { Activity, ArrowRight, CalendarClock, CalendarDays, CheckCircle2, CircleAlert, Copy, LoaderCircle, MessageSquareText, RotateCcw, Search, ShieldOff, Trash2, UsersRound, Video, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
@@ -148,7 +148,7 @@ export function ClinicianPage() {
   const title = view === 'patients' ? ['Patients', 'Active patients and their longitudinal records'] : view === 'appointments' ? ['Schedule & Bookings', 'Manage appointments, seven-day calendar, and patient self-booking availability.'] : view === 'measurements' ? ['Review queue', 'Readings received from patient sessions'] : ['Today', 'Your appointments, follow-up work, and patient activity in one place.'];
 
   return <div className="dashboard-page">
-    <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view === 'appointments' ? 'Schedule' : view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search name, email, or reason" /></label></div></section>
+    <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view === 'appointments' ? 'Schedule' : view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search name, email, or reason…" />{search && <button type="button" className="text-button" onClick={() => setSearch('')} aria-label="Clear search" style={{ padding: 0, margin: 0, border: 0, background: 'none' }}><X size={15} /></button>}</label></div></section>
     <section className="summary-strip workspace-summary">
       <Link to="/clinician?view=appointments"><div><CalendarClock /></div><span><strong>{todayAppointments.length}</strong>Appointments today</span><ArrowRight size={16} /></Link>
       <Link to="/clinician?view=patients"><div><UsersRound /></div><span><strong>{patientGroups.length}</strong>Active patients</span><ArrowRight size={16} /></Link>

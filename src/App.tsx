@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { AdminSessionGate } from './components/AdminSessionGate';
 import { ClinicianSessionGate } from './components/ClinicianSessionGate';
@@ -20,6 +20,7 @@ import { BookingPage } from './pages/BookingPage';
 import { ClinicianPage } from './pages/ClinicianPage';
 import { PatientProfilePage } from './pages/PatientProfilePage';
 import { ClinicianProfilePage } from './pages/ClinicianProfilePage';
+import { ClinicWebsitePage } from './pages/ClinicWebsitePage';
 
 // Code-split heavy routes (LiveKit WebRTC, camera processing, review engine)
 const ConsultationPage = lazyWithRetry(() => import('./pages/ConsultationPage').then((module) => ({ default: module.ConsultationPage })));
@@ -42,6 +43,34 @@ function ConsultationRoute() {
   return params.get('role') === 'clinician'
     ? <ClinicianSessionGate>{consultation}</ClinicianSessionGate>
     : <PatientSessionGate>{consultation}</PatientSessionGate>;
+}
+
+const RESERVED_TOP_PATHS = new Set([
+  'technology',
+  'demo',
+  'contact',
+  'clinicians',
+  'privacy',
+  'terms',
+  'security',
+  'clinician',
+  'join',
+  'book',
+  'admin',
+  'consultation',
+  'api',
+  'patient',
+  'assets',
+  'favicon.ico',
+]);
+
+function ClinicWebsiteRoute() {
+  const { clinicSlug } = useParams<{ clinicSlug: string }>();
+  const normalized = clinicSlug?.trim().toLowerCase();
+  if (!normalized || RESERVED_TOP_PATHS.has(normalized)) {
+    return <Navigate to="/" replace />;
+  }
+  return <ClinicWebsitePage slug={normalized} />;
 }
 
 export default function App() {
@@ -70,6 +99,8 @@ export default function App() {
         <Route path="/admin/clinicians" element={<Navigate to="/admin" replace />} />
         <Route path="/consultation/:appointmentId" element={<ConsultationRoute />} />
       </Route>
+      <Route path="/clinic/:clinicSlug" element={page(<ClinicWebsiteRoute />)} />
+      <Route path="/:clinicSlug" element={page(<ClinicWebsiteRoute />)} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
