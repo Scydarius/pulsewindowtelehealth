@@ -1,7 +1,7 @@
-import { Activity, ArrowLeft, CalendarClock, ClipboardList, LoaderCircle, Mail, MessageSquareText, UserRound, Video } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Activity, ArrowLeft, CalendarClock, ClipboardList, LoaderCircle, Mail, MessageSquareText, Trash2, UserRound, Video } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { loadPatientProfile, type PatientProfile } from '../services/clinicAccess';
+import { deletePatient, loadPatientProfile, type PatientProfile } from '../services/clinicAccess';
 
 const number = (value: number | null, digits = 0) => value === null ? '—' : value.toFixed(digits);
 const dateTime = (value: string) => new Date(value).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
@@ -19,12 +19,32 @@ function PatientTrend({ patient }: { patient: PatientProfile }) {
 }
 
 export function PatientProfilePage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const patientId = searchParams.get('id') ?? '';
   const [patient, setPatient] = useState<PatientProfile>();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string>();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const handleRemovePatient = async () => {
+    if (!patient) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to remove ${patient.display_name} (${patient.email})?\n\nThis will remove them from your active patients list and delete their associated appointment records and notes.`
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await deletePatient(patientId, patient.email);
+      navigate('/clinician?view=patients');
+    } catch (reason) {
+      setDeleteError(reason instanceof Error ? reason.message : 'Unable to remove patient.');
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -43,9 +63,24 @@ export function PatientProfilePage() {
   return <div className="patient-profile-page">
     <Link className="back-link" to="/clinician"><ArrowLeft size={18} /> Back to workspace</Link>
     <section className="patient-profile-hero">
-      <div className="patient-profile-avatar">{patient.display_name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</div>
-      <div><p className="eyebrow">Patient profile</p><h1>{patient.display_name}</h1><p><Mail size={15} /> {patient.email}</p></div>
+      <div className="patient-profile-hero-left">
+        <div className="patient-profile-avatar">{patient.display_name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</div>
+        <div><p className="eyebrow">Patient profile</p><h1>{patient.display_name}</h1><p><Mail size={15} /> {patient.email}</p></div>
+      </div>
+      <div className="patient-profile-hero-actions">
+        <button
+          type="button"
+          className="button button-secondary patient-remove-hero-btn"
+          onClick={() => void handleRemovePatient()}
+          disabled={deleting}
+          title="Remove patient from active list"
+        >
+          {deleting ? <LoaderCircle size={15} className="spin" /> : <Trash2 size={15} />}
+          {deleting ? 'Removing…' : 'Remove patient'}
+        </button>
+      </div>
     </section>
+    {deleteError && <p className="form-error" style={{ margin: '0 0 1rem' }}>{deleteError}</p>}
     <section className="summary-strip patient-history-summary">
       <article><div><CalendarClock /></div><span><strong>{patient.appointments.length}</strong>Appointments</span></article>
       <article><div><Activity /></div><span><strong>{completed}</strong>Completed checks</span></article>

@@ -156,6 +156,18 @@ export async function deleteAppointment(appointmentId: string) {
   if (!response.ok) throw new Error(body.error ?? 'Unable to remove the appointment.');
 }
 
+/** Remove a patient and all their linked appointment records and measurements. */
+export async function deletePatient(patientId: string, email?: string): Promise<void> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/appointment-patient-link', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ deletePatient: true, patientId, email }),
+  });
+  const body = (await response.json().catch(() => ({ error: 'The patient service is temporarily unavailable.' }))) as { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'Unable to remove the patient.');
+}
+
 export async function fetchPatientInvitation(token: string) {
   const response = await fetch(`/api/patient-invitations?token=${encodeURIComponent(token)}`);
   const body = await response.json().catch(() => ({ error: 'The secure invitation service is temporarily unavailable. Please try again.' })) as {

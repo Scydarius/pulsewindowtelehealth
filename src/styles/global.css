@@ -2940,3 +2940,88 @@ body { background: var(--cream); color: var(--ink); }
   color: #b45309;
 }
 
+/* Patient directory actions and removal */
+.patient-directory-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
+}
+.patient-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem !important;
+  font-weight: 700 !important;
+  padding: 6px 10px !important;
+  border-radius: 4px;
+  color: #b91c1c !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.patient-remove-btn:hover:not(:disabled) {
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+  color: #991b1b !important;
+}
+.patient-remove-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.patient-profile-hero {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 20px !important;
+  flex-wrap: wrap !important;
+}
+.patient-profile-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+.patient-profile-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.patient-remove-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #b91c1c !important;
+  border-color: #fca5a5 !important;
+  background: #fff !important;
+  transition: all 0.15s ease;
+}
+.patient-remove-hero-btn:hover:not(:disabled) {
+  background: #fef2f2 !important;
+  border-color: #ef4444 !important;
+  color: #991b1b !important;
+}
+.patient-remove-hero-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .patient-directory-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .patient-profile-hero-actions {
+    width: 100%;
+    margin-top: 10px;
+  }
+  .patient-remove-hero-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+

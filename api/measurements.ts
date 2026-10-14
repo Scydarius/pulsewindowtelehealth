@@ -61,11 +61,6 @@ export default {
         diagnostics: diagnostics ?? null,
       });
       if (error) throw new Error('Unable to save the measurement.');
-      try {
-        await db.from('appointments').update({ needs_review: true, reviewed_at: null }).eq('id', appointmentId);
-      } catch {
-        // Safe if column not migrated yet
-      }
       return Response.json({ message: 'Measurement saved.' }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       return Response.json({ error: error instanceof Error ? error.message : 'Unable to process measurement.' }, { status: 400 });

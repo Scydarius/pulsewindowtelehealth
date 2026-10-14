@@ -6,7 +6,7 @@ import { InvitePatientForm, type ExistingPatientOption } from '../components/Inv
 import { ClinicianAvailabilityPanel } from '../components/ClinicianAvailabilityPanel';
 import { CopyButton } from '../components/CopyButton';
 import { type ClinicAppointment, type ClinicianProfile, isAppointmentNeedingReview, loadClinicianWorkspace } from '../services/clinicianData';
-import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, revokePatientInvitation, updateAppointmentReviewStatus } from '../services/clinicAccess';
+import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, deletePatient, revokePatientInvitation, updateAppointmentReviewStatus } from '../services/clinicAccess';
 
 type WorkspaceView = 'overview' | 'patients' | 'appointments' | 'measurements' | 'availability' | 'calendar';
 const workspaceView = (value: string | null): WorkspaceView => value === 'patients' || value === 'appointments' || value === 'measurements' || value === 'availability' || value === 'calendar' ? value : 'overview';
@@ -40,6 +40,7 @@ export function ClinicianPage() {
   const [creatingLink, setCreatingLink] = useState<string>();
   const [revokingLink, setRevokingLink] = useState<string>();
   const [deletingAppointment, setDeletingAppointment] = useState<string>();
+  const [deletingPatient, setDeletingPatient] = useState<string>();
   const [revokedLinks, setRevokedLinks] = useState<Record<string, true>>({});
   const [claimingAccess, setClaimingAccess] = useState(false);
   const [search, setSearch] = useState('');
@@ -112,6 +113,24 @@ export function ClinicianPage() {
       await updateAppointmentReviewStatus(appointmentId, false);
     } catch {
       // Saved in local cache
+    }
+  };
+
+  const handleRemovePatient = async (patient: { id: string; display_name: string; email: string }) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to remove ${patient.display_name} (${patient.email})?\n\nThis will remove them from your active patients list and delete their associated appointment records and notes.`
+    );
+    if (!confirmed) return;
+    setDeletingPatient(patient.id);
+    setError('');
+    try {
+      await deletePatient(patient.id, patient.email);
+      setNotice(`Removed ${patient.display_name} from active patients.`);
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to remove patient.');
+    } finally {
+      setDeletingPatient(undefined);
     }
   };
   // Email is the patient identity used by invitations, so all visits for the
@@ -201,7 +220,7 @@ export function ClinicianPage() {
     </section>
 
     {view === 'overview' && <><section className="command-centre"><div className="command-centre-main"><div className="section-heading"><div><p className="eyebrow">Today / schedule</p><h2>Your next appointments</h2><p>Join a call, check the patient record, or manage access without leaving this view.</p></div><button className="text-button" onClick={() => selectScheduleTab('calendar')}>Open calendar <ArrowRight size={16} /></button></div><div className="command-list">{scheduled.slice(0, 3).map(commandAppointmentRow)}{scheduled.length === 0 && <EmptyAppointments />}</div></div><aside className="command-centre-action"><p className="eyebrow">Quick action</p><h2>Create an appointment</h2><p>Add a new patient or schedule a follow-up for an existing patient.</p><InvitePatientForm patients={patientOptions} onCreated={() => void load()} triggerVariant="primary" /></aside></section><section className="panel review-queue-panel"><div className="section-heading"><div><p className="eyebrow">Review queue</p><h2>Patient readings ready</h2><p>Open the session record, review measurements, and document follow-up.</p></div><Link className="text-button" to="/clinician?view=measurements">View all <ArrowRight size={16} /></Link></div><MeasurementList appointments={reviewQueue.slice(0, 4)} onRemoveFromReview={handleRemoveFromReview} /></section></>}
-    {view === 'patients' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Patient directory</p><h2>Active patients</h2><p>Every appointment for the same email is grouped under one patient card.</p></div><InvitePatientForm patients={patientOptions} onCreated={() => void load()} /></div><div className="patient-directory">{patientGroups.filter((group) => !search.trim() || [group.patient.display_name, group.patient.email].some((value) => value.toLowerCase().includes(search.trim().toLowerCase()))).map((group) => <article key={group.patient.email} className="patient-directory-card patient-directory-card-grouped"><div className="patient-avatar">{group.patient.display_name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><strong>{group.patient.display_name}</strong><span>{group.patient.email}</span><small>{group.records.length} appointment{group.records.length === 1 ? '' : 's'} · latest {new Date(group.records[0].starts_at).toLocaleDateString()}</small></div><Link className="button button-secondary button-small" to={`/clinician/patient?id=${encodeURIComponent(group.patient.id)}`}>Open profile <ArrowRight size={15} /></Link></article>)}{patientGroups.length === 0 && <EmptyAppointments />}</div></section>}
+    {view === 'patients' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Patient directory</p><h2>Active patients</h2><p>Every appointment for the same email is grouped under one patient card.</p></div><InvitePatientForm patients={patientOptions} onCreated={() => void load()} /></div><div className="patient-directory">{patientGroups.filter((group) => !search.trim() || [group.patient.display_name, group.patient.email].some((value) => value.toLowerCase().includes(search.trim().toLowerCase()))).map((group) => <article key={group.patient.email} className="patient-directory-card patient-directory-card-grouped"><div className="patient-avatar">{group.patient.display_name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><strong>{group.patient.display_name}</strong><span>{group.patient.email}</span><small>{group.records.length} appointment{group.records.length === 1 ? '' : 's'} · latest {new Date(group.records[0].starts_at).toLocaleDateString()}</small></div><div className="patient-directory-actions"><Link className="button button-secondary button-small" to={`/clinician/patient?id=${encodeURIComponent(group.patient.id)}`}>Open profile <ArrowRight size={15} /></Link><button type="button" className="text-button danger-action patient-remove-btn" disabled={deletingPatient === group.patient.id} onClick={() => void handleRemovePatient(group.patient)} title="Remove patient from active list">{deletingPatient === group.patient.id ? <LoaderCircle size={13} className="spin" /> : <Trash2 size={13} />} Remove</button></div></article>)}{patientGroups.length === 0 && <EmptyAppointments />}</div></section>}
     {view === 'appointments' && <div className="schedule-unified-container">
       <nav className="schedule-tab-nav" aria-label="Schedule views">
         <button className={scheduleTab === 'appointments' ? 'active' : ''} onClick={() => selectScheduleTab('appointments')}>

@@ -48,13 +48,80 @@ export default async function patientLink(request: VercelRequest, response: Verc
     const rawAuthorization = request.headers.authorization;
     const token = (Array.isArray(rawAuthorization) ? rawAuthorization[0] : rawAuthorization)?.replace(/^Bearer\s+/i, '');
     if (!token) throw new Error('Sign in is required.');
-    const body = (typeof request.body === 'string' ? JSON.parse(request.body) : request.body ?? {}) as { appointmentId?: string; deleteAppointment?: boolean; sendEmail?: boolean };
-    if (!body.appointmentId) return response.status(400).json({ error: 'Appointment is required.' });
+    const body = (typeof request.body === 'string' ? JSON.parse(request.body) : request.body ?? {}) as {
+      appointmentId?: string;
+      patientId?: string;
+      email?: string;
+      deleteAppointment?: boolean;
+      deletePatient?: boolean;
+      sendEmail?: boolean;
+    };
     const db = database();
     const { data: userData, error: userError } = await db.auth.getUser(token);
     if (userError || !userData.user) throw new Error('Your sign-in session is invalid.');
     const { data: clinician, error: clinicianError } = await db.from('clinician_profiles').select('id').eq('id', userData.user.id).maybeSingle();
     if (clinicianError || !clinician) throw new Error('This account is not an authorised clinician.');
+
+    if (request.method === 'DELETE' && body.deletePatient) {
+      const patientId = body.patientId;
+      const email = body.email?.trim().toLowerCase();
+      if (!patientId && !email) return response.status(400).json({ error: 'Patient ID or email is required.' });
+
+      let patientQuery = db.from('patients').select('id, display_name, email').eq('clinician_id', clinician.id);
+      if (patientId && email) {
+        patientQuery = patientQuery.or(`id.eq.${patientId},email.ilike.${email}`);
+      } else if (patientId) {
+        patientQuery = patientQuery.eq('id', patientId);
+      } else if (email) {
+        patientQuery = patientQuery.ilike('email', email);
+      }
+
+      const { data: matchedPatients, error: pError } = await patientQuery;
+      if (pError) throw new Error('Unable to find patient record.');
+      const patientIds = (matchedPatients ?? []).map((p) => p.id);
+
+      if (patientIds.length > 0) {
+        const { data: appointments, error: aError } = await db
+          .from('appointments')
+          .select('id, google_event_id')
+          .eq('clinician_id', clinician.id)
+          .in('patient_id', patientIds);
+
+        if (aError) throw new Error('Unable to locate appointments.');
+        const apptIds = (appointments ?? []).map((a) => a.id);
+
+        if (apptIds.length > 0) {
+          for (const a of appointments ?? []) {
+            if (a.google_event_id) {
+              try { await deleteGoogleCalendarEvent(db, clinician.id, a.google_event_id); }
+              catch { /* best-effort */ }
+            }
+          }
+          await Promise.all([
+            db.from('clinician_private_notes').delete().in('appointment_id', apptIds),
+            db.from('measurements').delete().in('appointment_id', apptIds),
+            db.from('patient_invites').delete().in('appointment_id', apptIds),
+          ]);
+          const { error: apptDeleteErr } = await db.from('appointments').delete().in('id', apptIds);
+          if (apptDeleteErr) throw new Error('Unable to remove linked appointments.');
+        }
+
+        const { error: deletePatientErr } = await db.from('patients').delete().in('id', patientIds).eq('clinician_id', clinician.id);
+        if (deletePatientErr) throw new Error('Unable to remove patient record.');
+
+        await recordAuditEvent(db, {
+          action: 'patient.deleted',
+          clinicianId: clinician.id,
+          appointmentId: null,
+          patientId: patientIds[0],
+          metadata: { patient_ids: patientIds, email },
+        });
+      }
+
+      return response.status(200).json({ deleted: true, patientIds });
+    }
+
+    if (!body.appointmentId) return response.status(400).json({ error: 'Appointment is required.' });
     const { data: appointment } = await db.from('appointments').select('id, patient_id, starts_at, google_event_id, patient:patients(display_name, email)').eq('id', body.appointmentId).eq('clinician_id', clinician.id).maybeSingle();
     if (!appointment) return response.status(403).json({ error: 'You are not authorised for this appointment.' });
 
