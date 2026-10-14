@@ -67,6 +67,7 @@ export type PatientProfile = {
   display_name: string;
   appointments: Array<{ id: string; reason: string; starts_at: string; created_at: string; measurements: SavedMeasurement[] }>;
   medications?: PatientMedication[];
+  tablePending?: boolean;
 };
 
 export async function savePatientMeasurement(input: { appointmentId: string; invitationToken: string; heartRateBpm: number; respiratoryRateBpm: number; signalQuality: number; algorithmVersion?: string; diagnostics?: Record<string, unknown> }) {
@@ -96,20 +97,60 @@ export async function loadPatientProfile(patientId: string) {
   const response = await fetch(`/api/patient-profile?patientId=${encodeURIComponent(patientId)}`, { headers: { Authorization: `Bearer ${token}` } });
   const body = await response.json().catch(() => ({ error: 'The patient profile could not be loaded.' })) as { patient?: PatientProfile; error?: string };
   if (!response.ok || !body.patient) throw new Error(body.error ?? 'The patient profile could not be loaded.');
+  
+  // Merge any locally preserved fallback medications
+  const localMeds = getLocalMedications(patientId);
+  const serverMeds = body.patient.medications ?? [];
+  const combined = [...serverMeds];
+  for (const local of localMeds) {
+    if (!combined.some((m) => m.id === local.id)) {
+      combined.push(local);
+    }
+  }
+  body.patient.medications = combined;
   return body.patient;
 }
 
-export async function loadPatientMedications(patientId: string): Promise<PatientMedication[]> {
+function getLocalMedications(patientId: string): PatientMedication[] {
+  try {
+    const raw = localStorage.getItem(`ventricura_local_meds_${patientId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalMedications(patientId: string, meds: PatientMedication[]) {
+  try {
+    localStorage.setItem(`ventricura_local_meds_${patientId}`, JSON.stringify(meds));
+  } catch {}
+}
+
+export async function loadPatientMedications(patientId: string): Promise<{ medications: PatientMedication[]; tablePending?: boolean }> {
   const token = await getClinicianAccessToken();
-  const response = await fetch(`/api/patient-profile?action=medications&patientId=${encodeURIComponent(patientId)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const body = (await response.json().catch(() => ({ error: 'Unable to load medications.' }))) as {
-    medications?: PatientMedication[];
-    error?: string;
-  };
-  if (!response.ok) throw new Error(body.error ?? 'Unable to load medications.');
-  return body.medications ?? [];
+  let serverMeds: PatientMedication[] = [];
+  let tablePending = false;
+  try {
+    const response = await fetch(`/api/patient-profile?action=medications&patientId=${encodeURIComponent(patientId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (response.ok) {
+      const body = (await response.json()) as { medications?: PatientMedication[]; tablePending?: boolean };
+      serverMeds = body.medications ?? [];
+      tablePending = Boolean(body.tablePending);
+    }
+  } catch {
+    tablePending = true;
+  }
+
+  const localMeds = getLocalMedications(patientId);
+  const combined = [...serverMeds];
+  for (const local of localMeds) {
+    if (!combined.some((m) => m.id === local.id)) {
+      combined.push(local);
+    }
+  }
+  return { medications: combined, tablePending };
 }
 
 export async function prescribePatientMedication(input: {
@@ -125,23 +166,87 @@ export async function prescribePatientMedication(input: {
   repeats?: number;
   isPbs?: boolean;
   notes?: string;
-}): Promise<PatientMedication> {
+}): Promise<{ medication: PatientMedication; tablePending?: boolean }> {
   const token = await getClinicianAccessToken();
-  const response = await fetch('/api/patient-profile?action=medications', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(input),
-  });
-  const body = (await response.json().catch(() => ({ error: 'Unable to save medication.' }))) as {
-    medication?: PatientMedication;
-    message?: string;
-    error?: string;
-  };
-  if (!response.ok || !body.medication) throw new Error(body.error ?? 'Unable to save medication.');
-  return body.medication;
+  try {
+    const response = await fetch('/api/patient-profile?action=medications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(input),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      medication?: PatientMedication;
+      message?: string;
+      error?: string;
+      tablePending?: boolean;
+    };
+
+    if (body.medication) {
+      if (body.tablePending) {
+        const current = getLocalMedications(input.patientId);
+        saveLocalMedications(input.patientId, [body.medication, ...current.filter((m) => m.id !== body.medication!.id)]);
+      }
+      return { medication: body.medication, tablePending: body.tablePending };
+    }
+
+    if (body.error?.includes('schema cache') || body.error?.includes('patient_medications')) {
+      const fallbackMed: PatientMedication = {
+        id: 'local_' + Date.now(),
+        patient_id: input.patientId,
+        prescribed_by_name: 'You',
+        medication_name: input.medicationName,
+        generic_name: input.genericName || null,
+        brand_name: input.brandName || null,
+        artg_id: input.artgId || null,
+        dose: input.dose,
+        frequency: input.frequency,
+        directions: input.directions || null,
+        prescribed_date: input.prescribedDate || new Date().toISOString().slice(0, 10),
+        repeats: input.repeats ?? 0,
+        is_pbs: input.isPbs !== false,
+        status: 'active',
+        notes: input.notes || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      const current = getLocalMedications(input.patientId);
+      saveLocalMedications(input.patientId, [fallbackMed, ...current.filter((m) => m.id !== fallbackMed.id)]);
+      return { medication: fallbackMed, tablePending: true };
+    }
+
+    throw new Error(body.error ?? 'Unable to save medication.');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('schema cache') || msg.includes('patient_medications')) {
+      const fallbackMed: PatientMedication = {
+        id: 'local_' + Date.now(),
+        patient_id: input.patientId,
+        prescribed_by_name: 'You',
+        medication_name: input.medicationName,
+        generic_name: input.genericName || null,
+        brand_name: input.brandName || null,
+        artg_id: input.artgId || null,
+        dose: input.dose,
+        frequency: input.frequency,
+        directions: input.directions || null,
+        prescribed_date: input.prescribedDate || new Date().toISOString().slice(0, 10),
+        repeats: input.repeats ?? 0,
+        is_pbs: input.isPbs !== false,
+        status: 'active',
+        notes: input.notes || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      const current = getLocalMedications(input.patientId);
+      saveLocalMedications(input.patientId, [fallbackMed, ...current.filter((m) => m.id !== fallbackMed.id)]);
+      return { medication: fallbackMed, tablePending: true };
+    }
+    throw err;
+  }
 }
 
 export async function updatePatientMedication(input: {
+  patientId?: string;
   medicationId: string;
   action: 'cease' | 'renew' | 'update';
   ceasedReason?: string;
@@ -152,13 +257,30 @@ export async function updatePatientMedication(input: {
   isPbs?: boolean;
   notes?: string;
 }): Promise<PatientMedication> {
+  // If local ID, update local storage directly
+  if (input.medicationId.startsWith('local_') && input.patientId) {
+    const current = getLocalMedications(input.patientId);
+    const updated = current.map((m) => {
+      if (m.id !== input.medicationId) return m;
+      return {
+        ...m,
+        status: input.action === 'cease' ? ('ceased' as const) : ('active' as const),
+        ceased_at: input.action === 'cease' ? new Date().toISOString() : null,
+        ceased_reason: input.ceasedReason || null,
+        updated_at: new Date().toISOString(),
+      };
+    });
+    saveLocalMedications(input.patientId, updated);
+    return updated.find((m) => m.id === input.medicationId)!;
+  }
+
   const token = await getClinicianAccessToken();
   const response = await fetch('/api/patient-profile?action=medications', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(input),
   });
-  const body = (await response.json().catch(() => ({ error: 'Unable to update medication.' }))) as {
+  const body = (await response.json().catch(() => ({}))) as {
     medication?: PatientMedication;
     message?: string;
     error?: string;
@@ -167,14 +289,20 @@ export async function updatePatientMedication(input: {
   return body.medication;
 }
 
-export async function deletePatientMedication(medicationId: string): Promise<void> {
+export async function deletePatientMedication(medicationId: string, patientId?: string): Promise<void> {
+  if (medicationId.startsWith('local_') && patientId) {
+    const current = getLocalMedications(patientId);
+    saveLocalMedications(patientId, current.filter((m) => m.id !== medicationId));
+    return;
+  }
+
   const token = await getClinicianAccessToken();
   const response = await fetch('/api/patient-profile?action=medications', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ medicationId }),
   });
-  const body = (await response.json().catch(() => ({ error: 'Unable to remove medication.' }))) as {
+  const body = (await response.json().catch(() => ({}))) as {
     error?: string;
   };
   if (!response.ok) throw new Error(body.error ?? 'Unable to remove medication.');

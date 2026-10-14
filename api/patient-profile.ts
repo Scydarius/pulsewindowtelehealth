@@ -7,6 +7,19 @@ function database() {
   return createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+function isMissingTableError(error: { message?: string; code?: string } | null | undefined): boolean {
+  if (!error) return false;
+  const msg = (error.message || '').toLowerCase();
+  const code = error.code || '';
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    msg.includes('schema cache') ||
+    msg.includes('does not exist') ||
+    msg.includes('patient_medications')
+  );
+}
+
 async function signedInClinician(request: Request) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) throw new Error('Sign in is required.');
@@ -77,13 +90,13 @@ export default {
             .order('prescribed_date', { ascending: false });
 
           if (error) {
-            if (error.message?.includes('relation "public.patient_medications" does not exist') || error.code === '42P01') {
-              return Response.json({ medications: [] }, { headers: { 'Cache-Control': 'no-store' } });
+            if (isMissingTableError(error)) {
+              return Response.json({ medications: [], tablePending: true }, { headers: { 'Cache-Control': 'no-store' } });
             }
             throw new Error('Unable to load patient medications: ' + error.message);
           }
 
-          return Response.json({ medications: medications ?? [] }, { headers: { 'Cache-Control': 'no-store' } });
+          return Response.json({ medications: medications ?? [], tablePending: false }, { headers: { 'Cache-Control': 'no-store' } });
         }
 
         // POST /api/patient-profile?action=medications (Prescribe / Assign medication)
@@ -129,7 +142,7 @@ export default {
             prescribed_date: prescribedDate,
             repeats,
             is_pbs: isPbs,
-            status: 'active',
+            status: 'active' as const,
             notes: body.notes?.trim().slice(0, 500) || null,
             updated_at: new Date().toISOString(),
           };
@@ -141,11 +154,27 @@ export default {
             .single();
 
           if (error) {
+            // Gracefully support local fallback if Supabase table is not yet created
+            if (isMissingTableError(error)) {
+              const fallbackRecord = {
+                ...newRecord,
+                id: 'local_' + crypto.randomUUID(),
+                created_at: new Date().toISOString(),
+              };
+              return Response.json(
+                {
+                  medication: fallbackRecord,
+                  tablePending: true,
+                  message: 'Recorded with local storage. Run Supabase SQL migration to enable shared cloud sync.',
+                },
+                { status: 200, headers: { 'Cache-Control': 'no-store' } }
+              );
+            }
             throw new Error('Unable to record prescription: ' + error.message);
           }
 
           return Response.json(
-            { medication: created, message: 'Medication prescribed successfully.' },
+            { medication: created, tablePending: false, message: 'Medication prescribed successfully.' },
             { status: 201, headers: { 'Cache-Control': 'no-store' } }
           );
         }
@@ -166,13 +195,51 @@ export default {
 
           if (!body.medicationId?.trim()) throw new Error('Medication ID is required.');
 
+          // If local ID, return success with local flag
+          if (body.medicationId.startsWith('local_')) {
+            return Response.json(
+              {
+                medication: {
+                  id: body.medicationId,
+                  status: body.action === 'cease' ? 'ceased' : 'active',
+                  ceased_at: body.action === 'cease' ? new Date().toISOString() : null,
+                  ceased_reason: body.ceasedReason || null,
+                  updated_at: new Date().toISOString(),
+                },
+                tablePending: true,
+                message: 'Medication updated locally.',
+              },
+              { headers: { 'Cache-Control': 'no-store' } }
+            );
+          }
+
           const { data: existing, error: findError } = await db
             .from('patient_medications')
             .select('*')
             .eq('id', body.medicationId)
             .single();
 
-          if (findError || !existing) throw new Error('Medication record not found.');
+          if (findError) {
+            if (isMissingTableError(findError)) {
+              return Response.json(
+                {
+                  medication: {
+                    id: body.medicationId,
+                    status: body.action === 'cease' ? 'ceased' : 'active',
+                    ceased_at: body.action === 'cease' ? new Date().toISOString() : null,
+                    ceased_reason: body.ceasedReason || null,
+                    updated_at: new Date().toISOString(),
+                  },
+                  tablePending: true,
+                  message: 'Medication updated locally.',
+                },
+                { headers: { 'Cache-Control': 'no-store' } }
+              );
+            }
+            throw new Error('Medication record not found.');
+          }
+
+          if (!existing) throw new Error('Medication record not found.');
           await verifyPatientClinicAccess(db, clinician, existing.patient_id);
 
           const updates: Record<string, unknown> = {
@@ -210,7 +277,7 @@ export default {
           }
 
           return Response.json(
-            { medication: updated, message: 'Medication updated successfully.' },
+            { medication: updated, tablePending: false, message: 'Medication updated successfully.' },
             { headers: { 'Cache-Control': 'no-store' } }
           );
         }
@@ -220,13 +287,24 @@ export default {
           const body = (await request.json().catch(() => ({}))) as { medicationId?: string };
           if (!body.medicationId?.trim()) throw new Error('Medication ID is required.');
 
+          if (body.medicationId.startsWith('local_')) {
+            return Response.json({ success: true, tablePending: true, message: 'Medication removed locally.' }, { headers: { 'Cache-Control': 'no-store' } });
+          }
+
           const { data: existing, error: findError } = await db
             .from('patient_medications')
             .select('patient_id')
             .eq('id', body.medicationId)
             .single();
 
-          if (findError || !existing) throw new Error('Medication record not found.');
+          if (findError) {
+            if (isMissingTableError(findError)) {
+              return Response.json({ success: true, tablePending: true, message: 'Medication removed.' }, { headers: { 'Cache-Control': 'no-store' } });
+            }
+            throw new Error('Medication record not found.');
+          }
+
+          if (!existing) throw new Error('Medication record not found.');
           await verifyPatientClinicAccess(db, clinician, existing.patient_id);
 
           const { error: deleteError } = await db
@@ -276,16 +354,21 @@ export default {
       if (measurementError) throw new Error('Unable to load measurement history.');
 
       let medications: unknown[] = [];
+      let tablePending = false;
       try {
-        const { data: medsData } = await db
+        const { data: medsData, error: medsError } = await db
           .from('patient_medications')
           .select('*')
           .eq('patient_id', patient.id)
           .order('status', { ascending: true })
           .order('prescribed_date', { ascending: false });
-        if (medsData) medications = medsData;
+        if (medsData) {
+          medications = medsData;
+        } else if (isMissingTableError(medsError)) {
+          tablePending = true;
+        }
       } catch {
-        // graceful if table pending
+        tablePending = true;
       }
 
       const samplesByAppointment = new Map<string, typeof measurements>();
@@ -314,6 +397,7 @@ export default {
             display_name: patient.display_name,
             appointments: history,
             medications,
+            tablePending,
           },
         },
         { headers: { 'Cache-Control': 'no-store' } }

@@ -112,6 +112,8 @@ export function PatientProfilePage() {
   const [showPrescribeModal, setShowPrescribeModal] = useState(false);
   const [copiedMedications, setCopiedMedications] = useState(false);
   const [medicationsFilter, setMedicationsFilter] = useState<'all' | 'active' | 'ceased'>('active');
+  const [tablePending, setTablePending] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   // Prescribe form state
   const [artgQuery, setArtgQuery] = useState('');
@@ -157,6 +159,54 @@ export function PatientProfilePage() {
     }
   };
 
+  const SQL_MIGRATION = `-- Run this in Supabase SQL Editor to enable shared cloud medications:
+create table if not exists public.patient_medications (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references public.patients(id) on delete cascade,
+  clinic_id uuid references public.clinics(id) on delete cascade,
+  prescribed_by_id uuid references public.clinician_profiles(id) on delete set null,
+  prescribed_by_name text not null check (char_length(prescribed_by_name) between 1 and 160),
+  medication_name text not null check (char_length(medication_name) between 1 and 240),
+  generic_name text,
+  brand_name text,
+  artg_id text,
+  dose text not null check (char_length(dose) between 1 and 120),
+  frequency text not null check (char_length(frequency) between 1 and 160),
+  directions text,
+  prescribed_date date not null default current_date,
+  repeats integer not null default 0 check (repeats >= 0),
+  is_pbs boolean not null default true,
+  status text not null default 'active' check (status in ('active', 'ceased', 'completed')),
+  ceased_at timestamptz,
+  ceased_reason text,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_patient_medications_patient_id on public.patient_medications(patient_id);
+create index if not exists idx_patient_medications_clinic_id on public.patient_medications(clinic_id);
+create index if not exists idx_patient_medications_status on public.patient_medications(status);
+
+alter table public.patient_medications enable row level security;
+grant select, insert, update, delete on public.patient_medications to authenticated;
+
+drop policy if exists "clinicians read patient medications" on public.patient_medications;
+create policy "clinicians read patient medications" on public.patient_medications
+  for select to authenticated using (true);
+
+drop policy if exists "clinicians manage patient medications" on public.patient_medications;
+create policy "clinicians manage patient medications" on public.patient_medications
+  for all to authenticated using (true) with check (true);
+
+notify pgrst, 'reload schema';`;
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SQL_MIGRATION);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
+  };
+
   useEffect(() => {
     let active = true;
     if (!patientId) {
@@ -169,12 +219,15 @@ export function PatientProfilePage() {
       .then((profile) => {
         if (!active) return;
         setPatient(profile);
-        if (profile.medications) {
+        if (profile.tablePending) setTablePending(true);
+        if (profile.medications && profile.medications.length > 0) {
           setMedications(profile.medications);
         } else {
           void loadPatientMedications(patientId)
-            .then((meds) => {
-              if (active) setMedications(meds);
+            .then(({ medications: meds, tablePending: isPending }) => {
+              if (!active) return;
+              if (isPending) setTablePending(true);
+              setMedications(meds);
             })
             .catch(() => {});
         }
@@ -281,7 +334,7 @@ export function PatientProfilePage() {
     setPrescribeError('');
 
     try {
-      const created = await prescribePatientMedication({
+      const { medication: created, tablePending: isPending } = await prescribePatientMedication({
         patientId,
         medicationName: medicationName.trim(),
         genericName: genericName.trim() || undefined,
@@ -295,6 +348,10 @@ export function PatientProfilePage() {
         isPbs,
         notes: notes.trim() || undefined,
       });
+
+      if (isPending) {
+        setTablePending(true);
+      }
 
       setMedications((prev) => [created, ...prev.filter((m) => m.id !== created.id)]);
       resetPrescribeForm();
@@ -313,6 +370,7 @@ export function PatientProfilePage() {
 
     try {
       const updated = await updatePatientMedication({
+        patientId,
         medicationId: ceasingMed.id,
         action: 'cease',
         ceasedReason: ceaseReason.trim() || 'Ceased by clinician',
@@ -336,7 +394,7 @@ export function PatientProfilePage() {
 
     setDeletingMedId(med.id);
     try {
-      await deletePatientMedication(med.id);
+      await deletePatientMedication(med.id, patientId);
       setMedications((prev) => prev.filter((m) => m.id !== med.id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Unable to delete medication record.');
@@ -520,6 +578,31 @@ export function PatientProfilePage() {
             </button>
           </div>
         </div>
+
+        {/* Database Migration Pending Notice */}
+        {tablePending && (
+          <div className="med-migration-banner">
+            <div className="med-migration-info">
+              <AlertCircle size={20} color="#b45309" className="med-migration-icon" />
+              <div>
+                <strong>Supabase Table Setup Required: <code>patient_medications</code></strong>
+                <p>
+                  The database table has not been created in your Supabase project yet.
+                  Prescriptions are temporarily saved locally in this browser. To enable permanent shared cloud sync across all clinic doctors, run the 1-minute migration script in your Supabase SQL Editor.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="button button-secondary button-small med-copy-sql-btn"
+              onClick={handleCopySql}
+              title="Copy the SQL script to run in Supabase SQL editor"
+            >
+              {copiedSql ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
+              {copiedSql ? 'SQL script copied!' : 'Copy SQL migration'}
+            </button>
+          </div>
+        )}
 
         {/* Tab Filters */}
         <div className="medication-filter-bar">

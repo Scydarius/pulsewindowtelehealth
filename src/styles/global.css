@@ -3772,3 +3772,55 @@ body { background: var(--cream); color: var(--ink); }
     padding: 20px;
   }
 }
+
+.med-migration-banner {
+  margin: 18px 0 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #f59e0b;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.med-migration-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 720px;
+}
+.med-migration-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.med-migration-info strong {
+  display: block;
+  font-size: 0.88rem;
+  color: #92400e;
+  margin-bottom: 3px;
+}
+.med-migration-info p {
+  font-size: 0.82rem;
+  color: #78350f;
+  margin: 0;
+  line-height: 1.45;
+}
+.med-migration-info code {
+  background: #fef3c7;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+.med-copy-sql-btn {
+  background: #ffffff !important;
+  color: #92400e !important;
+  border: 1px solid #d97706 !important;
+  font-weight: 750 !important;
+  font-size: 0.78rem !important;
+  white-space: nowrap;
+}
+.med-copy-sql-btn:hover {
+  background: #fef3c7 !important;
+}
