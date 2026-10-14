@@ -1,7 +1,7 @@
-import { Activity, ArrowLeft, CalendarClock, ChevronDown, ChevronUp, ClipboardList, Download, FileText, LoaderCircle, Printer, Save, Video } from 'lucide-react';
+import { Activity, ArrowLeft, BookmarkCheck, BookmarkPlus, CalendarClock, Check, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, Download, FileText, LoaderCircle, Printer, Save, Video } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
-import { loadPatientProfile, loadPrivateClinicalNote, savePrivateClinicalNote, type SavedMeasurement } from '../services/clinicAccess';
+import { getAppointmentReviewStatus, loadPatientProfile, loadPrivateClinicalNote, savePrivateClinicalNote, updateAppointmentReviewStatus, type SavedMeasurement } from '../services/clinicAccess';
 
 const time = (value: string) => new Date(value).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
 const value = (input: number | null | undefined, suffix = '', digits = 0) => input === null || input === undefined ? '—' : `${input.toFixed(digits)}${suffix}`;
@@ -183,12 +183,100 @@ function exportConsultationPdf(input: { appointmentId: string; patientName: stri
 export function ConsultationReviewPage() {
   const [params] = useSearchParams(); const appointmentId = params.get('appointment') ?? ''; const patientId = params.get('patient') ?? '';
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading'); const [error, setError] = useState(''); const [patient, setPatient] = useState<Awaited<ReturnType<typeof loadPatientProfile>>>(); const [notes, setNotes] = useState(''); const [noteStatus, setNoteStatus] = useState<'saved' | 'saving' | 'error'>('saved'); const [showSamples, setShowSamples] = useState(false);
-  useEffect(() => { if (!appointmentId || !patientId) { setError('This consultation review link is incomplete.'); setState('error'); return; } let active = true; void Promise.all([loadPatientProfile(patientId), loadPrivateClinicalNote(appointmentId)]).then(([profile, note]) => { if (!active) return; setPatient(profile); setNotes(note.content); setState('ready'); }).catch((reason) => { if (!active) return; setError(reason instanceof Error ? reason.message : 'Could not load this consultation review.'); setState('error'); }); return () => { active = false; }; }, [appointmentId, patientId]);
+  const [needsReview, setNeedsReview] = useState(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewNotice, setReviewNotice] = useState('');
+
+  useEffect(() => {
+    if (!appointmentId || !patientId) { setError('This consultation review link is incomplete.'); setState('error'); return; }
+    let active = true;
+    void Promise.all([loadPatientProfile(patientId), loadPrivateClinicalNote(appointmentId), getAppointmentReviewStatus(appointmentId)])
+      .then(([profile, note, review]) => {
+        if (!active) return;
+        setPatient(profile);
+        setNotes(note.content);
+        // Default to true if has measurements and no review record yet, or use explicit review status
+        const appt = profile.appointments.find((item) => item.id === appointmentId);
+        const hasMeasurements = (appt?.measurements.length ?? 0) > 0;
+        setNeedsReview(review.reviewedAt ? false : (review.needsReview || hasMeasurements));
+        setState('ready');
+      })
+      .catch((reason) => {
+        if (!active) return;
+        setError(reason instanceof Error ? reason.message : 'Could not load this consultation review.');
+        setState('error');
+      });
+
+    const onReviewUpdated = (e: Event) => {
+      const custom = e as CustomEvent<{ appointmentId: string; needsReview: boolean }>;
+      if (custom.detail?.appointmentId === appointmentId && active) {
+        setNeedsReview(custom.detail.needsReview);
+      }
+    };
+    window.addEventListener('ventricura:review-updated', onReviewUpdated);
+    return () => {
+      active = false;
+      window.removeEventListener('ventricura:review-updated', onReviewUpdated);
+    };
+  }, [appointmentId, patientId]);
+
   const appointment = useMemo(() => patient?.appointments.find((item) => item.id === appointmentId), [appointmentId, patient]);
   const samples = appointment?.measurements ?? []; const latest = samples.at(-1);
   const save = async () => { setNoteStatus('saving'); try { await savePrivateClinicalNote(appointmentId, notes); setNoteStatus('saved'); } catch { setNoteStatus('error'); } };
   const exportPdf = async () => { if (noteStatus !== 'saved') await save(); if (!exportConsultationPdf({ appointmentId, patientName: patient!.display_name, patientEmail: patient!.email, reason: appointment!.reason, startsAt: appointment!.starts_at, notes, samples })) setError('Your browser blocked the PDF window. Allow pop-ups for this site and try again.'); };
+
+  const handleToggleReview = async () => {
+    if (reviewSaving) return;
+    const next = !needsReview;
+    setReviewSaving(true);
+    setNeedsReview(next);
+    try {
+      await updateAppointmentReviewStatus(appointmentId, next);
+      setReviewNotice(next ? 'Patient flagged as needing review — added to queue' : 'Marked as reviewed — removed from review queue');
+      setTimeout(() => setReviewNotice(''), 4000);
+    } catch {
+      setNeedsReview(!next);
+    } finally {
+      setReviewSaving(false);
+    }
+  };
+
   if (state === 'loading') return <div className="workspace-state"><LoaderCircle className="spin" /><strong>Loading consultation record…</strong></div>;
   if (state === 'error' || !patient || !appointment) return <div className="workspace-state"><strong>Consultation review unavailable</strong><span>{error || 'This consultation could not be found.'}</span><Link className="button button-primary" to="/clinician">Back to workspace</Link></div>;
-  return <div className="consultation-review-page"><header className="review-topbar"><Link className="back-link" to={`/clinician/patient?id=${encodeURIComponent(patientId)}`}><ArrowLeft size={18} /> Patient profile</Link><div><span>CONSULTATION REVIEW</span><strong>Saved session record</strong></div><div className="review-actions"><button className="button button-secondary button-small" onClick={() => void exportPdf()}><Printer size={16} /> Export PDF</button><Link className="button button-secondary button-small" to={`/consultation/${appointmentId}?role=clinician${patient?.display_name ? `&patientName=${encodeURIComponent(patient.display_name)}` : ''}`}><Video size={16} /> Join live call</Link></div></header><section className="review-hero"><div><p className="eyebrow">{appointment.reason}</p><h1>{patient.display_name}</h1><p>{patient.email} · scheduled {time(appointment.starts_at)}</p></div><div className="review-hero-meta"><CalendarClock size={19} /><span>Session date</span><strong>{new Date(appointment.starts_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></div></section><section className="review-metrics"><article><Activity /><span>Latest pulse</span><strong>{value(latest?.heart_rate_bpm, ' BPM')}</strong><small>Saved API reading</small></article><article><Activity /><span>Latest breathing</span><strong>{value(latest?.respiratory_rate_bpm, ' /min')}</strong><small>Saved API reading</small></article><article><ClipboardList /><span>Signal quality</span><strong>{latest ? value(latest.signal_quality * 100, '%') : '—'}</strong><small>Latest saved sample</small></article><article><FileText /><span>Samples saved</span><strong>{samples.length}</strong><small>Session record</small></article></section><section className="review-grid"><article className="review-panel review-trend-panel"><div className="review-panel-heading"><div><p className="eyebrow">Session trend</p><h2>Pulse samples</h2></div><button className="text-button" onClick={() => exportCsv(appointmentId, samples)} disabled={!samples.length}><Download size={15} /> Export CSV</button></div><Trend samples={samples} /><p>Captured values returned by the rPPG API during this session.</p></article><article className="review-panel review-notes"><div className="review-panel-heading"><div><p className="eyebrow">Private record</p><h2>Clinician notes</h2></div><button className="button button-primary button-small" onClick={() => void save()} disabled={noteStatus === 'saving'}>{noteStatus === 'saving' ? <LoaderCircle className="spin" size={15} /> : <Save size={15} />}{noteStatus === 'saving' ? 'Saving…' : 'Save notes'}</button></div><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Observations, discussion, follow-up…" maxLength={10000} /><small>{noteStatus === 'error' ? 'Notes could not be saved. Try again.' : `${notes.length.toLocaleString()}/10,000 characters · visible only to the clinician.`}</small></article></section><section className="review-panel raw-session-panel"><div className="review-panel-heading"><div><p className="eyebrow">Raw session data</p><h2>{samples.length} saved measurements</h2></div><button className="text-button" onClick={() => setShowSamples((visible) => !visible)}>{showSamples ? <><ChevronUp size={16} /> Hide table</> : <><ChevronDown size={16} /> View table</>}</button></div>{showSamples && <div className="review-samples"><div><span>Captured</span><span>Pulse</span><span>Breathing</span><span>Signal quality</span></div>{samples.map((sample) => <div key={sample.measured_at}><span>{time(sample.measured_at)}</span><span>{value(sample.heart_rate_bpm, ' BPM')}</span><span>{value(sample.respiratory_rate_bpm, ' /min')}</span><span>{value(sample.signal_quality * 100, '%')}</span></div>)}</div>}</section></div>;
+  return <div className="consultation-review-page">
+    <header className="review-topbar">
+      <Link className="back-link" to={`/clinician/patient?id=${encodeURIComponent(patientId)}`}><ArrowLeft size={18} /> Patient profile</Link>
+      <div><span>CONSULTATION REVIEW</span><strong>Saved session record</strong></div>
+      <div className="review-actions">
+        <button
+          className={`button ${needsReview ? 'button-primary' : 'button-secondary'} button-small review-toggle-action`}
+          onClick={() => void handleToggleReview()}
+          disabled={reviewSaving}
+          title={needsReview ? 'Mark review complete and remove from queue' : 'Flag this patient for review'}
+        >
+          {reviewSaving ? <LoaderCircle className="spin" size={15} /> : needsReview ? <Check size={15} /> : <BookmarkPlus size={15} />}
+          {needsReview ? 'Mark as reviewed' : 'Flag for review'}
+        </button>
+        <button className="button button-secondary button-small" onClick={() => void exportPdf()}><Printer size={16} /> Export PDF</button>
+        <Link className="button button-secondary button-small" to={`/consultation/${appointmentId}?role=clinician${patient?.display_name ? `&patientName=${encodeURIComponent(patient.display_name)}` : ''}`}><Video size={16} /> Join live call</Link>
+      </div>
+    </header>
+    {reviewNotice && <div className="workspace-toast"><CheckCircle2 size={17} /> {reviewNotice}<button onClick={() => setReviewNotice('')} aria-label="Dismiss notification">×</button></div>}
+    <section className="review-hero">
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+          <p className="eyebrow" style={{ margin: 0 }}>{appointment.reason}</p>
+          <span className={`appointment-state ${needsReview ? 'state-ready-for-review' : ''}`}>
+            {needsReview ? 'Needs review' : 'Reviewed'}
+          </span>
+        </div>
+        <h1>{patient.display_name}</h1>
+        <p>{patient.email} · scheduled {time(appointment.starts_at)}</p>
+      </div>
+      <div className="review-hero-meta"><CalendarClock size={19} /><span>Session date</span><strong>{new Date(appointment.starts_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></div>
+    </section>
+    <section className="review-metrics"><article><Activity /><span>Latest pulse</span><strong>{value(latest?.heart_rate_bpm, ' BPM')}</strong><small>Saved API reading</small></article><article><Activity /><span>Latest breathing</span><strong>{value(latest?.respiratory_rate_bpm, ' /min')}</strong><small>Saved API reading</small></article><article><ClipboardList /><span>Signal quality</span><strong>{latest ? value(latest.signal_quality * 100, '%') : '—'}</strong><small>Latest saved sample</small></article><article><FileText /><span>Samples saved</span><strong>{samples.length}</strong><small>Session record</small></article></section>
+    <section className="review-grid"><article className="review-panel review-trend-panel"><div className="review-panel-heading"><div><p className="eyebrow">Session trend</p><h2>Pulse samples</h2></div><button className="text-button" onClick={() => exportCsv(appointmentId, samples)} disabled={!samples.length}><Download size={15} /> Export CSV</button></div><Trend samples={samples} /><p>Captured values returned by the rPPG API during this session.</p></article><article className="review-panel review-notes"><div className="review-panel-heading"><div><p className="eyebrow">Private record</p><h2>Clinician notes</h2></div><button className="button button-primary button-small" onClick={() => void save()} disabled={noteStatus === 'saving'}>{noteStatus === 'saving' ? <LoaderCircle className="spin" size={15} /> : <Save size={15} />}{noteStatus === 'saving' ? 'Saving…' : 'Save notes'}</button></div><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Observations, discussion, follow-up…" maxLength={10000} /><small>{noteStatus === 'error' ? 'Notes could not be saved. Try again.' : `${notes.length.toLocaleString()}/10,000 characters · visible only to the clinician.`}</small></article></section>
+    <section className="review-panel raw-session-panel"><div className="review-panel-heading"><div><p className="eyebrow">Raw session data</p><h2>{samples.length} saved measurements</h2></div><button className="text-button" onClick={() => setShowSamples((visible) => !visible)}>{showSamples ? <><ChevronUp size={16} /> Hide table</> : <><ChevronDown size={16} /> View table</>}</button></div>{showSamples && <div className="review-samples"><div><span>Captured</span><span>Pulse</span><span>Breathing</span><span>Signal quality</span></div>{samples.map((sample) => <div key={sample.measured_at}><span>{time(sample.measured_at)}</span><span>{value(sample.heart_rate_bpm, ' BPM')}</span><span>{value(sample.respiratory_rate_bpm, ' /min')}</span><span>{value(sample.signal_quality * 100, '%')}</span></div>)}</div>}</section>
+  </div>;
 }

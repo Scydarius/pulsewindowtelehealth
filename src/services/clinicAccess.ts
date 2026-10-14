@@ -244,3 +244,71 @@ export async function testGoogleCalendarSync(): Promise<GoogleSyncDiagnostic> {
   });
   return response.json();
 }
+
+export async function getAppointmentReviewStatus(appointmentId: string): Promise<{ needsReview: boolean; reviewedAt: string | null }> {
+  try {
+    const raw = localStorage.getItem(`ventricura_review_override_${appointmentId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.needsReview === 'boolean') {
+        return { needsReview: parsed.needsReview, reviewedAt: parsed.reviewedAt ?? null };
+      }
+    }
+  } catch {}
+
+  try {
+    const token = await getClinicianAccessToken();
+    const response = await fetch(`/api/appointment-review?appointmentId=${encodeURIComponent(appointmentId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (response.ok) {
+      const body = await response.json();
+      return { needsReview: Boolean(body.needsReview), reviewedAt: body.reviewedAt ?? null };
+    }
+  } catch {}
+
+  return { needsReview: false, reviewedAt: null };
+}
+
+export async function updateAppointmentReviewStatus(appointmentId: string, needsReview: boolean): Promise<void> {
+  const reviewedAt = needsReview ? null : new Date().toISOString();
+
+  // 1. Immediately store in localStorage so UI is instantaneous across tabs
+  try {
+    localStorage.setItem(
+      `ventricura_review_override_${appointmentId}`,
+      JSON.stringify({ needsReview, reviewedAt, updatedAt: Date.now() })
+    );
+  } catch {}
+
+  // Broadcast event in window
+  try {
+    window.dispatchEvent(new CustomEvent('ventricura:review-updated', { detail: { appointmentId, needsReview, reviewedAt } }));
+  } catch {}
+
+  // 2. Persist to API
+  try {
+    const token = await getClinicianAccessToken();
+    await fetch('/api/appointment-review', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ appointmentId, needsReview }),
+    });
+  } catch (err) {
+    console.warn('[updateAppointmentReviewStatus] API update failed, cached locally:', err);
+  }
+
+  // 3. Also attempt direct Supabase update if user session has direct access
+  if (supabase) {
+    try {
+      await supabase
+        .from('appointments')
+        .update({ needs_review: needsReview, reviewed_at: reviewedAt })
+        .eq('id', appointmentId);
+    } catch {}
+  }
+}
+

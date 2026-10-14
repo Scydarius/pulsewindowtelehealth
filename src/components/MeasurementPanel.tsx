@@ -1,4 +1,4 @@
-import { Activity, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Download, FileText, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind, X } from 'lucide-react';
+import { Activity, BookmarkCheck, BookmarkPlus, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Download, FileText, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
 import { loadPatientMeasurementTrend, loadPrivateClinicalNote, savePatientMeasurement, savePrivateClinicalNote, type SavedMeasurement } from '../services/clinicAccess';
@@ -20,6 +20,8 @@ type MeasurementPanelProps = {
   patientName?: string;
   clinicianName?: string;
   stopRequest?: number;
+  isFlaggedForReview?: boolean;
+  onToggleReviewFlag?: () => void;
 };
 
 const initialState: MeasurementUpdate = {
@@ -99,6 +101,8 @@ function PrivateNotes({
   appointmentId,
   vitals,
   patientName,
+  isFlaggedForReview,
+  onToggleReviewFlag,
 }: {
   appointmentId: string;
   patientName?: string;
@@ -108,6 +112,8 @@ function PrivateNotes({
     signalQuality: number;
     diagnostics?: Record<string, unknown>;
   } | null;
+  isFlaggedForReview?: boolean;
+  onToggleReviewFlag?: () => void;
 }) {
   const [content, setContent] = useState('');
   const [status, setStatus] = useState<'loading' | 'saved' | 'saving' | 'error'>('loading');
@@ -204,6 +210,17 @@ function PrivateNotes({
         >
           {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? 'Copied' : 'Copy for EHR'}
         </button>
+        {onToggleReviewFlag && (
+          <button
+            type="button"
+            className={`note-shortcut-btn ${isFlaggedForReview ? 'active-flag' : ''}`}
+            onClick={onToggleReviewFlag}
+            title={isFlaggedForReview ? 'Patient flagged as Needs Review. Click to remove from review queue.' : 'Flag patient as Needs Review for follow-up'}
+          >
+            {isFlaggedForReview ? <BookmarkCheck size={12} /> : <BookmarkPlus size={12} />}
+            {isFlaggedForReview ? 'Needs review' : 'Flag for review'}
+          </button>
+        )}
       </div>
 
       <textarea
@@ -240,6 +257,8 @@ export function MeasurementPanel({
   patientName = 'Patient',
   clinicianName = 'Clinician',
   stopRequest = 0,
+  isFlaggedForReview,
+  onToggleReviewFlag,
 }: MeasurementPanelProps) {
   const [measurement, setMeasurement] = useState<MeasurementUpdate>(initialState);
   const stopRef = useRef<(() => void) | null>(null);
@@ -940,6 +959,8 @@ export function MeasurementPanel({
           signalQuality: measurement.signalQuality,
           diagnostics: measurement.diagnostics,
         }}
+        isFlaggedForReview={isFlaggedForReview}
+        onToggleReviewFlag={onToggleReviewFlag}
       />
 
       <p className="clinician-measurement-note">This is the clinician-only results panel. It updates automatically when {effectivePatientName !== 'Patient' ? effectivePatientName : 'the patient'} completes their camera check.</p>

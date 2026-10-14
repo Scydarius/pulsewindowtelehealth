@@ -6,9 +6,34 @@ export type ClinicAppointment = {
   room_name: string;
   reason: string;
   starts_at: string;
+  needs_review?: boolean | null;
+  reviewed_at?: string | null;
   patient: { id: string; display_name: string; email: string } | null;
   latestMeasurement: { measured_at: string; heart_rate_bpm: number; respiratory_rate_bpm: number; signal_quality: number } | null;
 };
+
+export function isAppointmentNeedingReview(appointment: {
+  id: string;
+  needs_review?: boolean | null;
+  reviewed_at?: string | null;
+  latestMeasurement?: unknown;
+}): boolean {
+  try {
+    const raw = localStorage.getItem(`ventricura_review_override_${appointment.id}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.needsReview === 'boolean') {
+        return parsed.needsReview;
+      }
+    }
+  } catch {}
+
+  if (appointment.needs_review === true) return true;
+  if (appointment.reviewed_at) return false;
+  if (appointment.needs_review === false && appointment.reviewed_at !== undefined) return false;
+  if (appointment.latestMeasurement) return true;
+  return false;
+}
 
 export async function loadClinicianWorkspace() {
   if (!supabase) throw new Error('The clinical database is not configured.');
@@ -22,14 +47,25 @@ export async function loadClinicianWorkspace() {
     .maybeSingle();
   if (profileError || !profile) throw new Error('This account is not an authorised clinician.');
 
-  const { data: appointments, error: appointmentError } = await supabase
+  const appointmentsResult = await supabase
     .from('appointments')
-    .select('id, room_name, reason, starts_at, patient:patients(id, display_name, email)')
+    .select('id, room_name, reason, starts_at, needs_review, reviewed_at, patient:patients(id, display_name, email)')
     .eq('clinician_id', user.id)
     .order('starts_at', { ascending: true });
-  if (appointmentError) throw new Error('Unable to load appointments.');
 
-  const appointmentRows = (appointments ?? []) as unknown as Omit<ClinicAppointment, 'latestMeasurement'>[];
+  let rawAppointments = appointmentsResult.data as unknown[] | null;
+
+  if (appointmentsResult.error) {
+    const fallbackResult = await supabase
+      .from('appointments')
+      .select('id, room_name, reason, starts_at, patient:patients(id, display_name, email)')
+      .eq('clinician_id', user.id)
+      .order('starts_at', { ascending: true });
+    if (fallbackResult.error) throw new Error('Unable to load appointments.');
+    rawAppointments = fallbackResult.data as unknown[] | null;
+  }
+
+  const appointmentRows = (rawAppointments ?? []) as unknown as Omit<ClinicAppointment, 'latestMeasurement'>[];
   const appointmentIds = appointmentRows.map((appointment) => appointment.id);
   const latestMeasurements = new Map<string, ClinicAppointment['latestMeasurement']>();
   if (appointmentIds.length) {
@@ -51,6 +87,8 @@ export type ConsultationDetails = {
   patientName: string;
   reason: string;
   startsAt: string;
+  needsReview?: boolean;
+  reviewedAt?: string | null;
 };
 
 export async function loadConsultationDetails(appointmentId: string): Promise<ConsultationDetails | null> {
@@ -64,14 +102,31 @@ export async function loadConsultationDetails(appointmentId: string): Promise<Co
     .eq('id', user.id)
     .maybeSingle();
 
-  const { data: appointment } = await supabase
+  const apptResult = await supabase
     .from('appointments')
-    .select('id, reason, starts_at, patient:patients(id, display_name, email)')
+    .select('id, reason, starts_at, needs_review, reviewed_at, patient:patients(id, display_name, email)')
     .eq('id', appointmentId)
     .maybeSingle();
 
-  if (!appointment) return null;
+  let appointment = apptResult.data as {
+    id: string;
+    reason?: string;
+    starts_at?: string;
+    needs_review?: boolean;
+    reviewed_at?: string | null;
+    patient?: unknown;
+  } | null;
 
+  if (apptResult.error) {
+    const fallback = await supabase
+      .from('appointments')
+      .select('id, reason, starts_at, patient:patients(id, display_name, email)')
+      .eq('id', appointmentId)
+      .maybeSingle();
+    appointment = fallback.data as typeof appointment;
+  }
+
+  if (!appointment) return null;
   const patient = appointment.patient as unknown as { id: string; display_name: string; email: string } | null;
 
   return {
@@ -79,5 +134,7 @@ export async function loadConsultationDetails(appointmentId: string): Promise<Co
     patientName: patient?.display_name ?? 'Patient',
     reason: appointment.reason ?? '',
     startsAt: appointment.starts_at ?? '',
+    needsReview: Boolean(appointment.needs_review),
+    reviewedAt: appointment.reviewed_at ?? null,
   };
 }

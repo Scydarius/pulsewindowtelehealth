@@ -2842,3 +2842,101 @@ body { background: var(--cream); color: var(--ink); }
 
 @media (max-width: 760px){
   .app-header{padding:12px 16px;gap:12px}.brand-wordmark{max-width:130px}.brand-subtext,.header-user-copy{display:none}.header-user{margin-left:auto}.header-sign-out{font-size:0;padding:10px}.header-sign-out svg{margin:0}.primary-nav{display:none}.clinician-mobile-nav{display:flex;gap:4px;overflow-x:auto;padding:9px 12px;border-bottom:1px solid #deded8;background:#fff;scrollbar-width:none}.clinician-mobile-nav a{flex:0 0 auto;padding:8px 10px;font-size:.72rem}.app-main{overflow:hidden;padding:20px 16px 60px!important}.dashboard-page,.admin-page,.profile-page,.patient-profile-page,.consultation-review-page{width:100%!important;padding:0!important}.page-intro{display:block}.page-intro h1{font-size:clamp(2.2rem,11vw,3.3rem);line-height:.94}.workspace-actions{margin-top:18px}.search-field{width:100%}.summary-strip{grid-template-columns:1fr 1fr;gap:8px}.summary-strip>a{min-height:92px;padding:12px}.command-centre{grid-template-columns:1fr}.command-centre-action{border-top:1px solid #d8d8d2}.command-appointment,.appointment-row,.clinician-admin-row{grid-template-columns:1fr!important;gap:12px}.command-appointment-actions,.appointment-actions{justify-content:flex-start;flex-wrap:wrap}.appointment-intake-note,.appointment-link{grid-column:auto}.admin-add-form{grid-template-columns:1fr!important}.clinician-list{overflow:visible}.admin-name-field{max-width:none}.profile-editor{grid-template-columns:1fr;padding:22px;gap:25px;box-shadow:7px 7px 0 #e4e4de}.profile-photo-editor{display:grid;grid-template-columns:144px 1fr;align-items:center}.profile-photo-editor small,.profile-clinic{grid-column:2}.booking-page{padding:0;background:#f2f2ed}.booking-card{width:100%;margin:0;border:0;box-shadow:none}.booking-public-header{padding:17px}.booking-public-intro{display:grid;gap:18px;padding:28px 18px}.booking-public-intro h1{font-size:2.25rem}.booking-clinician-card{width:100%;min-width:0}.booking-live-layout{grid-template-columns:1fr;padding:18px;gap:18px}.booking-date-list{display:grid;grid-template-columns:repeat(4,1fr);overflow:visible}.booking-date-list button{min-width:0;padding:12px 4px}.booking-slot-list{grid-template-columns:repeat(2,1fr)}.booking-summary{position:static}.booking-public-form{display:grid;padding:18px}.demo-intro{width:calc(100% - 32px);padding:32px 0 24px;display:grid;gap:22px}.demo-intro h1{font-size:2.7rem}.demo-state{width:100%}.demo-console{width:100%;display:grid;grid-template-columns:1fr}.demo-camera-stage{min-height:280px}.demo-sidepanel{padding:18px}.demo-plots{grid-template-columns:1fr}.demo-plot{min-width:0}.demo-security{width:calc(100% - 32px);padding:18px;grid-template-columns:1fr}.demo-security svg:last-child{display:none}.measurement-panel{padding:18px}.live-metrics{grid-template-columns:1fr 1fr}.consultation-layout,.consultation-grid{grid-template-columns:1fr!important}.consultation-video{min-height:260px}}
+
+/* Review queue and consult review button styles */
+.consultation-flag-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+.consult-flag-review-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.consult-flag-review-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.consult-flag-review-btn.flagged {
+  background: #f59e0b;
+  border-color: #d97706;
+  color: #171717;
+  font-weight: 800;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+}
+.consult-flag-review-btn.flagged:hover:not(:disabled) {
+  background: #fbbf24;
+  border-color: #f59e0b;
+}
+.consult-review-toast {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #171717;
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  border: 1px solid #333333;
+  z-index: 100;
+  pointer-events: none;
+  animation: fadeInDown 0.2s ease forwards;
+}
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translate(-50%, -4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.note-shortcut-btn.active-flag {
+  background: #fef3c7 !important;
+  border-color: #f59e0b !important;
+  color: #92400e !important;
+  font-weight: 750 !important;
+}
+.review-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.review-dismiss-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  border: 1px solid #d4d4cd;
+  background: #ffffff;
+  color: #555550;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.review-dismiss-action:hover {
+  background: #ebebe5;
+  color: #111111;
+  border-color: #111111;
+}
+.flagged-consult-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #b45309;
+}
+

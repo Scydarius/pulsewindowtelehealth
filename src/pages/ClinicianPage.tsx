@@ -1,19 +1,20 @@
-import { Activity, ArrowRight, CalendarClock, CalendarDays, CheckCircle2, CircleAlert, Copy, LoaderCircle, MessageSquareText, RotateCcw, Search, ShieldOff, Trash2, UsersRound, Video, X } from 'lucide-react';
+import { Activity, ArrowRight, BookmarkCheck, CalendarClock, CalendarDays, Check, CheckCircle2, CircleAlert, Copy, LoaderCircle, MessageSquareText, RotateCcw, Search, ShieldOff, Trash2, UsersRound, Video, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
 import { InvitePatientForm, type ExistingPatientOption } from '../components/InvitePatientForm';
 import { ClinicianAvailabilityPanel } from '../components/ClinicianAvailabilityPanel';
 import { CopyButton } from '../components/CopyButton';
-import { type ClinicAppointment, type ClinicianProfile, loadClinicianWorkspace } from '../services/clinicianData';
-import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, revokePatientInvitation } from '../services/clinicAccess';
+import { type ClinicAppointment, type ClinicianProfile, isAppointmentNeedingReview, loadClinicianWorkspace } from '../services/clinicianData';
+import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, revokePatientInvitation, updateAppointmentReviewStatus } from '../services/clinicAccess';
 
 type WorkspaceView = 'overview' | 'patients' | 'appointments' | 'measurements' | 'availability' | 'calendar';
 const workspaceView = (value: string | null): WorkspaceView => value === 'patients' || value === 'appointments' || value === 'measurements' || value === 'availability' || value === 'calendar' ? value : 'overview';
 const reasonSummary = (value: string) => value.split('\n\nPatient notes:')[0].trim();
 const intakeNote = (value: string) => value.split('\n\nPatient notes:')[1]?.trim() ?? '';
 const appointmentState = (appointment: ClinicAppointment, now = new Date()) => {
-  if (appointment.latestMeasurement) return 'Ready for review';
+  if (isAppointmentNeedingReview(appointment)) return 'Needs review';
+  if (appointment.reviewed_at) return 'Reviewed';
   const startsAt = new Date(appointment.starts_at);
   if (startsAt.valueOf() < now.valueOf()) return 'Awaiting patient';
   if (startsAt.toDateString() === now.toDateString()) return 'Today';
@@ -65,11 +66,54 @@ export function ClinicianPage() {
   }, []);
   useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
 
+  useEffect(() => {
+    const onReviewUpdated = (e: Event) => {
+      const custom = e as CustomEvent<{ appointmentId: string; needsReview: boolean; reviewedAt: string | null }>;
+      if (custom.detail) {
+        setAppointments((prev) =>
+          prev.map((item) =>
+            item.id === custom.detail.appointmentId
+              ? {
+                  ...item,
+                  needs_review: custom.detail.needsReview,
+                  reviewed_at: custom.detail.reviewedAt,
+                }
+              : item
+          )
+        );
+      }
+    };
+    window.addEventListener('ventricura:review-updated', onReviewUpdated);
+    return () => window.removeEventListener('ventricura:review-updated', onReviewUpdated);
+  }, []);
+
   const now = new Date();
   const scheduled = appointments.filter((appointment) => new Date(appointment.starts_at) >= now);
   const todayAppointments = appointments.filter((appointment) => new Date(appointment.starts_at).toDateString() === now.toDateString());
-  const readingsToReview = appointments.filter((appointment) => appointment.latestMeasurement);
-  const reviewQueue = [...readingsToReview].sort((left, right) => new Date(right.latestMeasurement!.measured_at).valueOf() - new Date(left.latestMeasurement!.measured_at).valueOf());
+  const readingsToReview = appointments.filter((appointment) => isAppointmentNeedingReview(appointment));
+  const reviewQueue = [...readingsToReview].sort((left, right) => {
+    const leftTime = left.latestMeasurement ? new Date(left.latestMeasurement.measured_at).valueOf() : new Date(left.starts_at).valueOf();
+    const rightTime = right.latestMeasurement ? new Date(right.latestMeasurement.measured_at).valueOf() : new Date(right.starts_at).valueOf();
+    return rightTime - leftTime;
+  });
+
+  const handleRemoveFromReview = async (appointmentId: string) => {
+    const target = appointments.find((a) => a.id === appointmentId);
+    const patientName = target?.patient?.display_name || 'Patient';
+    setAppointments((prev) =>
+      prev.map((item) =>
+        item.id === appointmentId
+          ? { ...item, needs_review: false, reviewed_at: new Date().toISOString() }
+          : item
+      )
+    );
+    setNotice(`Removed ${patientName} from review queue.`);
+    try {
+      await updateAppointmentReviewStatus(appointmentId, false);
+    } catch {
+      // Saved in local cache
+    }
+  };
   // Email is the patient identity used by invitations, so all visits for the
   // same email stay together even if a legacy record was duplicated.
   const patientGroups = useMemo(() => Array.from(appointments.filter((appointment) => appointment.patient?.email).reduce((groups, appointment) => {
@@ -156,7 +200,7 @@ export function ClinicianPage() {
       <Link to="/clinician?view=calendar"><div><CalendarDays /></div><span><strong>{scheduled.length}</strong>Upcoming calls</span><ArrowRight size={16} /></Link>
     </section>
 
-    {view === 'overview' && <><section className="command-centre"><div className="command-centre-main"><div className="section-heading"><div><p className="eyebrow">Today / schedule</p><h2>Your next appointments</h2><p>Join a call, check the patient record, or manage access without leaving this view.</p></div><button className="text-button" onClick={() => selectScheduleTab('calendar')}>Open calendar <ArrowRight size={16} /></button></div><div className="command-list">{scheduled.slice(0, 3).map(commandAppointmentRow)}{scheduled.length === 0 && <EmptyAppointments />}</div></div><aside className="command-centre-action"><p className="eyebrow">Quick action</p><h2>Create an appointment</h2><p>Add a new patient or schedule a follow-up for an existing patient.</p><InvitePatientForm patients={patientOptions} onCreated={() => void load()} triggerVariant="primary" /></aside></section><section className="panel review-queue-panel"><div className="section-heading"><div><p className="eyebrow">Review queue</p><h2>Patient readings ready</h2><p>Open the session record, review measurements, and document follow-up.</p></div><Link className="text-button" to="/clinician?view=measurements">View all <ArrowRight size={16} /></Link></div><MeasurementList appointments={reviewQueue.slice(0, 4)} /></section></>}
+    {view === 'overview' && <><section className="command-centre"><div className="command-centre-main"><div className="section-heading"><div><p className="eyebrow">Today / schedule</p><h2>Your next appointments</h2><p>Join a call, check the patient record, or manage access without leaving this view.</p></div><button className="text-button" onClick={() => selectScheduleTab('calendar')}>Open calendar <ArrowRight size={16} /></button></div><div className="command-list">{scheduled.slice(0, 3).map(commandAppointmentRow)}{scheduled.length === 0 && <EmptyAppointments />}</div></div><aside className="command-centre-action"><p className="eyebrow">Quick action</p><h2>Create an appointment</h2><p>Add a new patient or schedule a follow-up for an existing patient.</p><InvitePatientForm patients={patientOptions} onCreated={() => void load()} triggerVariant="primary" /></aside></section><section className="panel review-queue-panel"><div className="section-heading"><div><p className="eyebrow">Review queue</p><h2>Patient readings ready</h2><p>Open the session record, review measurements, and document follow-up.</p></div><Link className="text-button" to="/clinician?view=measurements">View all <ArrowRight size={16} /></Link></div><MeasurementList appointments={reviewQueue.slice(0, 4)} onRemoveFromReview={handleRemoveFromReview} /></section></>}
     {view === 'patients' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Patient directory</p><h2>Active patients</h2><p>Every appointment for the same email is grouped under one patient card.</p></div><InvitePatientForm patients={patientOptions} onCreated={() => void load()} /></div><div className="patient-directory">{patientGroups.filter((group) => !search.trim() || [group.patient.display_name, group.patient.email].some((value) => value.toLowerCase().includes(search.trim().toLowerCase()))).map((group) => <article key={group.patient.email} className="patient-directory-card patient-directory-card-grouped"><div className="patient-avatar">{group.patient.display_name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><strong>{group.patient.display_name}</strong><span>{group.patient.email}</span><small>{group.records.length} appointment{group.records.length === 1 ? '' : 's'} · latest {new Date(group.records[0].starts_at).toLocaleDateString()}</small></div><Link className="button button-secondary button-small" to={`/clinician/patient?id=${encodeURIComponent(group.patient.id)}`}>Open profile <ArrowRight size={15} /></Link></article>)}{patientGroups.length === 0 && <EmptyAppointments />}</div></section>}
     {view === 'appointments' && <div className="schedule-unified-container">
       <nav className="schedule-tab-nav" aria-label="Schedule views">
@@ -190,15 +234,44 @@ export function ClinicianPage() {
 
       {scheduleTab === 'availability' && <ClinicianAvailabilityPanel />}
     </div>}
-    {view === 'measurements' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Measurement record</p><h2>Readings to review</h2><p>Open the patient call to review live signal context, saved data and private notes.</p></div></div><MeasurementList appointments={readingsToReview.filter(matchesPatient)} /></section>}
+    {view === 'measurements' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Measurement record</p><h2>Readings to review</h2><p>Open the patient call to review live signal context, saved data and private notes.</p></div></div><MeasurementList appointments={readingsToReview.filter(matchesPatient)} onRemoveFromReview={handleRemoveFromReview} /></section>}
     {notice && <div className="workspace-toast"><CheckCircle2 size={17} /> {notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}{linkError && <p className="form-error">{linkError}</p>}
   </div>;
 }
 
 function EmptyAppointments() { return <div className="empty-records"><UsersRound /><strong>No appointments to show</strong><span>Create a secure patient link to add a patient and appointment.</span></div>; }
-function MeasurementList({ appointments }: { appointments: ClinicAppointment[] }) {
-  if (!appointments.length) return <div className="empty-records compact-empty"><Activity /><strong>No readings received yet</strong><span>Completed camera checks will appear here for review.</span></div>;
-  return <div className="measurement-review-list">{appointments.map((appointment) => { const reading = appointment.latestMeasurement!; return <div className="review-card" key={appointment.id}><div className="patient-avatar alert">{(appointment.patient?.display_name ?? '?').split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div className="review-patient"><strong>{appointment.patient?.display_name ?? 'Patient'}</strong><span>Captured {new Date(reading.measured_at).toLocaleString()}</span></div><div className="review-reading-summary"><span><strong>{Math.round(reading.heart_rate_bpm)}</strong> BPM</span><span><strong>{Math.round(reading.respiratory_rate_bpm)}</strong> breaths/min</span><span><strong>{Math.round(reading.signal_quality)}%</strong> signal quality</span></div><span className="appointment-state state-ready-for-review">Ready</span><Link className="review-record-action" to={`/clinician/review?appointment=${encodeURIComponent(appointment.id)}&patient=${encodeURIComponent(appointment.patient?.id ?? '')}`}>Review <ArrowRight size={16} /></Link></div>; })}</div>;
+function MeasurementList({ appointments, onRemoveFromReview }: { appointments: ClinicAppointment[]; onRemoveFromReview?: (appointmentId: string) => void }) {
+  if (!appointments.length) return <div className="empty-records compact-empty"><Activity /><strong>No patients needing review</strong><span>Patients flagged during consultations or with completed camera checks will appear here for review.</span></div>;
+  return <div className="measurement-review-list">{appointments.map((appointment) => {
+    const reading = appointment.latestMeasurement;
+    return <div className="review-card" key={appointment.id}>
+      <div className="patient-avatar alert">{(appointment.patient?.display_name ?? '?').split(' ').map((part) => part[0]).join('').slice(0, 2)}</div>
+      <div className="review-patient">
+        <strong>{appointment.patient?.display_name ?? 'Patient'}</strong>
+        <span>{reading ? `Captured ${new Date(reading.measured_at).toLocaleString()}` : `Flagged during consultation · ${new Date(appointment.starts_at).toLocaleDateString()}`}</span>
+      </div>
+      <div className="review-reading-summary">
+        {reading ? (
+          <>
+            <span><strong>{Math.round(reading.heart_rate_bpm)}</strong> BPM</span>
+            <span><strong>{Math.round(reading.respiratory_rate_bpm)}</strong> breaths/min</span>
+            <span><strong>{Math.round(reading.signal_quality)}%</strong> quality</span>
+          </>
+        ) : (
+          <span className="flagged-consult-badge"><BookmarkCheck size={13} /> Flagged for review</span>
+        )}
+      </div>
+      <span className="appointment-state state-ready-for-review">Needs review</span>
+      <div className="review-card-actions">
+        <Link className="review-record-action" to={`/clinician/review?appointment=${encodeURIComponent(appointment.id)}&patient=${encodeURIComponent(appointment.patient?.id ?? '')}`}>Review <ArrowRight size={15} /></Link>
+        {onRemoveFromReview && (
+          <button type="button" className="review-dismiss-action text-button" onClick={() => onRemoveFromReview(appointment.id)} title="Remove from review queue">
+            <Check size={14} /> Remove
+          </button>
+        )}
+      </div>
+    </div>;
+  })}</div>;
 }
 
 function CalendarWeek({ appointments, onEditAvailability }: { appointments: ClinicAppointment[]; onEditAvailability?: () => void }) {

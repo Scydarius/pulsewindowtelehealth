@@ -1,9 +1,9 @@
-import { ArrowLeft, CheckCircle2, Clock3, Pill, UserRound, Video } from 'lucide-react';
+import { ArrowLeft, BookmarkCheck, BookmarkPlus, CheckCircle2, Clock3, LoaderCircle, Pill, UserRound, Video } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { MeasurementPanel } from '../components/MeasurementPanel';
 import { VideoRoom } from '../components/VideoRoom';
-import { fetchPatientInvitation } from '../services/clinicAccess';
+import { fetchPatientInvitation, getAppointmentReviewStatus, updateAppointmentReviewStatus } from '../services/clinicAccess';
 import { loadConsultationDetails } from '../services/clinicianData';
 import { subscribeToCameraCheck, type CameraCheckSyncState } from '../services/consultationSync';
 
@@ -56,6 +56,9 @@ export function ConsultationPage() {
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [measurementStopRequest, setMeasurementStopRequest] = useState(0);
+  const [needsReview, setNeedsReview] = useState(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewNotice, setReviewNotice] = useState('');
 
   // Live call timer counting up from appointment start
   useEffect(() => {
@@ -68,7 +71,7 @@ export function ConsultationPage() {
     return () => window.clearInterval(interval);
   }, [appointmentId]);
 
-  // Load participant names from appointment or patient invite
+  // Load participant names and review status from appointment or patient invite
   useEffect(() => {
     let active = true;
     if (role === 'clinician') {
@@ -76,7 +79,24 @@ export function ConsultationPage() {
         if (!active || !details) return;
         if (details.clinicianName && details.clinicianName !== 'Clinician') setClinicianName(details.clinicianName);
         if (details.patientName && details.patientName !== 'Patient') setPatientName(details.patientName);
+        if (typeof details.needsReview === 'boolean') setNeedsReview(details.needsReview);
       }).catch(() => {});
+
+      void getAppointmentReviewStatus(appointmentId).then((res) => {
+        if (active) setNeedsReview(res.needsReview);
+      }).catch(() => {});
+
+      const onReviewUpdated = (e: Event) => {
+        const custom = e as CustomEvent<{ appointmentId: string; needsReview: boolean }>;
+        if (custom.detail?.appointmentId === appointmentId && active) {
+          setNeedsReview(custom.detail.needsReview);
+        }
+      };
+      window.addEventListener('ventricura:review-updated', onReviewUpdated);
+      return () => {
+        active = false;
+        window.removeEventListener('ventricura:review-updated', onReviewUpdated);
+      };
     } else if (role === 'patient' && invitationToken) {
       void fetchPatientInvitation(invitationToken).then((details) => {
         if (!active || !details) return;
@@ -86,6 +106,22 @@ export function ConsultationPage() {
     }
     return () => { active = false; };
   }, [appointmentId, invitationToken, role]);
+
+  const handleToggleReviewFlag = async () => {
+    if (role !== 'clinician' || reviewSaving) return;
+    const nextState = !needsReview;
+    setReviewSaving(true);
+    setNeedsReview(nextState);
+    try {
+      await updateAppointmentReviewStatus(appointmentId, nextState);
+      setReviewNotice(nextState ? 'Flagged for review — added to review queue' : 'Removed from review queue');
+      setTimeout(() => setReviewNotice(''), 4000);
+    } catch {
+      setNeedsReview(!nextState);
+    } finally {
+      setReviewSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (role !== 'clinician') return;
@@ -99,6 +135,9 @@ export function ConsultationPage() {
       }
       if (sync.status === 'complete') {
         setShowCompleteNotice(true);
+        // Automatically mark as needing review when a camera reading finishes
+        setNeedsReview(true);
+        void updateAppointmentReviewStatus(appointmentId, true);
         const timer = setTimeout(() => setShowCompleteNotice(false), 7000);
         return () => clearTimeout(timer);
       }
@@ -124,6 +163,27 @@ export function ConsultationPage() {
             <span>{role === 'clinician' ? 'Secure clinical consultation' : 'Secure video appointment'}</span>
           </div>
         </div>
+        {role === 'clinician' && (
+          <div className="consultation-flag-container">
+            <button
+              type="button"
+              className={`consult-flag-review-btn ${needsReview ? 'flagged' : ''}`}
+              onClick={() => void handleToggleReviewFlag()}
+              disabled={reviewSaving}
+              title={needsReview ? 'Patient flagged as Needs Review. Click to remove from review queue.' : 'Flag this patient as Needs Review for follow-up'}
+            >
+              {reviewSaving ? (
+                <LoaderCircle className="spin" size={14} />
+              ) : needsReview ? (
+                <BookmarkCheck size={14} />
+              ) : (
+                <BookmarkPlus size={14} />
+              )}
+              <span>{needsReview ? 'Needs review' : 'Flag for review'}</span>
+            </button>
+            {reviewNotice && <span className="consult-review-toast">{reviewNotice}</span>}
+          </div>
+        )}
         <div className="call-time" aria-label={`Call elapsed time: ${formatCallDuration(elapsedSeconds)}`}>
           <span className="live-dot" />
           <Clock3 size={16} /> {formatCallDuration(elapsedSeconds)}
@@ -205,6 +265,8 @@ export function ConsultationPage() {
             patientName={patientName}
             clinicianName={clinicianName}
             stopRequest={measurementStopRequest}
+            isFlaggedForReview={needsReview}
+            onToggleReviewFlag={role === 'clinician' ? () => void handleToggleReviewFlag() : undefined}
           />
         </section>
       </main>
