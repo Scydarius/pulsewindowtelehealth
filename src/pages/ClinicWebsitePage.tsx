@@ -1,6 +1,7 @@
 import {
   Activity,
   ArrowRight,
+  Building2,
   CalendarDays,
   CheckCircle2,
   CircleAlert,
@@ -14,11 +15,14 @@ import {
   ShieldCheck,
   Stethoscope,
   User,
+  UserCog,
+  UserPlus,
   Video,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
+import { getClinicianAccessToken } from '../services/clinicAccess';
 import '../styles/clinic-site.css';
 
 export type ClinicDoctor = {
@@ -51,28 +55,33 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
   const [clinic, setClinic] = useState<ClinicSite | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isManager, setIsManager] = useState(false);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError('');
 
-    void fetch(`/api/clinician-invitations?action=clinic-site&slug=${encodeURIComponent(slug)}`)
-      .then(async (response) => {
-        const body = (await response.json()) as { clinic?: ClinicSite; error?: string };
+    void (async () => {
+      try {
+        const token = await getClinicianAccessToken().catch(() => null);
+        const headers: Record<string, string> = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const response = await fetch(`/api/clinician-invitations?action=clinic-site&slug=${encodeURIComponent(slug)}`, { headers });
+        const body = (await response.json()) as { clinic?: ClinicSite; isManager?: boolean; error?: string };
         if (!response.ok || !body.clinic) {
           throw new Error(body.error ?? 'Clinic page not found.');
         }
         if (active) {
           setClinic(body.clinic);
+          if (body.isManager) setIsManager(true);
         }
-      })
-      .catch((reason: Error) => {
-        if (active) setError(reason.message);
-      })
-      .finally(() => {
+      } catch (reason) {
+        if (active) setError(reason instanceof Error ? reason.message : 'Clinic page not found.');
+      } finally {
         if (active) setLoading(false);
-      });
+      }
+    })();
 
     return () => {
       active = false;
@@ -98,7 +107,10 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
           We couldn&apos;t find an active clinic at <strong>ventricura.com/{slug}</strong>.
         </p>
         <div className="clinic-state-actions">
-          <Link to="/" className="button button-primary">
+          <Link to={`/admin?newClinicSlug=${encodeURIComponent(slug)}`} className="button button-primary">
+            <Building2 size={16} /> Manage or Add Clinic in Admin
+          </Link>
+          <Link to="/" className="button button-secondary">
             Visit Ventricura Home
           </Link>
           <Link to="/contact" className="button button-secondary">
@@ -125,6 +137,20 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
         path={`/${clinic.slug}`}
       />
       <PublicHeader />
+
+      {isManager && (
+        <aside className="clinic-manager-topbar" aria-label="Clinical Manager Bar">
+          <div className="clinic-manager-topbar-inner">
+            <div className="clinic-manager-info">
+              <ShieldCheck size={18} />
+              <span>You are viewing <strong>{clinic.name}</strong> as an authorised Clinical Manager</span>
+            </div>
+            <Link to="/admin" className="button button-small button-primary clinic-manager-edit-btn">
+              <UserCog size={15} /> Edit Clinic, Doctors & Specialties in Admin
+            </Link>
+          </div>
+        </aside>
+      )}
 
       {/* Hero Section */}
       <section className="clinic-hero-section">

@@ -130,12 +130,30 @@ export default { async fetch(request: Request) {
       if (action === 'availability') { const { db, clinician } = await requireClinician(request); const { data, error } = await db.from('clinician_booking_profiles').select('booking_token, timezone, duration_minutes, weekly_availability, booking_enabled, booking_reason').eq('clinician_id', clinician.id).maybeSingle(); if (error) throw new Error('Could not load booking availability.'); const profile = data ?? { booking_token: newOpaqueToken().slice(0, 20), timezone: 'Australia/Adelaide', duration_minutes: 30, weekly_availability: defaultAvailability, booking_enabled: false, booking_reason: 'Telehealth consultation' }; return Response.json({ ...profile, weekly_availability: normaliseAvailability(profile.weekly_availability), bookingUrl: `${(process.env.APP_URL ?? url.origin).replace(/\/$/, '')}/book/${profile.booking_token}` }, { headers: { 'Cache-Control': 'no-store' } }); }
       const bookingToken = url.searchParams.get('bookingToken') ?? '';
       if (action === 'clinic-site') {
-        const slug = url.searchParams.get('slug')?.trim().toLowerCase() ?? '';
-        if (!slug) throw new Error('Clinic page not found.');
+        const rawSlug = url.searchParams.get('slug')?.trim().toLowerCase() ?? '';
+        if (!rawSlug) throw new Error('Clinic page not found.');
+        const slug = slugify(rawSlug);
         const db = database();
-        let clinicResult = await db.from('clinics').select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled').eq('slug', slug).maybeSingle();
+        let clinicResult = await db
+          .from('clinics')
+          .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled')
+          .or(`slug.eq.${slug},slug.eq.${rawSlug},slug.ilike.${slug.replace(/-/g, '')}`)
+          .maybeSingle();
+
+        if (!clinicResult.data) {
+          clinicResult = await db
+            .from('clinics')
+            .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled')
+            .ilike('name', rawSlug.replace(/[-_]+/g, ' '))
+            .maybeSingle();
+        }
+
         if (clinicResult.error && clinicResult.error.message?.includes('column')) {
-          clinicResult = await db.from('clinics').select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_enabled').eq('slug', slug).maybeSingle();
+          clinicResult = await db
+            .from('clinics')
+            .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_enabled')
+            .or(`slug.eq.${slug},slug.eq.${rawSlug}`)
+            .maybeSingle();
         }
         const clinic = clinicResult.data;
         if (clinicResult.error || !clinic || clinic.website_enabled === false) return Response.json({ error: 'Clinic page not found.' }, { status: 404 });
@@ -162,6 +180,24 @@ export default { async fetch(request: Request) {
         const rawSpecialties = (clinic as Record<string, unknown>).website_specialties as string | null | undefined;
         const specialties = rawSpecialties ? rawSpecialties.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [];
         const defaultBooking = doctors.find((d) => Boolean(d.bookingUrl))?.bookingUrl ?? null;
+
+        let isManager = false;
+        try {
+          const rawAuth = request.headers.get('authorization');
+          const token = rawAuth?.replace(/^Bearer\s+/i, '');
+          if (token) {
+            const { data: userAuth } = await db.auth.getUser(token);
+            if (userAuth?.user) {
+              const { data: staff } = await db.from('clinician_profiles').select('id, is_admin, is_platform_admin, clinic_id').eq('id', userAuth.user.id).maybeSingle();
+              if (staff && (staff.is_admin || staff.is_platform_admin || staff.clinic_id === clinic.id)) {
+                isManager = true;
+              }
+            }
+          }
+        } catch {
+          // best-effort
+        }
+
         return Response.json({
           clinic: {
             id: clinic.id,
@@ -176,8 +212,9 @@ export default { async fetch(request: Request) {
             email: clinic.website_email ?? '',
             bookingUrl: defaultBooking,
             doctors,
-          }
-        }, { headers: { 'Cache-Control': 'public, max-age=60' } });
+          },
+          isManager,
+        }, { headers: { 'Cache-Control': 'no-store' } });
       }
       if (action === 'public-profile') { const db = database(); const profile = await getBookingProfile(db, bookingToken); const { data: clinician } = await db.from('clinician_profiles').select('display_name, professional_title, about_me, photo_url, clinic:clinics(name)').eq('id', profile.clinician_id).single(); const clinic = clinician?.clinic as unknown as { name?: string } | null; return Response.json({ clinicianName: clinician?.display_name ?? 'Your clinician', professionalTitle: clinician?.professional_title ?? '', aboutMe: clinician?.about_me ?? '', photoUrl: clinician?.photo_url ?? '', clinicName: clinic?.name ?? '', timezone: profile.timezone, durationMinutes: profile.duration_minutes, bookingReason: profile.booking_reason }); }
       if (action === 'public-slots') { const db = database(); const profile = await getBookingProfile(db, bookingToken); return Response.json({ slots: await slotsForDate(db, profile, url.searchParams.get('date') ?? ''), timezone: profile.timezone }); }

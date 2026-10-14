@@ -3025,3 +3025,127 @@ body { background: var(--cream); color: var(--ink); }
   }
 }
 
+/* Search bar robust sizing and layout - prevent text cutoff */
+.page-intro {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-end !important;
+  flex-wrap: wrap !important;
+  gap: 18px 24px !important;
+  padding-bottom: 24px !important;
+  border-bottom: 1px solid var(--workspace-line) !important;
+}
+.page-intro > div:first-child {
+  flex: 1 1 320px !important;
+  min-width: 0 !important;
+}
+.workspace-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex: 1 1 360px !important;
+  max-width: 100% !important;
+}
+.search-field {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  height: auto !important;
+  min-height: 48px !important;
+  width: 100% !important;
+  max-width: 520px !important;
+  min-width: 260px !important;
+  padding: 6px 14px !important;
+  background: #ffffff !important;
+  border: 1px solid #bdbdb6 !important;
+  border-radius: 4px !important;
+  box-sizing: border-box !important;
+  box-shadow: none !important;
+}
+.search-field:focus-within {
+  border-color: #171717 !important;
+  box-shadow: 3px 3px 0 #d4d4cd !important;
+}
+.search-field svg {
+  flex-shrink: 0 !important;
+  color: #696963 !important;
+}
+.search-field input {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: 34px !important;
+  line-height: 34px !important;
+  padding: 0 4px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: 0.92rem !important;
+  color: #171717 !important;
+  box-sizing: border-box !important;
+}
+.search-field input::placeholder {
+  color: #8c8c87 !important;
+  opacity: 1 !important;
+}
+@media (max-width: 768px) {
+  .workspace-actions {
+    width: 100% !important;
+    justify-content: stretch !important;
+  }
+  .search-field {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Clinic site manager topbar */
+.clinic-manager-topbar {
+  background: #171717;
+  color: #ffffff;
+  border-bottom: 1px solid #333333;
+  padding: 10px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+.clinic-manager-topbar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.clinic-manager-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.84rem;
+  color: #deded8;
+}
+.clinic-manager-info strong {
+  color: #ffffff;
+}
+.clinic-manager-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  background: #ffffff !important;
+  color: #171717 !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+.clinic-manager-edit-btn:hover {
+  background: #f0f0ea !important;
+  color: #000000 !important;
+}
+
+

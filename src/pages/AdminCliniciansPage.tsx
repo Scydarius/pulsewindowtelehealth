@@ -16,7 +16,7 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { getClinicianAccessToken } from '../services/clinicAccess';
 
 type Clinic = {
@@ -62,11 +62,13 @@ type AdminPatient = {
 type Action = 'update' | 'reset_password';
 
 export function AdminCliniciansPage() {
+  const [searchParams] = useSearchParams();
+  const initialSlug = searchParams.get('newClinicSlug') ?? '';
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [clinicId, setClinicId] = useState('');
-  const [clinicName, setClinicName] = useState('');
-  const [clinicSlug, setClinicSlug] = useState('');
+  const [clinicName, setClinicName] = useState(() => initialSlug ? initialSlug.split(/[-_]+/).map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ') : '');
+  const [clinicSlug, setClinicSlug] = useState(initialSlug);
   const [editingClinic, setEditingClinic] = useState<string | null>(null);
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [allClinics, setAllClinics] = useState<{ id: string; name: string; slug: string }[]>([]);
@@ -332,41 +334,41 @@ export function AdminCliniciansPage() {
             <Building2 size={24} />
           </div>
 
-          {isPlatformAdmin && (
-            <form
-              className="access-form admin-add-form clinic-create-form"
-              onSubmit={(event) => void createClinic(event)}
-            >
-              <label>
-                Clinic name
-                <input
-                  value={clinicName}
-                  onChange={(event) => setClinicName(event.target.value)}
-                  placeholder="Grove Way Medical"
-                  required
-                />
-              </label>
-              <label>
-                Public address label
-                <input
-                  value={clinicSlug}
-                  onChange={(event) => setClinicSlug(event.target.value)}
-                  placeholder="grove-way-medical"
-                />
-              </label>
-              <div className="admin-managed-address">
-                <span>Managed Ventricura address</span>
-                <strong>ventricura.com/{clinicSlug || 'clinic-name'}</strong>
-                <small>Hosted and maintained by Ventricura.</small>
-              </div>
-              <button className="button button-primary" disabled={saving}>
-                <Building2 size={18} /> Add medical centre
-              </button>
-            </form>
-          )}
+          <form
+            className="access-form admin-add-form clinic-create-form"
+            onSubmit={(event) => void createClinic(event)}
+          >
+            <label>
+              Clinic name
+              <input
+                value={clinicName}
+                onChange={(event) => setClinicName(event.target.value)}
+                placeholder="e.g. Grove Way Medical"
+                required
+              />
+            </label>
+            <label>
+              Public address label (URL slug)
+              <input
+                value={clinicSlug}
+                onChange={(event) => setClinicSlug(event.target.value)}
+                placeholder="e.g. groveway or grove-way-medical"
+              />
+            </label>
+            <div className="admin-managed-address">
+              <span>Managed Ventricura address</span>
+              <strong>ventricura.com/{clinicSlug || 'clinic-name'}</strong>
+              <small>Public website for your clinic and practitioners.</small>
+            </div>
+            <button className="button button-primary" disabled={saving}>
+              <Building2 size={18} /> Add medical centre
+            </button>
+          </form>
 
           <div className="clinic-site-list">
-            {clinics.map((clinic) => (
+            {clinics.map((clinic) => {
+              const assignedDoctors = clinicians.filter((c) => c.clinic_id === clinic.id);
+              return (
               <article key={clinic.id} className="clinic-site-admin">
                 <div>
                   <strong>{clinic.name}</strong>
@@ -375,6 +377,10 @@ export function AdminCliniciansPage() {
                     {clinic.website_address ? `📍 ${clinic.website_address}` : 'No address set yet'} ·{' '}
                     {clinic.website_enabled !== false ? 'Live' : 'Hidden'}
                   </small>
+                  <div style={{ marginTop: '6px', fontSize: '0.8rem', color: '#444' }}>
+                    <strong>{assignedDoctors.length}</strong> doctor{assignedDoctors.length === 1 ? '' : 's'} assigned
+                    {assignedDoctors.length > 0 ? `: ${assignedDoctors.map((d) => d.display_name).join(', ')}` : ' (assign doctors below)'}
+                  </div>
                 </div>
                 <div className="clinic-site-actions">
                   <Link
@@ -580,7 +586,8 @@ export function AdminCliniciansPage() {
                   </form>
                 )}
               </article>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
@@ -650,27 +657,19 @@ export function AdminCliniciansPage() {
 
                   <label className="admin-field">
                     <span>Assigned Clinic</span>
-                    {isPlatformAdmin ? (
-                      <select
-                        value={clinician.clinic_id ?? ''}
-                        onChange={(event) =>
-                          updateLocal(clinician.id, { clinic_id: event.target.value || null })
-                        }
-                      >
-                        <option value="">No clinic (unassigned)</option>
-                        {allClinics.map((clinic) => (
-                          <option key={clinic.id} value={clinic.id}>
-                            {clinic.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        value={clinician.clinic_name ?? 'Your clinic'}
-                        readOnly
-                        disabled
-                      />
-                    )}
+                    <select
+                      value={clinician.clinic_id ?? ''}
+                      onChange={(event) =>
+                        updateLocal(clinician.id, { clinic_id: event.target.value || null })
+                      }
+                    >
+                      <option value="">No clinic (unassigned)</option>
+                      {allClinics.map((clinic) => (
+                        <option key={clinic.id} value={clinic.id}>
+                          {clinic.name}
+                        </option>
+                      ))}
+                    </select>
                   </label>
 
                   <label className="admin-field full-width">
