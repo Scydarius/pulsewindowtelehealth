@@ -36,7 +36,38 @@ export async function claimInitialAdministratorAccess() {
 }
 
 export type SavedMeasurement = { measured_at: string; heart_rate_bpm: number; respiratory_rate_bpm: number; signal_quality: number; algorithm_version: string | null; diagnostics?: Record<string, unknown> | null };
-export type PatientProfile = { email: string; display_name: string; appointments: Array<{ id: string; reason: string; starts_at: string; created_at: string; measurements: SavedMeasurement[] }> };
+
+export type PatientMedication = {
+  id: string;
+  patient_id: string;
+  clinic_id?: string | null;
+  prescribed_by_id?: string | null;
+  prescribed_by_name: string;
+  medication_name: string;
+  generic_name?: string | null;
+  brand_name?: string | null;
+  artg_id?: string | null;
+  dose: string;
+  frequency: string;
+  directions?: string | null;
+  prescribed_date: string;
+  repeats: number;
+  is_pbs: boolean;
+  status: 'active' | 'ceased' | 'completed';
+  ceased_at?: string | null;
+  ceased_reason?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PatientProfile = {
+  id?: string;
+  email: string;
+  display_name: string;
+  appointments: Array<{ id: string; reason: string; starts_at: string; created_at: string; measurements: SavedMeasurement[] }>;
+  medications?: PatientMedication[];
+};
 
 export async function savePatientMeasurement(input: { appointmentId: string; invitationToken: string; heartRateBpm: number; respiratoryRateBpm: number; signalQuality: number; algorithmVersion?: string; diagnostics?: Record<string, unknown> }) {
   const response = await fetch('/api/measurements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
@@ -66,6 +97,87 @@ export async function loadPatientProfile(patientId: string) {
   const body = await response.json().catch(() => ({ error: 'The patient profile could not be loaded.' })) as { patient?: PatientProfile; error?: string };
   if (!response.ok || !body.patient) throw new Error(body.error ?? 'The patient profile could not be loaded.');
   return body.patient;
+}
+
+export async function loadPatientMedications(patientId: string): Promise<PatientMedication[]> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch(`/api/patient-medications?patientId=${encodeURIComponent(patientId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = (await response.json().catch(() => ({ error: 'Unable to load medications.' }))) as {
+    medications?: PatientMedication[];
+    error?: string;
+  };
+  if (!response.ok) throw new Error(body.error ?? 'Unable to load medications.');
+  return body.medications ?? [];
+}
+
+export async function prescribePatientMedication(input: {
+  patientId: string;
+  medicationName: string;
+  genericName?: string;
+  brandName?: string;
+  artgId?: string;
+  dose: string;
+  frequency: string;
+  directions?: string;
+  prescribedDate?: string;
+  repeats?: number;
+  isPbs?: boolean;
+  notes?: string;
+}): Promise<PatientMedication> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/patient-medications', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+  const body = (await response.json().catch(() => ({ error: 'Unable to save medication.' }))) as {
+    medication?: PatientMedication;
+    message?: string;
+    error?: string;
+  };
+  if (!response.ok || !body.medication) throw new Error(body.error ?? 'Unable to save medication.');
+  return body.medication;
+}
+
+export async function updatePatientMedication(input: {
+  medicationId: string;
+  action: 'cease' | 'renew' | 'update';
+  ceasedReason?: string;
+  dose?: string;
+  frequency?: string;
+  directions?: string;
+  repeats?: number;
+  isPbs?: boolean;
+  notes?: string;
+}): Promise<PatientMedication> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/patient-medications', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+  const body = (await response.json().catch(() => ({ error: 'Unable to update medication.' }))) as {
+    medication?: PatientMedication;
+    message?: string;
+    error?: string;
+  };
+  if (!response.ok || !body.medication) throw new Error(body.error ?? 'Unable to update medication.');
+  return body.medication;
+}
+
+export async function deletePatientMedication(medicationId: string): Promise<void> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch('/api/patient-medications', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ medicationId }),
+  });
+  const body = (await response.json().catch(() => ({ error: 'Unable to remove medication.' }))) as {
+    error?: string;
+  };
+  if (!response.ok) throw new Error(body.error ?? 'Unable to remove medication.');
 }
 
 export type PrivateClinicalNote = { content: string; updated_at: string | null };
