@@ -274,7 +274,7 @@ function MeasurementList({ appointments, onRemoveFromReview }: { appointments: C
           <>
             <span><strong>{Math.round(reading.heart_rate_bpm)}</strong> BPM</span>
             <span><strong>{Math.round(reading.respiratory_rate_bpm)}</strong> breaths/min</span>
-            <span><strong>{Math.round(reading.signal_quality)}%</strong> quality</span>
+            <span><strong>{Math.round(reading.signal_quality <= 1 ? reading.signal_quality * 100 : reading.signal_quality)}%</strong> quality</span>
           </>
         ) : (
           <span className="flagged-consult-badge"><BookmarkCheck size={13} /> Flagged for review</span>
