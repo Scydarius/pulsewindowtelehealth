@@ -21,6 +21,7 @@ const tokenHash = async (token: string) => {
 const newOpaqueToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, '0')).join('');
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character] ?? character));
 const defaultAvailability: AvailabilityDay[] = [1, 2, 3, 4, 5, 6, 0].map((day) => ({ day, enabled: day >= 1 && day <= 5, start: '09:00', end: '17:00' }));
+const slugify = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 63);
 
 function dateParts(date: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
@@ -134,19 +135,29 @@ export default { async fetch(request: Request) {
         if (!rawSlug) throw new Error('Clinic page not found.');
         const slug = slugify(rawSlug);
         const db = database();
+
+        let isManager = false;
+        try {
+          const rawAuth = request.headers.get('authorization');
+          const token = rawAuth?.replace(/^Bearer\s+/i, '');
+          if (token) {
+            const { data: userAuth } = await db.auth.getUser(token);
+            if (userAuth?.user) {
+              const { data: staff } = await db.from('clinician_profiles').select('id, is_admin, is_platform_admin, clinic_id').eq('id', userAuth.user.id).maybeSingle();
+              if (staff && (staff.is_admin || staff.is_platform_admin)) {
+                isManager = true;
+              }
+            }
+          }
+        } catch {
+          // best-effort
+        }
+
         let clinicResult = await db
           .from('clinics')
           .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled')
           .or(`slug.eq.${slug},slug.eq.${rawSlug},slug.ilike.${slug.replace(/-/g, '')}`)
           .maybeSingle();
-
-        if (!clinicResult.data) {
-          clinicResult = await db
-            .from('clinics')
-            .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled')
-            .ilike('name', rawSlug.replace(/[-_]+/g, ' '))
-            .maybeSingle();
-        }
 
         if (clinicResult.error && clinicResult.error.message?.includes('column')) {
           clinicResult = await db
@@ -155,10 +166,44 @@ export default { async fetch(request: Request) {
             .or(`slug.eq.${slug},slug.eq.${rawSlug}`)
             .maybeSingle();
         }
+
+        if (!clinicResult.data) {
+          clinicResult = await db
+            .from('clinics')
+            .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_enabled')
+            .ilike('name', rawSlug.replace(/[-_]+/g, ' '))
+            .maybeSingle();
+        }
+
+        // Auto-provision default Ventricura clinic if missing
+        if (!clinicResult.data && (slug === 'ventricura' || rawSlug === 'ventricura')) {
+          const defaultClinicData = {
+            name: 'Ventricura Telehealth',
+            slug: 'ventricura',
+            website_headline: 'Specialist telehealth & contactless vitals consultations.',
+            website_intro: 'A unified clinical workspace connecting patients with qualified medical practitioners.',
+            website_about: 'Ventricura provides browser-based telehealth consultations with contactless vitals extraction, structured clinical notes, and integrated appointment scheduling.',
+            website_enabled: true,
+          };
+          const { data: created } = await db.from('clinics').upsert(defaultClinicData, { onConflict: 'slug' }).select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_enabled').single();
+          if (created) {
+            clinicResult = { data: created, error: null };
+          }
+        }
+
         const clinic = clinicResult.data;
-        if (clinicResult.error || !clinic || clinic.website_enabled === false) return Response.json({ error: 'Clinic page not found.' }, { status: 404 });
+        if (clinicResult.error || !clinic) return Response.json({ error: 'Clinic page not found.' }, { status: 404 });
+        if (clinic.website_enabled === false && !isManager) return Response.json({ error: 'This clinic page is currently unpublished.' }, { status: 404 });
+
         const baseUrl = (process.env.APP_URL ?? url.origin).replace(/\/$/, '');
-        const { data: clinicians } = await db.from('clinician_profiles').select('id, display_name, professional_title, about_me, photo_url, created_at').eq('clinic_id', clinic.id).order('created_at', { ascending: true });
+        let clinicianQuery = db.from('clinician_profiles').select('id, display_name, professional_title, about_me, photo_url, created_at');
+        if (clinic.slug === 'ventricura') {
+          clinicianQuery = clinicianQuery.or(`clinic_id.eq.${clinic.id},clinic_id.is.null`);
+        } else {
+          clinicianQuery = clinicianQuery.eq('clinic_id', clinic.id);
+        }
+        const { data: clinicians } = await clinicianQuery.order('created_at', { ascending: true });
+
         const clinicianIds = (clinicians ?? []).map((item) => item.id);
         const { data: bookingProfiles } = clinicianIds.length > 0
           ? await db.from('clinician_booking_profiles').select('clinician_id, booking_token, duration_minutes, booking_enabled, booking_reason').in('clinician_id', clinicianIds)
@@ -180,23 +225,6 @@ export default { async fetch(request: Request) {
         const rawSpecialties = (clinic as Record<string, unknown>).website_specialties as string | null | undefined;
         const specialties = rawSpecialties ? rawSpecialties.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [];
         const defaultBooking = doctors.find((d) => Boolean(d.bookingUrl))?.bookingUrl ?? null;
-
-        let isManager = false;
-        try {
-          const rawAuth = request.headers.get('authorization');
-          const token = rawAuth?.replace(/^Bearer\s+/i, '');
-          if (token) {
-            const { data: userAuth } = await db.auth.getUser(token);
-            if (userAuth?.user) {
-              const { data: staff } = await db.from('clinician_profiles').select('id, is_admin, is_platform_admin, clinic_id').eq('id', userAuth.user.id).maybeSingle();
-              if (staff && (staff.is_admin || staff.is_platform_admin || staff.clinic_id === clinic.id)) {
-                isManager = true;
-              }
-            }
-          }
-        } catch {
-          // best-effort
-        }
 
         return Response.json({
           clinic: {
