@@ -4582,3 +4582,283 @@ body { background: var(--cream); color: var(--ink); }
   font-size: 0.7rem;
   text-transform: uppercase;
 }
+
+/* ==========================================================================
+   PRESCRIBING WORKSTATION EXPANSION (DUAL-COLUMN CLINICAL DESK)
+   ========================================================================== */
+
+.modal-container.prescribe-medication-modal {
+  max-width: 1260px;
+  width: 95vw;
+  max-height: 94vh;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-container.prescribe-medication-modal .modal-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+}
+
+.modal-container.prescribe-medication-modal .prescribe-form {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.prescribe-workstation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.prescribe-workspace-left {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.prescribe-workspace-right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  position: sticky;
+  top: 0;
+}
+
+/* Regimen Presets */
+.regimen-presets-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 10px 14px;
+  border-radius: 3px;
+}
+
+.regimen-presets-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  color: #166534;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.regimen-presets-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.regimen-preset-chip {
+  background: #ffffff;
+  border: 1px solid #86efac;
+  padding: 4px 9px;
+  font-size: 0.76rem;
+  cursor: pointer;
+  border-radius: 3px;
+  color: #14532d;
+  transition: all 0.12s ease;
+}
+
+.regimen-preset-chip:hover {
+  background: #dcfce7;
+  border-color: #22c55e;
+}
+
+.regimen-preset-chip strong {
+  font-weight: 700;
+}
+
+/* Label with Action Buttons */
+.label-with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.helper-action-link {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #2563eb;
+  padding: 0;
+  transition: color 0.12s ease;
+}
+
+.helper-action-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.helper-label-hint {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* Clinical Uses Chips */
+.clinical-uses-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+
+.clinical-use-chip {
+  background: #f1f5f9;
+  border: 1px dashed #cbd5e1;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.12s ease;
+}
+
+.clinical-use-chip:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* Monograph Card Elements */
+.field-lbl-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.copy-into-dir-btn {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  font-size: 0.68rem;
+  font-weight: 750;
+  padding: 1px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.copy-into-dir-btn:hover {
+  background: #d1fae5;
+}
+
+.monograph-use-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.monograph-use-tag-btn {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 2px 7px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #166534;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.12s ease;
+}
+
+.monograph-use-tag-btn:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+/* Placeholder card for right panel */
+.monograph-placeholder-card {
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  padding: 36px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  min-height: 480px;
+  justify-content: center;
+}
+
+.monograph-placeholder-card .placeholder-icon {
+  opacity: 0.85;
+}
+
+.monograph-placeholder-card h4 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.monograph-placeholder-card p {
+  font-size: 0.86rem;
+  color: #64748b;
+  margin: 0;
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+.placeholder-features-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  text-align: left;
+  width: 100%;
+  max-width: 440px;
+}
+
+.placeholder-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 10px 14px;
+  border-radius: 3px;
+}
+
+.placeholder-feature strong {
+  display: block;
+  font-size: 0.84rem;
+  color: #1e293b;
+}
+
+.placeholder-feature span {
+  display: block;
+  font-size: 0.74rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+@media (max-width: 1024px) {
+  .prescribe-workstation-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .prescribe-workspace-right {
+    position: static;
+  }
+}

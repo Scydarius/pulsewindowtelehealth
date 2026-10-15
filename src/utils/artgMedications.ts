@@ -232,6 +232,85 @@ export function calculateSmartPbs(
   };
 }
 
+export type ClinicalRegimenPreset = {
+  id: string;
+  label: string;
+  repeats: number;
+  note: string;
+};
+
+export const CLINICAL_REGIMEN_PRESETS: ClinicalRegimenPreset[] = [
+  {
+    id: 'chronic',
+    label: 'Chronic Maintenance (5 Repeats)',
+    repeats: 5,
+    note: 'Long-term maintenance therapy for chronic condition. Routine 6-month clinical review scheduled.',
+  },
+  {
+    id: 'trial_3mo',
+    label: '3-Month Clinical Trial (2 Repeats)',
+    repeats: 2,
+    note: 'Initial 3-month trial of therapy. Assess therapeutic efficacy, biomarker response, and tolerability prior to further repeats.',
+  },
+  {
+    id: 'titration',
+    label: 'Dose Titration (0 Repeats)',
+    repeats: 0,
+    note: 'Initial dose titration phase. Patient instructed to follow up for clinical evaluation and dose escalation.',
+  },
+  {
+    id: 'acute_5d',
+    label: '5-Day Acute Course (0 Repeats)',
+    repeats: 0,
+    note: 'Short acute 5-day course. Complete full course; cease when finished.',
+  },
+  {
+    id: 'acute_7d',
+    label: '7-Day Acute Course (0 Repeats)',
+    repeats: 0,
+    note: 'Acute 7-day course. Complete full course as prescribed.',
+  },
+  {
+    id: 'prn_relief',
+    label: 'PRN Flare Relief (2 Repeats)',
+    repeats: 2,
+    note: 'As-needed (PRN) for acute symptom exacerbations. Do not exceed recommended maximum daily frequency.',
+  },
+];
+
+/**
+ * Extract distinct clinical indication tags / uses from an ArtgMedication's indication text or drug class.
+ */
+export function getClinicalUses(med: ArtgMedication | null): string[] {
+  if (!med) return [];
+  const uses: string[] = [];
+
+  if (med.indication) {
+    const parts = med.indication
+      .split(/[,;•]|\b(?:as well as|and treatment of|and for)\b/i)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 2 && s.length < 75);
+
+    for (const p of parts) {
+      const clean = p
+        .replace(/^(management of|treatment of|prevention of|relief of|prophylaxis of|for|control of|adjunct to|adjunctive therapy for)\s+/i, '')
+        .replace(/\.$/, '')
+        .trim();
+      if (!clean) continue;
+      const capitalized = clean.charAt(0).toUpperCase() + clean.slice(1);
+      if (!uses.some((u) => u.toLowerCase() === capitalized.toLowerCase()) && capitalized.length >= 3) {
+        uses.push(capitalized);
+      }
+    }
+  }
+
+  if (uses.length === 0 && med.drugClass) {
+    uses.push(med.drugClass);
+  }
+
+  return uses.slice(0, 6);
+}
+
 export type ClinicalAlert = {
   type: 'duplicate' | 'interaction' | 'schedule8' | 'caution';
   severity: 'high' | 'moderate' | 'info';
@@ -276,10 +355,63 @@ export function checkClinicalInteractions(
     });
   }
 
+  // SGLT2 Inhibitor Sick-Day Advice
+  if (candidateText.includes('empagliflozin') || candidateText.includes('dapagliflozin') || candidateText.includes('jardiance') || candidateText.includes('forxiga')) {
+    alerts.push({
+      type: 'caution',
+      severity: 'info',
+      title: 'SGLT2 Inhibitor Sick-Day Protocol',
+      detail:
+        'Advise patient to temporarily withhold this SGLT2 inhibitor during acute dehydrating illness, severe gastroenteritis, prolonged fasting, or major surgery to prevent euglycaemic DKA.',
+    });
+  }
+
+  // Triple Whammy Detection across all meds
+  const isCandidateAceOrArb =
+    candidateText.includes('perindopril') || candidateText.includes('ramipril') || candidateText.includes('enalapril') ||
+    candidateText.includes('candesartan') || candidateText.includes('irbesartan') || candidateText.includes('telmisartan') ||
+    candidateText.includes('olmesartan') || candidateText.includes('valsartan') || candidateText.includes('coveram') || candidateText.includes('twynsta');
+
+  const isCandidateNsaid =
+    candidateText.includes('meloxicam') || candidateText.includes('celecoxib') || candidateText.includes('ibuprofen') ||
+    candidateText.includes('naproxen') || candidateText.includes('diclofenac') || candidateText.includes('voltaren') || candidateText.includes('mobic');
+
+  const isCandidateDiuretic =
+    candidateText.includes('furosemide') || candidateText.includes('frusemide') || candidateText.includes('lasix') ||
+    candidateText.includes('indapamide') || candidateText.includes('hydrochlorothiazide') || candidateText.includes('spironolactone') ||
+    candidateText.includes('eplerenone');
+
+  let hasExistingAceOrArb = false;
+  let hasExistingDiuretic = false;
+  let hasExistingNsaid = false;
+
   for (const existing of activeMeds) {
     const existingGeneric = (existing.generic_name || '').toLowerCase();
     const existingBrand = (existing.brand_name || existing.medication_name || '').toLowerCase();
     const existingText = `${existing.medication_name} ${existing.generic_name ?? ''} ${existing.brand_name ?? ''}`.toLowerCase();
+
+    if (
+      existingText.includes('perindopril') || existingText.includes('ramipril') || existingText.includes('enalapril') ||
+      existingText.includes('candesartan') || existingText.includes('irbesartan') || existingText.includes('telmisartan') ||
+      existingText.includes('olmesartan') || existingText.includes('valsartan') || existingText.includes('coveram') || existingText.includes('twynsta')
+    ) {
+      hasExistingAceOrArb = true;
+    }
+
+    if (
+      existingText.includes('furosemide') || existingText.includes('frusemide') || existingText.includes('lasix') ||
+      existingText.includes('indapamide') || existingText.includes('hydrochlorothiazide') || existingText.includes('spironolactone') ||
+      existingText.includes('eplerenone')
+    ) {
+      hasExistingDiuretic = true;
+    }
+
+    const isExistingNsaid =
+      existingText.includes('meloxicam') || existingText.includes('celecoxib') || existingText.includes('ibuprofen') ||
+      existingText.includes('naproxen') || existingText.includes('diclofenac') || existingText.includes('voltaren') || existingText.includes('mobic');
+    if (isExistingNsaid) {
+      hasExistingNsaid = true;
+    }
 
     // 2. Duplicate Active Ingredient
     if (
@@ -296,16 +428,11 @@ export function checkClinicalInteractions(
     }
 
     // 3. Dual RAAS Blockade (ACE inhibitor + ARB)
-    const isCandidateAceOrArb =
-      candidateText.includes('perindopril') || candidateText.includes('ramipril') || candidateText.includes('enalapril') ||
-      candidateText.includes('candesartan') || candidateText.includes('irbesartan') || candidateText.includes('telmisartan') ||
-      candidateText.includes('olmesartan') || candidateText.includes('valsartan');
-    const isExistingAceOrArb =
+    if (isCandidateAceOrArb && (
       existingText.includes('perindopril') || existingText.includes('ramipril') || existingText.includes('enalapril') ||
       existingText.includes('candesartan') || existingText.includes('irbesartan') || existingText.includes('telmisartan') ||
-      existingText.includes('olmesartan') || existingText.includes('valsartan');
-
-    if (isCandidateAceOrArb && isExistingAceOrArb) {
+      existingText.includes('olmesartan') || existingText.includes('valsartan')
+    )) {
       alerts.push({
         type: 'interaction',
         severity: 'high',
@@ -315,13 +442,6 @@ export function checkClinicalInteractions(
     }
 
     // 4. Blood Thinner + NSAID (Bleeding risk)
-    const isCandidateNsaid =
-      candidateText.includes('meloxicam') || candidateText.includes('celecoxib') || candidateText.includes('ibuprofen') ||
-      candidateText.includes('naproxen') || candidateText.includes('diclofenac') || candidateText.includes('voltaren');
-    const isExistingNsaid =
-      existingText.includes('meloxicam') || existingText.includes('celecoxib') || existingText.includes('ibuprofen') ||
-      existingText.includes('naproxen') || existingText.includes('diclofenac') || existingText.includes('voltaren');
-
     const isCandidateAnticoag =
       candidateText.includes('apixaban') || candidateText.includes('eliquis') || candidateText.includes('rivaroxaban') ||
       candidateText.includes('xarelto') || candidateText.includes('warfarin') || candidateText.includes('dabigatran') || candidateText.includes('pradaxa');
@@ -381,6 +501,48 @@ export function checkClinicalInteractions(
         detail: `Combining tramadol with an SSRI/SNRI (${existing.medication_name} + ${candidate.medicationName}) increases the risk of Serotonin Syndrome and seizures. Monitor for agitation, tremor, or hyperreflexia.`,
       });
     }
+
+    // 7. Statin + Strong CYP3A4 Inhibitor (Rhabdomyolysis Risk)
+    const isCandidateCyp3a4Statin = candidateText.includes('atorvastatin') || candidateText.includes('simvastatin') || candidateText.includes('lipitor') || candidateText.includes('zocor');
+    const isExistingCyp3a4Statin = existingText.includes('atorvastatin') || existingText.includes('simvastatin') || existingText.includes('lipitor') || existingText.includes('zocor');
+    const isCandidateCypInhibitor = candidateText.includes('clarithromycin') || candidateText.includes('erythromycin') || candidateText.includes('diltiazem') || candidateText.includes('verapamil') || candidateText.includes('itraconazole');
+    const isExistingCypInhibitor = existingText.includes('clarithromycin') || existingText.includes('erythromycin') || existingText.includes('diltiazem') || existingText.includes('verapamil') || existingText.includes('itraconazole');
+
+    if ((isCandidateCyp3a4Statin && isExistingCypInhibitor) || (isCandidateCypInhibitor && isExistingCyp3a4Statin)) {
+      alerts.push({
+        type: 'interaction',
+        severity: 'high',
+        title: 'Statin Rhabdomyolysis / Toxicity Caution',
+        detail: `Co-prescribing a CYP3A4-metabolised statin with a strong CYP3A4 inhibitor (${existing.medication_name} + ${candidate.medicationName}) substantially elevates statin plasma concentrations, heightening the risk of myopathy and rhabdomyolysis. Consider dose reduction or temporary suspension.`,
+      });
+    }
+
+    // 8. Methotrexate + NSAID
+    const isCandidateMethotrexate = candidateText.includes('methotrexate') || candidateText.includes('methoblastin');
+    const isExistingMethotrexate = existingText.includes('methotrexate') || existingText.includes('methoblastin');
+    if ((isCandidateMethotrexate && isExistingNsaid) || (isCandidateNsaid && isExistingMethotrexate)) {
+      alerts.push({
+        type: 'interaction',
+        severity: 'high',
+        title: 'Methotrexate Toxicity Caution',
+        detail: `Co-prescribing an NSAID with methotrexate (${existing.medication_name} + ${candidate.medicationName}) reduces renal methotrexate clearance, risking severe myelosuppression and liver toxicity.`,
+      });
+    }
+  }
+
+  // 9. Triple Whammy Check (ACEi/ARB + Diuretic + NSAID)
+  const allAceOrArb = isCandidateAceOrArb || hasExistingAceOrArb;
+  const allDiuretic = isCandidateDiuretic || hasExistingDiuretic;
+  const allNsaid = isCandidateNsaid || hasExistingNsaid;
+
+  if (allAceOrArb && allDiuretic && allNsaid) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Triple Whammy Acute Kidney Injury Risk',
+      detail:
+        'CRITICAL ALERT: Co-prescribing an ACE inhibitor/ARB, a diuretic, and an NSAID simultaneously dramatically reduces renal perfusion and glomerular filtration, predisposing to sudden acute renal failure and severe hyperkalaemia. Avoid combination; use paracetamol for analgesia.',
+    });
   }
 
   return alerts;
