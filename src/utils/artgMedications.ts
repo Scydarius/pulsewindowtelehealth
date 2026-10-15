@@ -1,5 +1,7 @@
 import artgData from '../data/artg-medications.json';
 
+export type PregnancyCategory = 'A' | 'B1' | 'B2' | 'B3' | 'C' | 'D' | 'X';
+
 export type ArtgMedication = {
   id: string;
   name: string;
@@ -12,6 +14,17 @@ export type ArtgMedication = {
   schedule: 'S4' | 'S8' | 'S2' | 'S3';
   drugClass: string;
   category: string;
+  indication?: string;
+  mechanismOfAction?: string;
+  pbsListingType?: 'General' | 'Restricted Benefit' | 'Authority Required' | 'Non-PBS';
+  pbsRestrictionNote?: string;
+  pregnancyCategory?: PregnancyCategory;
+  counselingAdvice?: string;
+  cautionsAndContraindications?: string;
+  adverseEffects?: string;
+  monitoringAdvice?: string;
+  storageAdvice?: string;
+  safeScriptMonitored?: boolean;
   defaultDose: string;
   defaultFrequency: string;
   defaultDirections: string;
@@ -28,15 +41,55 @@ export type ArtgMedication = {
 
 export const ARTG_MEDICATIONS: ArtgMedication[] = artgData as ArtgMedication[];
 
+/** Helper to look up an ARTG medication by ID */
+export function getArtgMedicationById(id: string): ArtgMedication | undefined {
+  return ARTG_MEDICATIONS.find((m) => m.id === id);
+}
+
+/** Get list of unique categories available in the catalog */
+export function getDistinctCategories(): string[] {
+  return Array.from(new Set(ARTG_MEDICATIONS.map((m) => m.category))).sort();
+}
+
+export type SearchArtgOptions = {
+  category?: string;
+  schedule?: string;
+  pbsOnly?: boolean;
+  limit?: number;
+};
+
 /** Search Australian Register of Therapeutic Goods prescribable medicines */
-export function searchArtgMedications(query: string, limit = 20): ArtgMedication[] {
+export function searchArtgMedications(
+  query: string,
+  options?: SearchArtgOptions | number
+): ArtgMedication[] {
+  const opts: SearchArtgOptions =
+    typeof options === 'number' ? { limit: options } : options || {};
+  const limit = opts.limit ?? 25;
   const q = query.trim().toLowerCase();
-  if (!q) return ARTG_MEDICATIONS.slice(0, limit);
+
+  let pool = ARTG_MEDICATIONS;
+
+  if (opts.category && opts.category !== 'All') {
+    pool = pool.filter((m) => m.category === opts.category);
+  }
+
+  if (opts.schedule && opts.schedule !== 'All') {
+    pool = pool.filter((m) => m.schedule === opts.schedule);
+  }
+
+  if (opts.pbsOnly) {
+    pool = pool.filter((m) => m.pbs);
+  }
+
+  if (!q) {
+    return pool.slice(0, limit);
+  }
 
   const tokens = q.split(/\s+/).filter(Boolean);
 
-  const results = ARTG_MEDICATIONS.filter((med) => {
-    const haystack = `${med.brand} ${med.generic} ${med.name} ${med.strength} ${med.form} ${med.category} ${med.drugClass}`.toLowerCase();
+  const results = pool.filter((med) => {
+    const haystack = `${med.brand} ${med.generic} ${med.name} ${med.strength} ${med.form} ${med.category} ${med.drugClass} ${med.indication ?? ''}`.toLowerCase();
     return tokens.every((token) => haystack.includes(token));
   });
 
@@ -56,6 +109,82 @@ export function searchArtgMedications(query: string, limit = 20): ArtgMedication
   });
 
   return results.slice(0, limit);
+}
+
+/**
+ * TGA Pregnancy Categorisation definitions with clinical recommendations.
+ */
+export function getPregnancyDescription(category?: PregnancyCategory | string): {
+  badgeClass: string;
+  severity: 'safe' | 'caution' | 'danger';
+  title: string;
+  detail: string;
+} {
+  switch (category) {
+    case 'A':
+      return {
+        badgeClass: 'preg-cat-a',
+        severity: 'safe',
+        title: 'Category A — Well-established safety in pregnancy',
+        detail:
+          'Taken by a large number of pregnant women without proven increase in fetal malformations or harmful effects.',
+      };
+    case 'B1':
+      return {
+        badgeClass: 'preg-cat-b1',
+        severity: 'caution',
+        title: 'Category B1 — Limited human data; animal studies reassuring',
+        detail:
+          'Limited human pregnancy data. Animal studies show no evidence of fetal damage.',
+      };
+    case 'B2':
+      return {
+        badgeClass: 'preg-cat-b2',
+        severity: 'caution',
+        title: 'Category B2 — Limited human and animal data',
+        detail:
+          'Limited human data. Animal studies inadequate/lacking but available data show no fetal harm.',
+      };
+    case 'B3':
+      return {
+        badgeClass: 'preg-cat-b3',
+        severity: 'caution',
+        title: 'Category B3 — Animal fetal findings; human significance uncertain',
+        detail:
+          'Limited human data. Animal studies show evidence of increased fetal damage, significance in humans uncertain. Use with specialist care.',
+      };
+    case 'C':
+      return {
+        badgeClass: 'preg-cat-c',
+        severity: 'caution',
+        title: 'Category C — Pharmacological adverse effects on fetus',
+        detail:
+          'Owing to pharmacological effects, has caused or suspected of causing reversible harmful effects on the fetus (without malformations). Caution required.',
+      };
+    case 'D':
+      return {
+        badgeClass: 'preg-cat-d',
+        severity: 'danger',
+        title: 'Category D — Known or suspected fetal malformations/damage',
+        detail:
+          'Known or suspected to cause increased incidence of human fetal malformations or irreversible damage. Only use if benefits outweigh maternal life-threatening risks.',
+      };
+    case 'X':
+      return {
+        badgeClass: 'preg-cat-x',
+        severity: 'danger',
+        title: 'Category X — STRICTLY CONTRAINDICATED in pregnancy',
+        detail:
+          'High risk of causing permanent severe fetal damage. Strictly contraindicated in pregnancy or women planning pregnancy.',
+      };
+    default:
+      return {
+        badgeClass: 'preg-cat-unknown',
+        severity: 'caution',
+        title: 'Pregnancy Category Not Specified',
+        detail: 'Consult the Australian Medicines Handbook (AMH) or TGA PI for pregnancy safety data.',
+      };
+  }
 }
 
 /**
@@ -124,12 +253,26 @@ export function checkClinicalInteractions(
   const candidateText = `${candidate.medicationName} ${candidate.genericName ?? ''} ${candidate.brandName ?? ''}`.toLowerCase();
 
   // 1. S8 Controlled Drug Warning
-  if (candidate.schedule === 'S8' || candidateText.includes('vyvanse') || candidateText.includes('endone') || candidateText.includes('palexia') || candidateText.includes('ritalin') || candidateText.includes('concerta') || candidateText.includes('dexamfetamine') || candidateText.includes('norspan') || candidateText.includes('oxycodone')) {
+  if (
+    candidate.schedule === 'S8' ||
+    candidateText.includes('vyvanse') ||
+    candidateText.includes('endone') ||
+    candidateText.includes('palexia') ||
+    candidateText.includes('ritalin') ||
+    candidateText.includes('concerta') ||
+    candidateText.includes('dexamfetamine') ||
+    candidateText.includes('norspan') ||
+    candidateText.includes('oxycodone') ||
+    candidateText.includes('targin') ||
+    candidateText.includes('fentanyl') ||
+    candidateText.includes('morphine')
+  ) {
     alerts.push({
       type: 'schedule8',
       severity: 'moderate',
       title: 'Schedule 8 Controlled Drug (S8)',
-      detail: 'This is a controlled Schedule 8 medicine. Check state prescription monitoring (SafeScript / ScriptCheck) and verify valid Authority/Permit before dispensing.',
+      detail:
+        'This is a controlled Schedule 8 medicine. Check state prescription monitoring (SafeScript / ScriptCheck) and verify valid Authority/Permit before dispensing.',
     });
   }
 
