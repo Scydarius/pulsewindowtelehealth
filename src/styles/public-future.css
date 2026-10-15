@@ -313,9 +313,122 @@ main.home-v6{background:#f4f4ef!important;color:#101010!important}.home-v6 .publ
   display: none !important;
 }
 .technology-page .technology-hero:after,
-.v12-technology-hero:after {
+.v12-technology-hero:after,
+.ventricura-public .v6-demo:after,
+.home-v6 .v6-demo:after {
   display: none !important;
   content: none !important;
+}
+/* Clean, readable live demo section */
+.ventricura-public .v6-demo,
+.home-v6 .v6-demo {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: auto !important;
+  margin: 0 !important;
+  padding: 100px max(36px, calc((100vw - 1440px) / 2)) 110px !important;
+  box-sizing: border-box !important;
+  background: #f4f4ef !important;
+  color: #101010 !important;
+  overflow: visible !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+}
+.ventricura-public .v6-demo h2,
+.home-v6 .v6-demo h2 {
+  max-width: 820px !important;
+  margin: 0 0 20px 0 !important;
+  font-size: clamp(2.4rem, 4.4vw, 4rem) !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.025em !important;
+  word-spacing: 0.02em !important;
+  color: #101010 !important;
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
+}
+.ventricura-public .v6-demo h2 em,
+.home-v6 .v6-demo h2 em {
+  font-family: Georgia, 'Times New Roman', serif !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  color: #484844 !important;
+  letter-spacing: -0.015em !important;
+}
+.ventricura-public .v6-demo p,
+.home-v6 .v6-demo p {
+  max-width: 620px !important;
+  margin: 0 0 32px 0 !important;
+  font-size: clamp(1.02rem, 1.3vw, 1.15rem) !important;
+  line-height: 1.65 !important;
+  color: #555550 !important;
+  letter-spacing: 0.005em !important;
+}
+.ventricura-public .v6-demo a,
+.home-v6 .v6-demo a {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 15px 30px !important;
+  background: #101010 !important;
+  color: #f4f4ef !important;
+  border: 1px solid #101010 !important;
+  border-radius: 4px !important;
+  font-size: 0.92rem !important;
+  font-weight: 650 !important;
+  letter-spacing: 0.01em !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+.ventricura-public .v6-demo a:hover,
+.home-v6 .v6-demo a:hover {
+  background: #2a2a2a !important;
+  border-color: #2a2a2a !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+}
+@media(max-width: 900px) {
+  .ventricura-public .v6-demo,
+  .home-v6 .v6-demo {
+    padding: 72px 24px !important;
+  }
+  .ventricura-public .v6-demo h2,
+  .home-v6 .v6-demo h2 {
+    font-size: clamp(2rem, 5.5vw, 2.75rem) !important;
+    line-height: 1.2 !important;
+  }
+}
+@media(max-width: 620px) {
+  .ventricura-public .v6-demo,
+  .home-v6 .v6-demo {
+    padding: 56px 16px !important;
+  }
+  .ventricura-public .v6-demo h2,
+  .home-v6 .v6-demo h2 {
+    font-size: clamp(1.85rem, 8vw, 2.35rem) !important;
+    line-height: 1.22 !important;
+  }
+  .ventricura-public .v6-demo h2 br,
+  .home-v6 .v6-demo h2 br {
+    display: inline !important;
+    content: ' ' !important;
+  }
+  .ventricura-public .v6-demo p,
+  .home-v6 .v6-demo p {
+    font-size: 0.98rem !important;
+    margin-bottom: 26px !important;
+  }
+  .ventricura-public .v6-demo a,
+  .home-v6 .v6-demo a {
+    width: 100% !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
 }
 /* Clean, readable closing banner */
 .ventricura-public .v6-close,
