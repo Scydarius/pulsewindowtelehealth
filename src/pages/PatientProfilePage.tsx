@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   CalendarClock,
   Check,
@@ -12,8 +13,11 @@ import {
   MessageSquareText,
   Pill,
   Plus,
+  Printer,
   RotateCcw,
+  Search,
   ShieldCheck,
+  Sparkles,
   Trash2,
   UserRound,
   Video,
@@ -31,7 +35,14 @@ import {
   type PatientProfile,
   updatePatientMedication,
 } from '../services/clinicAccess';
-import { searchArtgMedications, type ArtgMedication } from '../utils/artgMedications';
+import {
+  ARTG_MEDICATIONS,
+  calculateSmartPbs,
+  checkClinicalInteractions,
+  searchArtgMedications,
+  type ArtgMedication,
+  type ClinicalAlert,
+} from '../utils/artgMedications';
 
 const number = (value: number | null, digits = 0) => (value === null ? '—' : value.toFixed(digits));
 const dateTime = (value: string) =>
@@ -112,6 +123,7 @@ export function PatientProfilePage() {
   const [showPrescribeModal, setShowPrescribeModal] = useState(false);
   const [copiedMedications, setCopiedMedications] = useState(false);
   const [medicationsFilter, setMedicationsFilter] = useState<'all' | 'active' | 'ceased'>('active');
+  const [medSearchQuery, setMedSearchQuery] = useState('');
   const [tablePending, setTablePending] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
@@ -264,10 +276,38 @@ notify pgrst, 'reload schema';`;
     setDose(med.defaultDose || med.strength);
     setFrequency(med.defaultFrequency || 'Once daily');
     setDirections(med.defaultDirections || '');
-    setRepeats(typeof med.defaultRepeats === 'number' ? med.defaultRepeats : 5);
-    setIsPbs(med.pbs);
+    const initialRepeats = typeof med.defaultRepeats === 'number' ? med.defaultRepeats : 5;
+    setRepeats(initialRepeats);
+    const pbsCalc = calculateSmartPbs(med, initialRepeats);
+    setIsPbs(pbsCalc.isPbs);
     setArtgQuery('');
     setArtgResults([]);
+  };
+
+  const handleRepeatsChange = (val: number) => {
+    const cleanVal = Math.max(0, val);
+    setRepeats(cleanVal);
+    const pbsCalc = calculateSmartPbs(selectedArtg, cleanVal);
+    setIsPbs(pbsCalc.isPbs);
+  };
+
+  const handleApplyDosePreset = (preset: {
+    label: string;
+    dose: string;
+    frequency: string;
+    directions: string;
+    repeats?: number;
+  }) => {
+    setDose(preset.dose);
+    setFrequency(preset.frequency);
+    if (preset.directions) {
+      setDirections(preset.directions);
+    }
+    if (typeof preset.repeats === 'number') {
+      setRepeats(preset.repeats);
+      const pbsCalc = calculateSmartPbs(selectedArtg, preset.repeats);
+      setIsPbs(pbsCalc.isPbs);
+    }
   };
 
   const handleClearSelectedArtg = () => {
@@ -301,6 +341,10 @@ notify pgrst, 'reload schema';`;
 
   const handleRePrescribe = (pastMed: PatientMedication) => {
     resetPrescribeForm();
+    const matchingArtg = pastMed.artg_id
+      ? ARTG_MEDICATIONS.find((m) => m.id === pastMed.artg_id) || null
+      : null;
+    setSelectedArtg(matchingArtg);
     setMedicationName(pastMed.medication_name);
     setGenericName(pastMed.generic_name || '');
     setBrandName(pastMed.brand_name || '');
@@ -429,6 +473,10 @@ notify pgrst, 'reload schema';`;
     setTimeout(() => setCopiedMedications(false), 2500);
   };
 
+  const handlePrintMedications = () => {
+    window.print();
+  };
+
   const activeMedications = useMemo(
     () => medications.filter((m) => m.status === 'active'),
     [medications]
@@ -438,12 +486,38 @@ notify pgrst, 'reload schema';`;
     [medications]
   );
 
-  const displayedMedications =
-    medicationsFilter === 'active'
-      ? activeMedications
-      : medicationsFilter === 'ceased'
-      ? ceasedMedications
-      : medications;
+  const smartPbsInfo = useMemo(() => {
+    return calculateSmartPbs(selectedArtg, repeats);
+  }, [selectedArtg, repeats]);
+
+  const clinicalAlerts = useMemo<ClinicalAlert[]>(() => {
+    if (!medicationName.trim()) return [];
+    return checkClinicalInteractions(
+      {
+        medicationName,
+        genericName,
+        brandName,
+        drugClass: selectedArtg?.drugClass,
+        schedule: selectedArtg?.schedule,
+      },
+      activeMedications
+    );
+  }, [medicationName, genericName, brandName, selectedArtg, activeMedications]);
+
+  const displayedMedications = useMemo(() => {
+    const baseList =
+      medicationsFilter === 'active'
+        ? activeMedications
+        : medicationsFilter === 'ceased'
+        ? ceasedMedications
+        : medications;
+    const q = medSearchQuery.trim().toLowerCase();
+    if (!q) return baseList;
+    return baseList.filter((m) => {
+      const haystack = `${m.medication_name} ${m.generic_name ?? ''} ${m.brand_name ?? ''} ${m.dose} ${m.directions ?? ''} ${m.notes ?? ''} ${m.prescribed_by_name}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [medicationsFilter, activeMedications, ceasedMedications, medications, medSearchQuery]);
 
   if (loading)
     return (
@@ -563,6 +637,14 @@ notify pgrst, 'reload schema';`;
             <button
               type="button"
               className="button button-secondary button-small"
+              onClick={handlePrintMedications}
+              title="Print formal Australian medication summary chart for patient or pharmacy"
+            >
+              <Printer size={15} /> Print medication chart
+            </button>
+            <button
+              type="button"
+              className="button button-secondary button-small"
               onClick={handleCopyMedicationList}
               title="Copy active medication list formatted for clinical letters"
             >
@@ -604,7 +686,7 @@ notify pgrst, 'reload schema';`;
           </div>
         )}
 
-        {/* Tab Filters */}
+        {/* Tab Filters and Search */}
         <div className="medication-filter-bar">
           <div className="medication-filter-tabs">
             <button
@@ -628,6 +710,27 @@ notify pgrst, 'reload schema';`;
             >
               All records ({medications.length})
             </button>
+          </div>
+
+          <div className="medication-search-wrapper">
+            <Search size={14} className="med-search-icon" />
+            <input
+              type="text"
+              placeholder="Search by brand, generic, dose, or indication…"
+              value={medSearchQuery}
+              onChange={(e) => setMedSearchQuery(e.target.value)}
+              className="med-search-input"
+            />
+            {medSearchQuery && (
+              <button
+                type="button"
+                className="med-search-clear-btn"
+                onClick={() => setMedSearchQuery('')}
+                title="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1011,12 +1114,22 @@ notify pgrst, 'reload schema';`;
               {/* Selected ARTG Badge */}
               {selectedArtg && (
                 <div className="selected-artg-banner">
-                  <ShieldCheck size={16} color="#16a34a" />
                   <div className="selected-artg-info">
-                    <strong>ARTG Entry: {selectedArtg.name}</strong>
-                    <span>
-                      {selectedArtg.id} • {selectedArtg.strength} {selectedArtg.form}
-                    </span>
+                    <div className="selected-artg-title-row">
+                      <ShieldCheck size={16} color="#16a34a" />
+                      <strong>ARTG Indexed: {selectedArtg.name}</strong>
+                      <span className="aust-pill">{selectedArtg.id}</span>
+                      <span className={`schedule-badge ${selectedArtg.schedule.toLowerCase()}`}>
+                        {selectedArtg.schedule}
+                      </span>
+                    </div>
+                    <div className="selected-artg-meta">
+                      <span>Generic: <strong>{selectedArtg.generic}</strong></span>
+                      <span>•</span>
+                      <span>{selectedArtg.strength} {selectedArtg.form}</span>
+                      <span>•</span>
+                      <span>Class: {selectedArtg.drugClass}</span>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -1026,6 +1139,57 @@ notify pgrst, 'reload schema';`;
                   >
                     Change
                   </button>
+                </div>
+              )}
+
+              {/* Clinical Advisory Pearl / Warning Note */}
+              {selectedArtg?.warningNote && (
+                <div className="clinical-pearl-banner">
+                  <AlertCircle size={15} color="#d97706" />
+                  <span>
+                    <strong>Clinical Advisory:</strong> {selectedArtg.warningNote}
+                  </span>
+                </div>
+              )}
+
+              {/* Real-Time Clinical Safety & Interaction Alerts */}
+              {clinicalAlerts.length > 0 && (
+                <div className="clinical-alerts-wrapper">
+                  {clinicalAlerts.map((alert, idx) => (
+                    <div key={idx} className={`clinical-alert-banner ${alert.severity}`}>
+                      <div className="clinical-alert-icon">
+                        <AlertTriangle size={18} />
+                      </div>
+                      <div className="clinical-alert-content">
+                        <strong>{alert.title}</strong>
+                        <p>{alert.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 1-Click Common Clinical Dosing Presets */}
+              {selectedArtg?.commonDoses && selectedArtg.commonDoses.length > 0 && (
+                <div className="dose-presets-container">
+                  <div className="dose-presets-label">
+                    <Sparkles size={13} color="#2563eb" />
+                    <span>Common Clinical Doses (Click to populate)</span>
+                  </div>
+                  <div className="dose-presets-list">
+                    {selectedArtg.commonDoses.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="dose-preset-chip"
+                        onClick={() => handleApplyDosePreset(preset)}
+                        title={`Apply dose: ${preset.dose}, ${preset.frequency}`}
+                      >
+                        <strong>{preset.label}</strong>
+                        <span>{preset.frequency}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -1086,14 +1250,21 @@ notify pgrst, 'reload schema';`;
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="med-repeats-input">Repeats Authorised</label>
+                  <label htmlFor="med-repeats-input">
+                    Repeats Authorised
+                    {selectedArtg && (
+                      <span className="repeats-limit-hint">
+                        (PBS max: {selectedArtg.maxPbsRepeats ?? 5})
+                      </span>
+                    )}
+                  </label>
                   <input
                     id="med-repeats-input"
                     type="number"
                     min="0"
                     max="11"
                     value={repeats}
-                    onChange={(e) => setRepeats(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    onChange={(e) => handleRepeatsChange(parseInt(e.target.value, 10) || 0)}
                   />
                 </div>
               </div>
@@ -1119,9 +1290,17 @@ notify pgrst, 'reload schema';`;
                     />
                     <span className="checkbox-text">
                       <strong>PBS Subsidised Prescription</strong>
-                      <small>Uncheck for private or non-PBS benefit</small>
+                      <small>Auto-calculated from ARTG listing & repeats (clinician may override)</small>
                     </span>
                   </label>
+
+                  {/* Smart PBS auto-toggle feedback box */}
+                  <div className={`smart-pbs-status-box ${smartPbsInfo.isPbs ? 'pbs-active' : 'pbs-inactive'} ${smartPbsInfo.exceedsMax ? 'exceeds-max' : ''}`}>
+                    <span className="smart-pbs-icon">
+                      {smartPbsInfo.isPbs ? '✓' : smartPbsInfo.exceedsMax ? '⚠️' : 'ℹ'}
+                    </span>
+                    <span className="smart-pbs-reason-text">{smartPbsInfo.reason}</span>
+                  </div>
                 </div>
               </div>
 
@@ -1264,6 +1443,116 @@ notify pgrst, 'reload schema';`;
           </div>
         </div>
       )}
+
+      {/* PRINTABLE MEDICATION CHART (Formatted for A4 medical print & PDF export) */}
+      <div className="printable-medication-chart" aria-hidden="true">
+        <div className="print-header">
+          <div className="print-clinic-brand">
+            <h1>VENTRICURA TELEHEALTH</h1>
+            <p>Integrated Clinical & Cardiovascular Care • Australia</p>
+          </div>
+          <div className="print-doc-title">
+            <h2>CURRENT MEDICATION SUMMARY</h2>
+            <p>Generated: {new Date().toLocaleDateString('en-AU', { dateStyle: 'full' })}</p>
+          </div>
+        </div>
+
+        <div className="print-patient-meta">
+          <div>
+            <strong>Patient Name:</strong> {patient.display_name}
+          </div>
+          <div>
+            <strong>Email / Identifier:</strong> {patient.email}
+          </div>
+          <div>
+            <strong>Patient ID:</strong> {patient.id || patientId}
+          </div>
+          <div>
+            <strong>Active Medications:</strong> {activeMedications.length}
+          </div>
+        </div>
+
+        <table className="print-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Medication & Active Ingredient</th>
+              <th>Dose</th>
+              <th>Frequency</th>
+              <th>Repeats</th>
+              <th>PBS Benefit</th>
+              <th>Directions for Patient</th>
+              <th>Prescribed By / Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeMedications.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
+                  No active medications recorded for this patient.
+                </td>
+              </tr>
+            ) : (
+              activeMedications.map((m, idx) => (
+                <tr key={m.id}>
+                  <td>{idx + 1}</td>
+                  <td>
+                    <strong>{m.medication_name}</strong>
+                    {m.generic_name && <div className="print-sub">{m.generic_name}</div>}
+                    {m.artg_id && <div className="print-sub-aust">{m.artg_id}</div>}
+                  </td>
+                  <td>{m.dose}</td>
+                  <td>{m.frequency}</td>
+                  <td>{m.repeats}</td>
+                  <td>{m.is_pbs ? 'PBS Subsidised' : 'Private / Non-PBS'}</td>
+                  <td>{m.directions || '—'}</td>
+                  <td>
+                    {m.prescribed_by_name}
+                    <div className="print-sub">{new Date(m.prescribed_date).toLocaleDateString('en-AU')}</div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        {ceasedMedications.length > 0 && (
+          <div className="print-ceased-section">
+            <h3>Recently Ceased / Inactive Regimens</h3>
+            <table className="print-table print-ceased-table">
+              <thead>
+                <tr>
+                  <th>Medication</th>
+                  <th>Dose & Frequency</th>
+                  <th>Ceased Date</th>
+                  <th>Reason for Cessation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ceasedMedications.slice(0, 6).map((m) => (
+                  <tr key={m.id}>
+                    <td>{m.medication_name}</td>
+                    <td>{m.dose} ({m.frequency})</td>
+                    <td>{m.ceased_at ? new Date(m.ceased_at).toLocaleDateString('en-AU') : '—'}</td>
+                    <td>{m.ceased_reason || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="print-footer">
+          <div className="print-signature-box">
+            <p>Clinician Signature: ____________________________________</p>
+            <p>Prescriber / Provider Number: ___________________________</p>
+          </div>
+          <div className="print-disclaimer">
+            This document is a confidential Australian clinical health record generated via Ventricura Telehealth.
+            Dispensing pharmacists and treating healthcare practitioners should confirm clinical appropriateness before administration.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

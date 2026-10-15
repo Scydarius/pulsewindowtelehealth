@@ -39,3 +39,4 @@ create policy "clinicians read patient medications" on public.patient_medication
 drop policy if exists "clinicians manage patient medications" on public.patient_medications;
 create policy "clinicians manage patient medications" on public.patient_medications
   for all to authenticated using (true) with check (true);
+

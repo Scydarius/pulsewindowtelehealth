@@ -3183,6 +3183,12 @@ body { background: var(--cream); color: var(--ink); }
 .medication-filter-bar {
   margin: 22px 0 16px;
   border-bottom: 1px solid #e5e5df;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 6px;
 }
 .medication-filter-tabs {
   display: flex;
@@ -3205,6 +3211,46 @@ body { background: var(--cream); color: var(--ink); }
 .med-filter-tab.active {
   color: #171717;
   border-bottom-color: #171717;
+}
+.medication-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 280px;
+}
+.med-search-icon {
+  position: absolute;
+  left: 10px;
+  color: #767670;
+  pointer-events: none;
+}
+.med-search-input {
+  width: 100%;
+  font-size: 0.82rem;
+  padding: 6px 30px 6px 30px !important;
+  border: 1px solid #d4d4cc !important;
+  background: #fafaf7 !important;
+  border-radius: 4px;
+}
+.med-search-input:focus {
+  background: #ffffff !important;
+  border-color: #171717 !important;
+  outline: none;
+}
+.med-search-clear-btn {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #a3a39e;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.med-search-clear-btn:hover {
+  color: #171717;
 }
 .patient-medications-list {
   display: flex;
@@ -3658,26 +3704,61 @@ body { background: var(--cream); color: var(--ink); }
 }
 .selected-artg-banner {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   background: #f0fdf4;
   border: 1px solid #86efac;
-  padding: 10px 14px;
+  padding: 12px 14px;
 }
 .selected-artg-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   flex: 1;
 }
-.selected-artg-info strong {
-  font-size: 0.85rem;
+.selected-artg-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.selected-artg-title-row strong {
+  font-size: 0.92rem;
   color: #166534;
 }
-.selected-artg-info span {
-  font-size: 0.74rem;
+.selected-artg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
   color: #15803d;
+}
+.schedule-badge {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.schedule-badge.s4 {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+.schedule-badge.s8 {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  letter-spacing: 0.05em;
+}
+.schedule-badge.s2,
+.schedule-badge.s3 {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
 }
 .selected-artg-remove {
   background: transparent;
@@ -3687,12 +3768,131 @@ body { background: var(--cream); color: var(--ink); }
   font-weight: 750;
   padding: 4px 8px;
   cursor: pointer;
+  white-space: nowrap;
 }
 .selected-artg-remove:hover {
   background: #dcfce7;
 }
 
-/* Checkbox */
+/* Clinical Advisory Pearl */
+.clinical-pearl-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  color: #92400e;
+  line-height: 1.45;
+}
+.clinical-pearl-banner strong {
+  color: #78350f;
+}
+
+/* Clinical Safety & Interaction Alerts */
+.clinical-alerts-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.clinical-alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 3px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.clinical-alert-banner.high {
+  background: #fef2f2;
+  border: 1px solid #f87171;
+  color: #991b1b;
+}
+.clinical-alert-banner.high .clinical-alert-icon {
+  color: #dc2626;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.clinical-alert-banner.moderate {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+}
+.clinical-alert-banner.moderate .clinical-alert-icon {
+  color: #ea580c;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.clinical-alert-content strong {
+  display: block;
+  font-size: 0.86rem;
+  margin-bottom: 2px;
+}
+.clinical-alert-content p {
+  margin: 0;
+}
+
+/* 1-Click Dose Presets */
+.dose-presets-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 10px 14px;
+  border-radius: 3px;
+}
+.dose-presets-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.dose-presets-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dose-preset-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 4px 9px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.12s ease;
+  color: #0f172a;
+}
+.dose-preset-chip:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+.dose-preset-chip strong {
+  font-weight: 700;
+}
+.dose-preset-chip span {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.repeats-limit-hint {
+  font-size: 0.72rem;
+  color: #2563eb;
+  font-weight: normal;
+  margin-left: 6px;
+}
+
+/* Checkbox & Smart PBS Box */
 .med-checkbox-group {
   justify-content: flex-end;
   padding-bottom: 4px;
@@ -3722,6 +3922,38 @@ body { background: var(--cream); color: var(--ink); }
 .checkbox-text small {
   font-size: 0.74rem;
   color: #64748b;
+}
+.smart-pbs-status-box {
+  margin-top: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  border-radius: 3px;
+  line-height: 1.35;
+}
+.smart-pbs-status-box.pbs-active {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+.smart-pbs-status-box.pbs-inactive {
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+.smart-pbs-status-box.exceeds-max {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+.smart-pbs-icon {
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.smart-pbs-reason-text {
+  flex: 1;
 }
 
 /* Cease Modal Presets */
@@ -3823,4 +4055,131 @@ body { background: var(--cream); color: var(--ink); }
 }
 .med-copy-sql-btn:hover {
   background: #fef3c7 !important;
+}
+
+/* ==========================================================================
+   Printable Australian Clinical Medication Summary
+   ========================================================================== */
+@media screen {
+  .printable-medication-chart {
+    display: none !important;
+  }
+}
+
+@media print {
+  /* Hide standard web UI on print */
+  body * {
+    visibility: hidden;
+  }
+  .printable-medication-chart,
+  .printable-medication-chart * {
+    visibility: visible;
+  }
+  .printable-medication-chart {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 24px;
+    background: #ffffff;
+    color: #000000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 10pt;
+  }
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #000000;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  .print-clinic-brand h1 {
+    font-size: 16pt;
+    font-weight: 800;
+    margin: 0 0 3px;
+    letter-spacing: -0.02em;
+  }
+  .print-clinic-brand p {
+    font-size: 8.5pt;
+    margin: 0;
+    color: #333333;
+  }
+  .print-doc-title {
+    text-align: right;
+  }
+  .print-doc-title h2 {
+    font-size: 13pt;
+    font-weight: 700;
+    margin: 0 0 3px;
+  }
+  .print-doc-title p {
+    font-size: 8pt;
+    color: #555555;
+    margin: 0;
+  }
+  .print-patient-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 14px;
+    padding: 8px 12px;
+    background: #f4f4f4;
+    border: 1px solid #cccccc;
+    margin-bottom: 16px;
+    font-size: 9pt;
+  }
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    font-size: 9pt;
+  }
+  .print-table th,
+  .print-table td {
+    border: 1px solid #cccccc;
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .print-table th {
+    background: #eaeaea;
+    font-weight: 700;
+  }
+  .print-sub {
+    font-size: 7.5pt;
+    color: #444444;
+    margin-top: 1px;
+  }
+  .print-sub-aust {
+    font-family: monospace;
+    font-size: 7pt;
+    color: #000000;
+  }
+  .print-ceased-section {
+    margin-top: 18px;
+  }
+  .print-ceased-section h3 {
+    font-size: 10pt;
+    margin: 0 0 6px;
+    border-bottom: 1px solid #cccccc;
+    padding-bottom: 3px;
+  }
+  .print-footer {
+    margin-top: 28px;
+    page-break-inside: avoid;
+  }
+  .print-signature-box {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    font-size: 8.5pt;
+  }
+  .print-disclaimer {
+    font-size: 7pt;
+    color: #666666;
+    border-top: 1px solid #cccccc;
+    padding-top: 6px;
+    line-height: 1.35;
+  }
 }
