@@ -10,7 +10,6 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
-  Clock,
   Copy,
   FileText,
   HeartPulse,
@@ -46,7 +45,6 @@ import {
 } from '../services/clinicAccess';
 import {
   ARTG_MEDICATIONS,
-  CLINICAL_REGIMEN_PRESETS,
   calculateSmartPbs,
   checkClinicalInteractions,
   getArtgMedicationById,
@@ -56,7 +54,6 @@ import {
   searchArtgMedications,
   type ArtgMedication,
   type ClinicalAlert,
-  type ClinicalRegimenPreset,
 } from '../utils/artgMedications';
 
 const number = (value: number | null, digits = 0) => (value === null ? '—' : value.toFixed(digits));
@@ -338,16 +335,6 @@ notify pgrst, 'reload schema';`;
   };
 
   const clinicalUses = useMemo(() => getClinicalUses(selectedArtg), [selectedArtg]);
-
-  const handleApplyRegimenPreset = (preset: ClinicalRegimenPreset) => {
-    handleRepeatsChange(preset.repeats);
-    setNotes((prev) => {
-      const trimmed = prev.trim();
-      if (!trimmed) return preset.note;
-      if (trimmed.includes(preset.note)) return trimmed;
-      return `${trimmed} — ${preset.note}`;
-    });
-  };
 
   const handleApplyIndicationChip = (use: string) => {
     setNotes((prev) => {
@@ -1365,27 +1352,6 @@ notify pgrst, 'reload schema';`;
                     </div>
                   )}
 
-                  {/* Clinical Treatment Regimen & Duration Presets */}
-                  <div className="regimen-presets-container">
-                    <div className="regimen-presets-label">
-                      <Clock size={13} color="#059669" />
-                      <span>Clinical Treatment Regimen & Duration Presets</span>
-                    </div>
-                    <div className="regimen-presets-list">
-                      {CLINICAL_REGIMEN_PRESETS.map((regimen) => (
-                        <button
-                          key={regimen.id}
-                          type="button"
-                          className="regimen-preset-chip"
-                          onClick={() => handleApplyRegimenPreset(regimen)}
-                          title={regimen.note}
-                        >
-                          <strong>{regimen.label}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   {/* Form Input Fields */}
                   <div className="form-row-2">
                     <div className="form-group">
@@ -1762,8 +1728,8 @@ notify pgrst, 'reload schema';`;
                         <div className="placeholder-feature">
                           <BookOpen size={16} color="#2563eb" />
                           <div>
-                            <strong>1-Click Clinical Uses & Regimens</strong>
-                            <span>Quick-populate clinical indications, administration pearls & repeats</span>
+                            <strong>1-Click Clinical Indications & Pearls</strong>
+                            <span>Quick-populate clinical indications & counseling instructions</span>
                           </div>
                         </div>
                       </div>

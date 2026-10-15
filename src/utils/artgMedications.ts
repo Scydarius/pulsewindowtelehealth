@@ -232,51 +232,6 @@ export function calculateSmartPbs(
   };
 }
 
-export type ClinicalRegimenPreset = {
-  id: string;
-  label: string;
-  repeats: number;
-  note: string;
-};
-
-export const CLINICAL_REGIMEN_PRESETS: ClinicalRegimenPreset[] = [
-  {
-    id: 'chronic',
-    label: 'Chronic Maintenance (5 Repeats)',
-    repeats: 5,
-    note: 'Long-term maintenance therapy for chronic condition. Routine 6-month clinical review scheduled.',
-  },
-  {
-    id: 'trial_3mo',
-    label: '3-Month Clinical Trial (2 Repeats)',
-    repeats: 2,
-    note: 'Initial 3-month trial of therapy. Assess therapeutic efficacy, biomarker response, and tolerability prior to further repeats.',
-  },
-  {
-    id: 'titration',
-    label: 'Dose Titration (0 Repeats)',
-    repeats: 0,
-    note: 'Initial dose titration phase. Patient instructed to follow up for clinical evaluation and dose escalation.',
-  },
-  {
-    id: 'acute_5d',
-    label: '5-Day Acute Course (0 Repeats)',
-    repeats: 0,
-    note: 'Short acute 5-day course. Complete full course; cease when finished.',
-  },
-  {
-    id: 'acute_7d',
-    label: '7-Day Acute Course (0 Repeats)',
-    repeats: 0,
-    note: 'Acute 7-day course. Complete full course as prescribed.',
-  },
-  {
-    id: 'prn_relief',
-    label: 'PRN Flare Relief (2 Repeats)',
-    repeats: 2,
-    note: 'As-needed (PRN) for acute symptom exacerbations. Do not exceed recommended maximum daily frequency.',
-  },
-];
 
 /**
  * Extract distinct clinical indication tags / uses from an ArtgMedication's indication text or drug class.
