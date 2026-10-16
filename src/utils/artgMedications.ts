@@ -271,6 +271,8 @@ export type ClinicalAlert = {
   severity: 'high' | 'moderate' | 'info';
   title: string;
   detail: string;
+  points?: string[];
+  prescriberAction?: string;
 };
 
 type ParsedClinicalProfile = {
@@ -516,8 +518,8 @@ export function checkClinicalInteractions(
   activeMeds: Array<{ medication_name: string; generic_name?: string | null; brand_name?: string | null }>
 ): ClinicalAlert[] {
   const alerts: ClinicalAlert[] = [];
-  const candidateGeneric = (candidate.genericName || '').toLowerCase();
-  const candidateBrand = (candidate.brandName || candidate.medicationName || '').toLowerCase();
+  const candidateGeneric = (candidate.genericName || '').toLowerCase().trim();
+  const candidateBrand = (candidate.brandName || candidate.medicationName || '').toLowerCase().trim();
   const candidateText = `${candidate.medicationName} ${candidate.genericName ?? ''} ${candidate.brandName ?? ''} ${candidate.drugClass ?? ''}`.toLowerCase();
 
   const c = parseClinicalProfile(candidateText, candidate.drugClass);
@@ -563,15 +565,39 @@ export function checkClinicalInteractions(
   const qtDrugNames: string[] = [];
   if (c.isQtProlonging) qtDrugNames.push(candidate.medicationName);
 
+  const duplicateMeds: string[] = [];
+  const activeAnticoagulants: string[] = [];
+  const activeAntiplatelets: string[] = [];
+  const activeNsaids: string[] = [];
+  const activeNitrates: string[] = [];
+  const activeArnis: string[] = [];
+  const activeAzathioprine: string[] = [];
+  const activeLithium: string[] = [];
+  const activeSedatives: string[] = [];
+  const activeCyp2c19Ppis: string[] = [];
+  const activeArbs: string[] = [];
+  const activePotassiumSparing: string[] = [];
+  const activeNonDhpCcbs: string[] = [];
+  const activeStrongCyp3a4: string[] = [];
+  const activeMethotrexate: string[] = [];
+  const activeTramadol: string[] = [];
+  const duplicateStatins: string[] = [];
+  const duplicatePpis: string[] = [];
+  const duplicateGlp1s: string[] = [];
+  const duplicateBetaBlockers: string[] = [];
+  const duplicateNsaids: string[] = [];
+
   for (const existing of activeMeds) {
-    const existingGeneric = (existing.generic_name || '').toLowerCase();
-    const existingBrand = (existing.brand_name || existing.medication_name || '').toLowerCase();
+    const existingGeneric = (existing.generic_name || '').toLowerCase().trim();
+    const existingBrand = (existing.brand_name || existing.medication_name || '').toLowerCase().trim();
     const existingText = `${existing.medication_name} ${existing.generic_name ?? ''} ${existing.brand_name ?? ''}`.toLowerCase();
     const e = parseClinicalProfile(existingText);
 
     if (e.isAnticoag || e.isAntiplatelet) {
       totalAntithromboticCount++;
-      activeAntithromboticNames.push(existing.medication_name);
+      if (!activeAntithromboticNames.includes(existing.medication_name)) {
+        activeAntithromboticNames.push(existing.medication_name);
+      }
     }
 
     if (e.isAcei || e.isArb) hasAceOrArb = true;
@@ -580,234 +606,299 @@ export function checkClinicalInteractions(
 
     if (e.isQtProlonging) {
       totalQtCount++;
-      qtDrugNames.push(existing.medication_name);
+      if (!qtDrugNames.includes(existing.medication_name)) {
+        qtDrugNames.push(existing.medication_name);
+      }
     }
 
     // A. DUPLICATE ACTIVE INGREDIENT
-    if (
-      (candidateGeneric && existingGeneric && (candidateGeneric.includes(existingGeneric) || existingGeneric.includes(candidateGeneric))) ||
-      (candidateBrand && existingBrand && candidateBrand === existingBrand)
-    ) {
-      alerts.push({
-        type: 'duplicate',
-        severity: 'high',
-        title: 'Duplicate Therapy Alert',
-        detail: `Patient is already prescribed ${existing.medication_name}. Co-prescribing risks duplicate active ingredient dosing and toxicity.`,
-      });
+    const isDuplicate =
+      (candidateGeneric && existingGeneric && (candidateGeneric === existingGeneric || (candidateGeneric.length >= 4 && existingGeneric.length >= 4 && (candidateGeneric.startsWith(existingGeneric) || existingGeneric.startsWith(candidateGeneric))))) ||
+      (candidateBrand && existingBrand && candidateBrand === existingBrand);
+    if (isDuplicate && !duplicateMeds.includes(existing.medication_name)) {
+      duplicateMeds.push(existing.medication_name);
       continue;
     }
 
-    // B. MULTIPLE ANTICOAGULANTS (CONTRAINDICATED)
-    if (c.isAnticoag && e.isAnticoag) {
-      alerts.push({
-        type: 'contraindication',
-        severity: 'high',
-        title: 'CONTRAINDICATED: Multiple Anticoagulants (Fatal Bleeding Risk)',
-        detail: `Patient is currently active on ${existing.medication_name}. Co-prescribing ${candidate.medicationName} produces concurrent full-dose systemic anticoagulation, creating an extreme, potentially fatal risk of major intracranial or gastrointestinal haemorrhage. Multiple systemic anticoagulants must never be co-prescribed outside of strict bridging protocols.`,
-      });
+    // B. MULTIPLE ANTICOAGULANTS
+    if (c.isAnticoag && e.isAnticoag && !activeAnticoagulants.includes(existing.medication_name)) {
+      activeAnticoagulants.push(existing.medication_name);
     }
 
     // C. ANTICOAGULANT + ANTIPLATELET COMBINATION
-    if ((c.isAnticoag && e.isAntiplatelet) || (c.isAntiplatelet && e.isAnticoag)) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'High Bleeding Risk: Anticoagulant + Antiplatelet Combination',
-        detail: `Co-prescribing an oral anticoagulant with an antiplatelet (${existing.medication_name} + ${candidate.medicationName}) substantially elevates major haemorrhage risk (2 to 3-fold). Ensure validated clinical indication (e.g. post-PCI / acute coronary syndrome) and consider gastroprotection with a PPI.`,
-      });
+    if (((c.isAnticoag && e.isAntiplatelet) || (c.isAntiplatelet && e.isAnticoag)) && !activeAntiplatelets.includes(existing.medication_name)) {
+      activeAntiplatelets.push(existing.medication_name);
     }
 
     // D. BLOOD THINNER + NSAID
-    if (((c.isAnticoag || c.isAntiplatelet) && e.isNsaid) || (c.isNsaid && (e.isAnticoag || e.isAntiplatelet))) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'Major Bleeding Hazard: Blood Thinner + NSAID',
-        detail: `Co-prescribing an NSAID with a blood thinner (${existing.medication_name} + ${candidate.medicationName}) dramatically increases gastrointestinal ulceration and life-threatening bleeding risk. Substitute with paracetamol.`,
-      });
+    if ((((c.isAnticoag || c.isAntiplatelet) && e.isNsaid) || (c.isNsaid && (e.isAnticoag || e.isAntiplatelet))) && !activeNsaids.includes(existing.medication_name)) {
+      activeNsaids.push(existing.medication_name);
     }
 
-    // E. PDE-5 INHIBITOR + ORGANIC NITRATE (LETHAL CONTRAINDICATION)
-    if ((c.isPde5 && e.isNitrate) || (c.isNitrate && e.isPde5)) {
-      alerts.push({
-        type: 'contraindication',
-        severity: 'high',
-        title: 'LETHAL CONTRAINDICATION: PDE5 Inhibitor + Organic Nitrate',
-        detail: `Co-prescribing PDE-5 inhibitors with organic nitrates (${existing.medication_name} + ${candidate.medicationName}) causes profound, irreversible synergistic vasodilation, catastrophic hypotension, and cardiovascular collapse.`,
-      });
+    // E. PDE-5 INHIBITOR + ORGANIC NITRATE
+    if (((c.isPde5 && e.isNitrate) || (c.isNitrate && e.isPde5)) && !activeNitrates.includes(existing.medication_name)) {
+      activeNitrates.push(existing.medication_name);
     }
 
-    // F. ENTRESTO + ACE INHIBITOR (FATAL ANGIOEDEMA)
-    if ((c.isArni && e.isAcei) || (c.isAcei && e.isArni)) {
-      alerts.push({
-        type: 'contraindication',
-        severity: 'high',
-        title: 'FATAL ANGIOEDEMA CONTRAINDICATION: Entresto + ACE Inhibitor',
-        detail: `Combining Entresto with an ACE inhibitor (${existing.medication_name} + ${candidate.medicationName}) triggers severe, life-threatening airway angioedema. A mandatory 36-hour washout period is required when switching from an ACE inhibitor.`,
-      });
+    // F. ENTRESTO + ACE INHIBITOR
+    if (((c.isArni && e.isAcei) || (c.isAcei && e.isArni)) && !activeArnis.includes(existing.medication_name)) {
+      activeArnis.push(existing.medication_name);
     }
 
-    // G. ALLOPURINOL + AZATHIOPRINE / 6-MP (LETHAL TOXICITY)
-    if ((c.isAllopurinol && e.isAzathioprine) || (c.isAzathioprine && e.isAllopurinol)) {
-      alerts.push({
-        type: 'contraindication',
-        severity: 'high',
-        title: 'LETHAL TOXICITY: Allopurinol + Azathioprine / 6-MP',
-        detail: `Allopurinol blocks xanthine oxidase metabolism of azathioprine/6-mercaptopurine (${existing.medication_name} + ${candidate.medicationName}), leading to catastrophic bone marrow aplasia and fatal pancytopenia.`,
-      });
+    // G. ALLOPURINOL + AZATHIOPRINE / 6-MP
+    if (((c.isAllopurinol && e.isAzathioprine) || (c.isAzathioprine && e.isAllopurinol)) && !activeAzathioprine.includes(existing.medication_name)) {
+      activeAzathioprine.push(existing.medication_name);
     }
 
-    // H. LITHIUM TOXICITY (NSAID / ACEi / ARB / Diuretic)
-    if (
-      (c.isLithium && (e.isNsaid || e.isAcei || e.isArb || e.isDiuretic)) ||
-      ((c.isNsaid || c.isAcei || c.isArb || c.isDiuretic) && e.isLithium)
-    ) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'Severe Lithium Toxicity Hazard',
-        detail: `Co-prescribing ${candidate.medicationName} with Lithium (${existing.medication_name}) impairs renal lithium clearance, triggering acute neurotoxicity, tremor, ataxia, seizures, and renal failure.`,
-      });
+    // H. LITHIUM TOXICITY
+    if (((c.isLithium && (e.isNsaid || e.isAcei || e.isArb || e.isDiuretic)) || ((c.isNsaid || c.isAcei || c.isArb || c.isDiuretic) && e.isLithium)) && !activeLithium.includes(existing.medication_name)) {
+      activeLithium.push(existing.medication_name);
     }
 
     // I. OPIOID + BENZODIAZEPINE / SEDATIVE
-    if ((c.isOpioid && e.isBenzoOrZDrug) || (c.isBenzoOrZDrug && e.isOpioid)) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'SafeScript Alert: Concurrent Opioid + Sedative/Benzodiazepine',
-        detail: `Co-prescribing opioids with benzodiazepines (${existing.medication_name} + ${candidate.medicationName}) causes profound additive CNS and respiratory depression, drastically heightening fatal overdose risk.`,
-      });
+    if (((c.isOpioid && e.isBenzoOrZDrug) || (c.isBenzoOrZDrug && e.isOpioid)) && !activeSedatives.includes(existing.medication_name)) {
+      activeSedatives.push(existing.medication_name);
     }
 
-    // J. CLOPIDOGREL + CYP2C19 INHIBITING PPI (OMEPRAZOLE/ESOMEPRAZOLE)
+    // J. CLOPIDOGREL + CYP2C19 INHIBITING PPI
     const isCandidateClopidogrel = candidateText.includes('clopidogrel') || candidateText.includes('plavix');
     const isExistingClopidogrel = existingText.includes('clopidogrel') || existingText.includes('plavix');
-    if ((isCandidateClopidogrel && e.isCyp2c19Ppi) || (c.isCyp2c19Ppi && isExistingClopidogrel)) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'Loss of Antiplatelet Efficacy: Clopidogrel + Omeprazole/Esomeprazole',
-        detail: `Omeprazole and esomeprazole inhibit CYP2C19, blocking metabolic conversion of clopidogrel to its active antiplatelet form and increasing stent thrombosis and stroke risk. Switch PPI to Pantoprazole (Somac).`,
-      });
+    if (((isCandidateClopidogrel && e.isCyp2c19Ppi) || (c.isCyp2c19Ppi && isExistingClopidogrel)) && !activeCyp2c19Ppis.includes(existing.medication_name)) {
+      activeCyp2c19Ppis.push(existing.medication_name);
     }
 
     // K. DUAL RAAS BLOCKADE (ACEi + ARB)
-    if ((c.isAcei && e.isArb) || (c.isArb && e.isAcei)) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'Dual RAAS Blockade Caution (ACEi + ARB)',
-        detail: `Combining ACE inhibitors and ARBs (${existing.medication_name} + ${candidate.medicationName}) increases the risk of severe hyperkalaemia, hypotension, and acute kidney injury without mortality benefit.`,
-      });
+    if (((c.isAcei && e.isArb) || (c.isArb && e.isAcei)) && !activeArbs.includes(existing.medication_name)) {
+      activeArbs.push(existing.medication_name);
     }
 
-    // L. POTASSIUM-SPARING DIURETIC + ACEi/ARB (HYPERKALAEMIA)
-    if (
-      (c.isPotassiumSparingDiuretic && (e.isAcei || e.isArb)) ||
-      ((c.isAcei || c.isArb) && e.isPotassiumSparingDiuretic)
-    ) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'Severe Hyperkalaemia Hazard: Potassium-Sparing Diuretic + ACEi/ARB',
-        detail: `Combining spironolactone/eplerenone with an ACE inhibitor or ARB (${existing.medication_name} + ${candidate.medicationName}) dramatically increases serum potassium retention. Close monitoring of K+ and renal function is mandatory.`,
-      });
+    // L. POTASSIUM-SPARING DIURETIC + ACEi/ARB
+    if (((c.isPotassiumSparingDiuretic && (e.isAcei || e.isArb)) || ((c.isAcei || c.isArb) && e.isPotassiumSparingDiuretic)) && !activePotassiumSparing.includes(existing.medication_name)) {
+      activePotassiumSparing.push(existing.medication_name);
     }
 
-    // M. BETA-BLOCKER + NON-DHP CCB (HEART BLOCK)
-    if ((c.isBetaBlocker && e.isNonDhpCcb) || (c.isNonDhpCcb && e.isBetaBlocker)) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'Severe Bradycardia & AV Block Hazard: Beta-Blocker + Verapamil/Diltiazem',
-        detail: `Combining a beta-blocker with verapamil or diltiazem (${existing.medication_name} + ${candidate.medicationName}) produces synergistic AV nodal depression, profound bradycardia, and cardiogenic collapse.`,
-      });
+    // M. BETA-BLOCKER + NON-DHP CCB
+    if (((c.isBetaBlocker && e.isNonDhpCcb) || (c.isNonDhpCcb && e.isBetaBlocker)) && !activeNonDhpCcbs.includes(existing.medication_name)) {
+      activeNonDhpCcbs.push(existing.medication_name);
     }
 
-    // N. STATIN + STRONG CYP3A4 INHIBITOR (RHABDOMYOLYSIS)
-    const isCandidateCyp3a4Statin =
-      candidateText.includes('atorvastatin') || candidateText.includes('simvastatin') || candidateText.includes('lipitor') || candidateText.includes('zocor');
-    const isExistingCyp3a4Statin =
-      existingText.includes('atorvastatin') || existingText.includes('simvastatin') || existingText.includes('lipitor') || existingText.includes('zocor');
-    if ((isCandidateCyp3a4Statin && e.isStrongCyp3a4Inhibitor) || (c.isStrongCyp3a4Inhibitor && isExistingCyp3a4Statin)) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'Statin Rhabdomyolysis Hazard: CYP3A4 Statin + Potent Inhibitor',
-        detail: `Co-prescribing atorvastatin/simvastatin with a strong CYP3A4 inhibitor (${existing.medication_name} + ${candidate.medicationName}) substantially elevates statin plasma levels, triggering severe myopathy and life-threatening rhabdomyolysis.`,
-      });
+    // N. STATIN + STRONG CYP3A4 INHIBITOR
+    const isCandidateCyp3a4Statin = candidateText.includes('atorvastatin') || candidateText.includes('simvastatin') || candidateText.includes('lipitor') || candidateText.includes('zocor');
+    const isExistingCyp3a4Statin = existingText.includes('atorvastatin') || existingText.includes('simvastatin') || existingText.includes('lipitor') || existingText.includes('zocor');
+    if (((isCandidateCyp3a4Statin && e.isStrongCyp3a4Inhibitor) || (c.isStrongCyp3a4Inhibitor && isExistingCyp3a4Statin)) && !activeStrongCyp3a4.includes(existing.medication_name)) {
+      activeStrongCyp3a4.push(existing.medication_name);
     }
 
     // O. METHOTREXATE + NSAID
-    if ((c.isMethotrexate && e.isNsaid) || (c.isNsaid && e.isMethotrexate)) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'Methotrexate Toxicity Hazard: Reduced Clearance with NSAIDs',
-        detail: `NSAIDs reduce renal methotrexate excretion and displace plasma protein binding (${existing.medication_name} + ${candidate.medicationName}), causing severe bone marrow suppression, hepatotoxicity, and stomatitis.`,
-      });
+    if (((c.isMethotrexate && e.isNsaid) || (c.isNsaid && e.isMethotrexate)) && !activeMethotrexate.includes(existing.medication_name)) {
+      activeMethotrexate.push(existing.medication_name);
     }
 
     // P. SEROTONIN TOXICITY (SSRI/SNRI + Tramadol)
-    if ((c.isSsriOrSnri && e.isTramadol) || (c.isTramadol && e.isSsriOrSnri)) {
-      alerts.push({
-        type: 'interaction',
-        severity: 'high',
-        title: 'Serotonin Syndrome Hazard: SSRI/SNRI + Tramadol',
-        detail: `Combining tramadol with an antidepressant (${existing.medication_name} + ${candidate.medicationName}) increases the risk of Serotonin Syndrome (hyperthermia, neuromuscular rigidity, clonus) and reduces seizure threshold.`,
-      });
+    if (((c.isSsriOrSnri && e.isTramadol) || (c.isTramadol && e.isSsriOrSnri)) && !activeTramadol.includes(existing.medication_name)) {
+      activeTramadol.push(existing.medication_name);
     }
 
     // Q. THERAPEUTIC CLASS DUPLICATIONS
-    if (c.isStatin && e.isStatin) {
-      alerts.push({
-        type: 'duplicate',
-        severity: 'high',
-        title: 'Therapeutic Duplication: Multiple Statins',
-        detail: `Patient is already on a statin (${existing.medication_name}). Co-prescribing another statin (${candidate.medicationName}) provides no additional benefit and multiplies myopathy risk.`,
-      });
-    }
-
-    if (c.isPpi && e.isPpi) {
-      alerts.push({
-        type: 'duplicate',
-        severity: 'moderate',
-        title: 'Therapeutic Duplication: Multiple Proton Pump Inhibitors',
-        detail: `Patient is already prescribed a PPI (${existing.medication_name}). Co-prescribing multiple PPIs (${candidate.medicationName}) is redundant.`,
-      });
-    }
-
-    if (c.isGlp1OrGip && e.isGlp1OrGip) {
-      alerts.push({
-        type: 'duplicate',
-        severity: 'high',
-        title: 'Therapeutic Duplication: Multiple GLP-1 / GIP Incretin Agonists',
-        detail: `Patient is already taking an incretin agonist (${existing.medication_name}). Combining Ozempic, Wegovy, or Mounjaro is contraindicated and causes severe gastrointestinal toxicity.`,
-      });
-    }
-
-    if (c.isBetaBlocker && e.isBetaBlocker) {
-      alerts.push({
-        type: 'duplicate',
-        severity: 'high',
-        title: 'Therapeutic Duplication: Multiple Beta-Blockers',
-        detail: `Patient is already taking a beta-blocker (${existing.medication_name}). Adding another beta-blocker (${candidate.medicationName}) risks severe bradycardia and hypotension.`,
-      });
-    }
-
-    if (c.isNsaid && e.isNsaid) {
-      alerts.push({
-        type: 'duplicate',
-        severity: 'high',
-        title: 'Therapeutic Duplication: Multiple Systemic NSAIDs',
-        detail: `Patient is already on an NSAID (${existing.medication_name}). Co-prescribing multiple systemic NSAIDs (${candidate.medicationName}) drastically multiplies peptic ulceration and renal failure risk.`,
-      });
-    }
+    if (c.isStatin && e.isStatin && !duplicateStatins.includes(existing.medication_name)) duplicateStatins.push(existing.medication_name);
+    if (c.isPpi && e.isPpi && !duplicatePpis.includes(existing.medication_name)) duplicatePpis.push(existing.medication_name);
+    if (c.isGlp1OrGip && e.isGlp1OrGip && !duplicateGlp1s.includes(existing.medication_name)) duplicateGlp1s.push(existing.medication_name);
+    if (c.isBetaBlocker && e.isBetaBlocker && !duplicateBetaBlockers.includes(existing.medication_name)) duplicateBetaBlockers.push(existing.medication_name);
+    if (c.isNsaid && e.isNsaid && !duplicateNsaids.includes(existing.medication_name)) duplicateNsaids.push(existing.medication_name);
   }
 
-  // 3. MULTI-AGENT ANTITHROMBOTIC POLYPHARMACY CHECK
-  if (totalAntithromboticCount >= 3) {
+  // GENERATE CONSOLIDATED ALERTS (ONE PER CLINICAL HAZARD)
+  if (duplicateMeds.length > 0) {
+    alerts.push({
+      type: 'duplicate',
+      severity: 'high',
+      title: 'Duplicate Active Therapy Alert',
+      detail: `Patient is already prescribed ${duplicateMeds.join(', ')}. Co-prescribing risks duplicate active ingredient dosing and toxicity.`,
+    });
+  }
+
+  if (activeAnticoagulants.length > 0) {
+    alerts.push({
+      type: 'contraindication',
+      severity: 'high',
+      title: 'CONTRAINDICATED: Multiple Anticoagulants (Fatal Bleeding Risk)',
+      detail: `Patient is active on ${activeAnticoagulants.join(' and ')}. Co-prescribing ${candidate.medicationName} creates concurrent full-dose systemic anticoagulation with extreme, potentially fatal risk of major haemorrhage. Multiple systemic anticoagulants must never be co-prescribed outside of strict bridging protocols.`,
+    });
+  }
+
+  if (activeAntiplatelets.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'High Bleeding Risk: Anticoagulant + Antiplatelet Combination',
+      detail: `Co-prescribing with antiplatelet therapy (${activeAntiplatelets.join(', ')} + ${candidate.medicationName}) substantially elevates major haemorrhage risk (2 to 3-fold). Ensure validated clinical indication (e.g. post-PCI) and consider gastroprotection with a PPI.`,
+    });
+  }
+
+  if (activeNsaids.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Major Bleeding Hazard: Blood Thinner + NSAID',
+      detail: `Co-prescribing an NSAID with blood thinners (${activeNsaids.join(', ')} + ${candidate.medicationName}) dramatically increases gastrointestinal ulceration and life-threatening bleeding risk. Substitute with paracetamol.`,
+    });
+  }
+
+  if (activeNitrates.length > 0) {
+    alerts.push({
+      type: 'contraindication',
+      severity: 'high',
+      title: 'LETHAL CONTRAINDICATION: PDE5 Inhibitor + Organic Nitrate',
+      detail: `Co-prescribing PDE-5 inhibitors with organic nitrates (${activeNitrates.join(', ')} + ${candidate.medicationName}) causes profound, irreversible synergistic vasodilation, catastrophic hypotension, and cardiovascular collapse.`,
+    });
+  }
+
+  if (activeArnis.length > 0) {
+    alerts.push({
+      type: 'contraindication',
+      severity: 'high',
+      title: 'FATAL ANGIOEDEMA CONTRAINDICATION: Entresto + ACE Inhibitor',
+      detail: `Combining Entresto with an ACE inhibitor (${activeArnis.join(', ')} + ${candidate.medicationName}) triggers severe, life-threatening airway angioedema. A mandatory 36-hour washout period is required when switching from an ACE inhibitor.`,
+    });
+  }
+
+  if (activeAzathioprine.length > 0) {
+    alerts.push({
+      type: 'contraindication',
+      severity: 'high',
+      title: 'LETHAL TOXICITY: Allopurinol + Azathioprine / 6-MP',
+      detail: `Allopurinol blocks xanthine oxidase metabolism of azathioprine/6-MP (${activeAzathioprine.join(', ')} + ${candidate.medicationName}), causing catastrophic bone marrow aplasia and fatal pancytopenia.`,
+    });
+  }
+
+  if (activeLithium.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Severe Lithium Toxicity Hazard',
+      detail: `Co-prescribing ${candidate.medicationName} with Lithium therapy (${activeLithium.join(', ')}), impairs renal lithium clearance, triggering acute neurotoxicity, tremor, ataxia, seizures, and renal failure.`,
+    });
+  }
+
+  if (activeSedatives.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'SafeScript Alert: Concurrent Opioid + Sedative/Benzodiazepine',
+      detail: `Co-prescribing opioids with benzodiazepines or sedatives (${activeSedatives.join(', ')} + ${candidate.medicationName}) causes additive CNS and respiratory depression, drastically heightening fatal overdose risk.`,
+    });
+  }
+
+  if (activeCyp2c19Ppis.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Loss of Antiplatelet Efficacy: Clopidogrel + Omeprazole/Esomeprazole',
+      detail: `Omeprazole/esomeprazole inhibit CYP2C19, blocking metabolic conversion of clopidogrel to its active antiplatelet form (${activeCyp2c19Ppis.join(', ')} + ${candidate.medicationName}). Switch PPI to Pantoprazole (Somac).`,
+    });
+  }
+
+  if (activeArbs.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Dual RAAS Blockade Caution (ACEi + ARB)',
+      detail: `Combining ACE inhibitors and ARBs (${activeArbs.join(', ')} + ${candidate.medicationName}) increases the risk of severe hyperkalaemia, hypotension, and acute kidney injury without mortality benefit.`,
+    });
+  }
+
+  if (activePotassiumSparing.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Severe Hyperkalaemia Hazard: Potassium-Sparing Diuretic + ACEi/ARB',
+      detail: `Combining spironolactone/eplerenone with an ACE inhibitor or ARB (${activePotassiumSparing.join(', ')} + ${candidate.medicationName}) dramatically increases serum potassium retention. Close monitoring of K+ and renal function is mandatory.`,
+    });
+  }
+
+  if (activeNonDhpCcbs.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Severe Bradycardia & AV Block Hazard: Beta-Blocker + Verapamil/Diltiazem',
+      detail: `Combining a beta-blocker with verapamil or diltiazem (${activeNonDhpCcbs.join(', ')} + ${candidate.medicationName}) produces synergistic AV nodal depression and severe bradycardia.`,
+    });
+  }
+
+  if (activeStrongCyp3a4.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Statin Rhabdomyolysis Hazard: CYP3A4 Statin + Potent Inhibitor',
+      detail: `Co-prescribing atorvastatin/simvastatin with a strong CYP3A4 inhibitor (${activeStrongCyp3a4.join(', ')} + ${candidate.medicationName}) substantially elevates statin plasma levels, triggering life-threatening rhabdomyolysis.`,
+    });
+  }
+
+  if (activeMethotrexate.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Methotrexate Toxicity Hazard: Reduced Clearance with NSAIDs',
+      detail: `NSAIDs reduce renal methotrexate excretion (${activeMethotrexate.join(', ')} + ${candidate.medicationName}), causing severe bone marrow suppression and toxicity.`,
+    });
+  }
+
+  if (activeTramadol.length > 0) {
+    alerts.push({
+      type: 'interaction',
+      severity: 'high',
+      title: 'Serotonin Syndrome Hazard: SSRI/SNRI + Tramadol',
+      detail: `Combining tramadol with an antidepressant (${activeTramadol.join(', ')} + ${candidate.medicationName}) increases the risk of Serotonin Syndrome and reduces seizure threshold.`,
+    });
+  }
+
+  if (duplicateStatins.length > 0) {
+    alerts.push({
+      type: 'duplicate',
+      severity: 'high',
+      title: 'Therapeutic Duplication: Multiple Statins',
+      detail: `Patient is already on statin therapy (${duplicateStatins.join(', ')}). Co-prescribing another statin (${candidate.medicationName}) provides no additional benefit and multiplies myopathy risk.`,
+    });
+  }
+
+  if (duplicatePpis.length > 0) {
+    alerts.push({
+      type: 'duplicate',
+      severity: 'moderate',
+      title: 'Therapeutic Duplication: Multiple Proton Pump Inhibitors',
+      detail: `Patient is already prescribed a PPI (${duplicatePpis.join(', ')}). Co-prescribing multiple PPIs (${candidate.medicationName}) is redundant.`,
+    });
+  }
+
+  if (duplicateGlp1s.length > 0) {
+    alerts.push({
+      type: 'duplicate',
+      severity: 'high',
+      title: 'Therapeutic Duplication: Multiple GLP-1 / GIP Incretin Agonists',
+      detail: `Patient is already taking an incretin agonist (${duplicateGlp1s.join(', ')}). Combining Ozempic, Wegovy, or Mounjaro is contraindicated and causes severe gastrointestinal toxicity.`,
+    });
+  }
+
+  if (duplicateBetaBlockers.length > 0) {
+    alerts.push({
+      type: 'duplicate',
+      severity: 'high',
+      title: 'Therapeutic Duplication: Multiple Beta-Blockers',
+      detail: `Patient is already taking a beta-blocker (${duplicateBetaBlockers.join(', ')}). Adding another beta-blocker (${candidate.medicationName}) risks severe bradycardia and hypotension.`,
+    });
+  }
+
+  if (duplicateNsaids.length > 0) {
+    alerts.push({
+      type: 'duplicate',
+      severity: 'high',
+      title: 'Therapeutic Duplication: Multiple Systemic NSAIDs',
+      detail: `Patient is already on an NSAID (${duplicateNsaids.join(', ')}). Co-prescribing multiple systemic NSAIDs (${candidate.medicationName}) drastically multiplies peptic ulceration and renal failure risk.`,
+    });
+  }
+
+  // 3. MULTI-AGENT ANTITHROMBOTIC POLYPHARMACY (if not already covered by multiple anticoagulants)
+  if (totalAntithromboticCount >= 3 && activeAnticoagulants.length === 0) {
     alerts.unshift({
       type: 'contraindication',
       severity: 'high',
@@ -838,4 +929,65 @@ export function checkClinicalInteractions(
   }
 
   return alerts;
+}
+
+/**
+ * Combines multiple clinical alerts into 1 unified, cohesive warning.
+ * If 0 alerts: returns null.
+ * If 1 alert: returns that alert directly.
+ * If multiple alerts: groups and consolidates them into 1 single high-priority warning
+ * with clean, non-repeating bullet points and a unified prescriber action.
+ */
+export function combineClinicalAlerts(alerts: ClinicalAlert[]): ClinicalAlert | null {
+  if (!alerts || alerts.length === 0) return null;
+  if (alerts.length === 1) return alerts[0];
+
+  const hasContraindication = alerts.some((a) => a.type === 'contraindication');
+  const hasHigh = alerts.some((a) => a.severity === 'high');
+  const hasModerate = alerts.some((a) => a.severity === 'moderate');
+
+  const severity: 'high' | 'moderate' | 'info' = hasHigh
+    ? 'high'
+    : hasModerate
+    ? 'moderate'
+    : 'info';
+
+  const type: ClinicalAlert['type'] = hasContraindication
+    ? 'contraindication'
+    : alerts.some((a) => a.type === 'interaction')
+    ? 'interaction'
+    : alerts[0].type;
+
+  const title = hasContraindication
+    ? `CRITICAL CONTRAINDICATION: ${alerts.length} Significant Clinical Risks Identified`
+    : `Clinical Safety Warning: ${alerts.length} Interaction Risks Identified`;
+
+  // Deduplicate themes and extract points
+  const points: string[] = [];
+  const seenThemes = new Set<string>();
+
+  for (const a of alerts) {
+    const cleanTitle = a.title
+      .replace(/^(CRITICAL ALERT: |LETHAL CONTRAINDICATION: |FATAL ANGIOEDEMA CONTRAINDICATION: |CONTRAINDICATED: |LETHAL TOXICITY: )/i, '')
+      .trim();
+
+    const themeKey = cleanTitle.toLowerCase().split(/[:(]/)[0].trim();
+    if (seenThemes.has(themeKey)) continue;
+    seenThemes.add(themeKey);
+
+    points.push(`${cleanTitle} — ${a.detail}`);
+  }
+
+  const prescriberAction = hasContraindication
+    ? 'Do not co-prescribe contraindicated combinations without formal specialist review and verified bridging protocol. Discontinue conflicting active medication(s) before dispensing.'
+    : 'Review patient history, assess renal/hepatic parameters, and adjust dosing or select non-interacting alternatives.';
+
+  return {
+    type,
+    severity,
+    title,
+    detail: points.join('\n\n'),
+    points,
+    prescriberAction,
+  };
 }

@@ -23,6 +23,7 @@ import {
   ARTG_MEDICATIONS,
   calculateSmartPbs,
   checkClinicalInteractions,
+  combineClinicalAlerts,
   getClinicalUses,
   getDistinctCategories,
   getPregnancyDescription,
@@ -271,6 +272,11 @@ export function PrescribeMedicationModal({
       activeExistingMeds
     );
   }, [medicationName, genericName, brandName, selectedArtg, activeExistingMeds]);
+
+  // If there are multiple clinical warnings, combine them into 1 single comprehensive alert
+  const combinedAlert = useMemo<ClinicalAlert | null>(() => {
+    return combineClinicalAlerts(clinicalAlerts);
+  }, [clinicalAlerts]);
 
   const hasMonographData = useMemo(() => {
     if (!selectedArtg) return false;
@@ -524,24 +530,49 @@ export function PrescribeMedicationModal({
                 </div>
               )}
 
-              {/* INLINE CLINICAL SAFETY & INTERACTION WARNING BANNER */}
-              {clinicalAlerts.length > 0 && (
-                <div className="clean-inline-safety-banner" role="alert">
+              {/* INLINE CLINICAL SAFETY & INTERACTION WARNING BANNER (COMBINED INTO 1) */}
+              {combinedAlert && (
+                <div className={`clean-inline-safety-banner ${combinedAlert.severity}`} role="alert">
                   <div className="clean-inline-safety-header">
                     <AlertTriangle size={18} className="clean-inline-safety-icon" />
-                    <span>Clinical Safety Alert ({clinicalAlerts.length} warning{clinicalAlerts.length === 1 ? '' : 's'} detected)</span>
+                    <span>
+                      {clinicalAlerts.length > 1
+                        ? `Clinical Safety Warning (${clinicalAlerts.length} Warnings Combined into 1)`
+                        : 'Clinical Safety Warning'}
+                    </span>
+                    <span className="clean-inline-safety-badge">
+                      {combinedAlert.severity === 'high' ? 'CRITICAL' : 'CAUTION'}
+                    </span>
                   </div>
-                  <div className="clean-inline-safety-list">
-                    {clinicalAlerts.map((alert, idx) => (
-                      <div key={idx} className={`clean-inline-safety-row ${alert.severity}`}>
-                        <div className="clean-inline-safety-badge">
-                          {alert.severity === 'high' ? 'CRITICAL' : 'CAUTION'}
-                        </div>
-                        <div>
-                          <strong>{alert.title}</strong> — <span>{alert.detail}</span>
-                        </div>
+
+                  <div className="clean-inline-safety-content">
+                    <div className="clean-combined-alert-title-row">
+                      <strong>{combinedAlert.title}</strong>
+                    </div>
+
+                    {combinedAlert.points && combinedAlert.points.length > 1 ? (
+                      <ul className="clean-combined-points-list">
+                        {combinedAlert.points.map((pt, idx) => {
+                          const separatorIndex = pt.indexOf(' — ');
+                          const pointTitle = separatorIndex !== -1 ? pt.slice(0, separatorIndex) : '';
+                          const pointBody = separatorIndex !== -1 ? pt.slice(separatorIndex + 3) : pt;
+                          return (
+                            <li key={idx}>
+                              {pointTitle ? <strong>{pointTitle}: </strong> : null}
+                              <span>{pointBody}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="clean-combined-alert-detail">{combinedAlert.detail}</p>
+                    )}
+
+                    {combinedAlert.prescriberAction && (
+                      <div className="clean-combined-action-box">
+                        <strong>Prescriber Action:</strong> <span>{combinedAlert.prescriberAction}</span>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               )}
@@ -819,18 +850,35 @@ export function PrescribeMedicationModal({
                     {/* TAB 1: SAFETY & INTERACTIONS */}
                     {effectiveTab === 'safety' && (
                       <div className="clean-tab-content">
-                        {/* Clinical interaction alerts */}
-                        {clinicalAlerts.length > 0 ? (
-                          <div className="clean-alerts-list">
-                            {clinicalAlerts.map((alert, idx) => (
-                              <div key={idx} className={`clean-alert-item ${alert.severity}`}>
-                                <AlertTriangle size={16} className="clean-alert-icon" />
-                                <div>
-                                  <strong>{alert.title}</strong>
-                                  <p>{alert.detail}</p>
-                                </div>
-                              </div>
-                            ))}
+                        {/* Clinical interaction alerts (Consolidated into 1) */}
+                        {combinedAlert ? (
+                          <div className={`clean-alert-item ${combinedAlert.severity}`}>
+                            <AlertTriangle size={16} className="clean-alert-icon" />
+                            <div style={{ width: '100%' }}>
+                              <strong>{combinedAlert.title}</strong>
+                              {combinedAlert.points && combinedAlert.points.length > 1 ? (
+                                <ul className="clean-combined-ref-points">
+                                  {combinedAlert.points.map((pt, idx) => {
+                                    const separatorIndex = pt.indexOf(' — ');
+                                    const pointTitle = separatorIndex !== -1 ? pt.slice(0, separatorIndex) : '';
+                                    const pointBody = separatorIndex !== -1 ? pt.slice(separatorIndex + 3) : pt;
+                                    return (
+                                      <li key={idx}>
+                                        {pointTitle ? <strong>{pointTitle}: </strong> : null}
+                                        <span>{pointBody}</span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              ) : (
+                                <p>{combinedAlert.detail}</p>
+                              )}
+                              {combinedAlert.prescriberAction && (
+                                <p className="clean-action-subtext">
+                                  <strong>Action:</strong> {combinedAlert.prescriberAction}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <div className="clean-safe-strip">
@@ -948,25 +996,44 @@ export function PrescribeMedicationModal({
                       </div>
                     )}
                   </div>
-                ) : clinicalAlerts.length > 0 ? (
+                ) : combinedAlert ? (
                   <div className="clean-monograph-card">
                     <div className="clean-monograph-tab-bar">
                       <button type="button" className="clean-tab-btn active">
                         <ShieldAlert size={14} /> Safety & Alerts
-                        <span className="clean-alert-count-pill">{clinicalAlerts.length}</span>
+                        {clinicalAlerts.length > 1 && (
+                          <span className="clean-alert-count-pill">{clinicalAlerts.length}</span>
+                        )}
                       </button>
                     </div>
                     <div className="clean-tab-content">
-                      <div className="clean-alerts-list">
-                        {clinicalAlerts.map((alert, idx) => (
-                          <div key={idx} className={`clean-alert-item ${alert.severity}`}>
-                            <AlertTriangle size={16} className="clean-alert-icon" />
-                            <div>
-                              <strong>{alert.title}</strong>
-                              <p>{alert.detail}</p>
-                            </div>
-                          </div>
-                        ))}
+                      <div className={`clean-alert-item ${combinedAlert.severity}`}>
+                        <AlertTriangle size={16} className="clean-alert-icon" />
+                        <div style={{ width: '100%' }}>
+                          <strong>{combinedAlert.title}</strong>
+                          {combinedAlert.points && combinedAlert.points.length > 1 ? (
+                            <ul className="clean-combined-ref-points">
+                              {combinedAlert.points.map((pt, idx) => {
+                                const separatorIndex = pt.indexOf(' — ');
+                                const pointTitle = separatorIndex !== -1 ? pt.slice(0, separatorIndex) : '';
+                                const pointBody = separatorIndex !== -1 ? pt.slice(separatorIndex + 3) : pt;
+                                return (
+                                  <li key={idx}>
+                                    {pointTitle ? <strong>{pointTitle}: </strong> : null}
+                                    <span>{pointBody}</span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : (
+                            <p>{combinedAlert.detail}</p>
+                          )}
+                          {combinedAlert.prescriberAction && (
+                            <p className="clean-action-subtext">
+                              <strong>Action:</strong> {combinedAlert.prescriberAction}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
