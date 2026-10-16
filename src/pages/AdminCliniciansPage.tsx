@@ -2,13 +2,17 @@ import {
   ArrowLeft,
   Building2,
   CalendarDays,
+  Camera,
+  CheckCircle2,
   CircleAlert,
   ExternalLink,
+  Image,
   KeyRound,
   LoaderCircle,
   MapPin,
   Save,
   ShieldCheck,
+  Sparkles,
   Stethoscope,
   Trash2,
   UserCog,
@@ -18,6 +22,14 @@ import {
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getClinicianAccessToken } from '../services/clinicAccess';
+import { supabase } from '../services/supabase';
+
+const CLINIC_BANNER_PRESETS = [
+  { label: 'Modern Practice', url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1600&q=80' },
+  { label: 'Telehealth Studio', url: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1600&q=80' },
+  { label: 'Diagnostic Clinic', url: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1600&q=80' },
+  { label: 'Minimal Titanium', url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1600&q=80' },
+];
 
 type Clinic = {
   id: string;
@@ -31,6 +43,9 @@ type Clinic = {
   website_specialties?: string | null;
   website_phone?: string | null;
   website_email?: string | null;
+  website_banner_url?: string | null;
+  website_banner_text?: string | null;
+  website_banner_enabled?: boolean;
   website_enabled?: boolean;
 };
 
@@ -195,6 +210,43 @@ export function AdminCliniciansPage() {
     }
   };
 
+  const [uploadingBannerFor, setUploadingBannerFor] = useState<string | null>(null);
+
+  const uploadClinicBanner = async (clinicId: string, file: File) => {
+    if (!supabase) {
+      setError('Database connection not available.');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024) {
+      setError('Please select a JPG, PNG, or WebP image under 3 MB.');
+      return;
+    }
+    setUploadingBannerFor(clinicId);
+    setError('');
+    setMessage('');
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error('Please sign in again.');
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `${user.id}/clinic-banner-${clinicId}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('clinician-avatars')
+        .upload(path, file, { upsert: false, contentType: file.type });
+      if (uploadError) throw new Error(uploadError.message);
+      const { data } = supabase.storage.from('clinician-avatars').getPublicUrl(path);
+      setClinics((items) =>
+        items.map((item) => (item.id === clinicId ? { ...item, website_banner_url: data.publicUrl } : item))
+      );
+      setMessage('Banner image uploaded. Click "Save clinic website" to publish changes.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to upload banner.');
+    } finally {
+      setUploadingBannerFor(null);
+    }
+  };
+
   const updateClinic = async (event: FormEvent, clinic: Clinic) => {
     event.preventDefault();
     setSaving(true);
@@ -214,6 +266,9 @@ export function AdminCliniciansPage() {
           websiteSpecialties: clinic.website_specialties,
           websitePhone: clinic.website_phone,
           websiteEmail: clinic.website_email,
+          websiteBannerUrl: clinic.website_banner_url,
+          websiteBannerText: clinic.website_banner_text,
+          websiteBannerEnabled: clinic.website_banner_enabled !== false,
           websiteEnabled: clinic.website_enabled !== false,
         })
       );
@@ -590,6 +645,137 @@ export function AdminCliniciansPage() {
                         rows={3}
                       />
                     </label>
+
+                    {/* Clinic Profile Cover Banner & Visual Identity */}
+                    <div className="admin-clinic-banner-section full-width-field">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <div>
+                          <strong style={{ fontSize: '0.92rem', color: '#171717', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Image size={16} /> Clinic Profile Cover Banner
+                          </strong>
+                          <span style={{ fontSize: '0.78rem', color: '#666' }}>
+                            Displayed across your public clinic webpage at ventricura.com/{clinic.slug} and patient booking headers.
+                          </span>
+                        </div>
+                        {clinic.website_banner_url && (
+                          <button
+                            type="button"
+                            className="button button-secondary button-small"
+                            onClick={() =>
+                              setClinics((items) =>
+                                items.map((item) => (item.id === clinic.id ? { ...item, website_banner_url: null } : item))
+                              )
+                            }
+                          >
+                            <Trash2 size={13} /> Remove banner
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="admin-banner-preview-box">
+                        {clinic.website_banner_url ? (
+                          <img src={clinic.website_banner_url} alt={`${clinic.name} Banner Preview`} />
+                        ) : (
+                          <div className="admin-banner-placeholder">
+                            <Image size={32} />
+                            <span>No banner image uploaded yet</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="admin-banner-controls-row">
+                        <label className="button button-secondary button-small" style={{ cursor: 'pointer', margin: 0 }}>
+                          {uploadingBannerFor === clinic.id ? (
+                            <LoaderCircle size={15} className="spin" />
+                          ) : (
+                            <Camera size={15} />
+                          )}
+                          {uploadingBannerFor === clinic.id ? 'Uploading…' : 'Upload custom banner image'}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            hidden
+                            disabled={uploadingBannerFor === clinic.id}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (file) void uploadClinicBanner(clinic.id, file);
+                            }}
+                          />
+                        </label>
+                        <span style={{ fontSize: '0.74rem', color: '#666' }}>JPG, PNG or WebP · Up to 3 MB · 16:9 or 3:1 aspect ratio recommended</span>
+                      </div>
+
+                      <div>
+                        <span style={{ fontWeight: 700, fontSize: '0.76rem', color: '#444', display: 'block', marginBottom: '6px' }}>
+                          Or choose a clinical preset banner:
+                        </span>
+                        <div className="admin-banner-presets-row">
+                          {CLINIC_BANNER_PRESETS.map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              className="admin-banner-preset-btn"
+                              onClick={() =>
+                                setClinics((items) =>
+                                  items.map((item) => (item.id === clinic.id ? { ...item, website_banner_url: preset.url } : item))
+                                )
+                              }
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <label style={{ margin: 0, fontWeight: 600 }}>
+                        Or enter direct banner image URL
+                        <input
+                          type="url"
+                          value={clinic.website_banner_url ?? ''}
+                          onChange={(event) =>
+                            setClinics((items) =>
+                              items.map((item) => (item.id === clinic.id ? { ...item, website_banner_url: event.target.value } : item))
+                            )
+                          }
+                          placeholder="https://example.com/clinic-banner.jpg"
+                        />
+                      </label>
+
+                      <label style={{ margin: 0, fontWeight: 600 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Sparkles size={14} style={{ color: '#0c8a6f' }} />
+                          <span>Announcement / Alert banner text (optional)</span>
+                        </div>
+                        <input
+                          value={clinic.website_banner_text ?? ''}
+                          onChange={(event) =>
+                            setClinics((items) =>
+                              items.map((item) => (item.id === clinic.id ? { ...item, website_banner_text: event.target.value } : item))
+                            )
+                          }
+                          placeholder="e.g. Bulk-billed Telehealth Consultations Available Australia-Wide · No Referral Needed"
+                          maxLength={200}
+                        />
+                        <span style={{ fontSize: '0.74rem', color: '#666', fontWeight: 400 }}>
+                          Displays as a prominent clinical announcement bar at the top of your clinic website and booking portal.
+                        </span>
+                      </label>
+
+                      <label className="admin-toggle" style={{ margin: 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={clinic.website_banner_enabled !== false}
+                          onChange={(event) =>
+                            setClinics((items) =>
+                              items.map((item) =>
+                                item.id === clinic.id ? { ...item, website_banner_enabled: event.target.checked } : item
+                              )
+                            )
+                          }
+                        />
+                        <span>Enable clinic banner & announcement on public profile</span>
+                      </label>
+                    </div>
 
                     <label className="admin-toggle">
                       <input

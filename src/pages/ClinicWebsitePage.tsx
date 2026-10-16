@@ -13,6 +13,7 @@ import {
   MapPin,
   Phone,
   ShieldCheck,
+  Sparkles,
   Stethoscope,
   User,
   UserCog,
@@ -47,6 +48,9 @@ export type ClinicSite = {
   specialties: string[];
   phone: string;
   email: string;
+  bannerUrl?: string | null;
+  bannerText?: string | null;
+  bannerEnabled?: boolean;
   bookingUrl: string | null;
   doctors: ClinicDoctor[];
 };
@@ -138,6 +142,17 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
       />
       <PublicHeader />
 
+      {clinic.bannerText && clinic.bannerEnabled !== false && (
+        <aside className="clinic-announcement-strip" aria-label="Practice announcement">
+          <div className="clinic-site-wrapper clinic-announcement-inner">
+            <span className="clinic-announcement-tag">
+              <Sparkles size={12} /> Practice Announcement
+            </span>
+            <span>{clinic.bannerText}</span>
+          </div>
+        </aside>
+      )}
+
       {isManager && (
         <aside className="clinic-manager-topbar" aria-label="Clinical Manager Bar">
           <div className="clinic-manager-topbar-inner">
@@ -150,6 +165,15 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
             </Link>
           </div>
         </aside>
+      )}
+
+      {clinic.bannerUrl && clinic.bannerEnabled !== false && (
+        <div className="clinic-site-wrapper" style={{ marginTop: '24px', marginBottom: '-40px', position: 'relative', zIndex: 2 }}>
+          <div className="clinic-cover-banner-wrapper">
+            <img src={clinic.bannerUrl} alt={`${clinic.name} clinical banner`} />
+            <div className="clinic-cover-banner-overlay" />
+          </div>
+        </div>
       )}
 
       {/* Hero Section */}

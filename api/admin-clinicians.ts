@@ -130,7 +130,15 @@ async function handle(request: Request) {
 
     if (request.method === 'GET' && action === 'self-profile') {
       const { db, profile } = await signedIn(request);
-      const { data: clinic } = profile.clinic_id ? await db.from('clinics').select('name, slug').eq('id', profile.clinic_id).maybeSingle() : { data: null };
+      let clinicData: Record<string, unknown> | null = null;
+      if (profile.clinic_id) {
+        let clinicQuery = await db.from('clinics').select('name, slug, website_banner_url, website_banner_text, website_banner_enabled').eq('id', profile.clinic_id).maybeSingle();
+        if (clinicQuery.error && clinicQuery.error.message?.includes('column')) {
+          const fallback = await db.from('clinics').select('name, slug').eq('id', profile.clinic_id).maybeSingle();
+          clinicQuery = fallback as typeof clinicQuery;
+        }
+        clinicData = (clinicQuery.data as Record<string, unknown> | null) ?? null;
+      }
       const { data: booking } = await db.from('clinician_booking_profiles').select('booking_token, booking_enabled').eq('clinician_id', profile.id).maybeSingle();
       return Response.json({
         profile: {
@@ -138,8 +146,10 @@ async function handle(request: Request) {
           professional_title: profile.professional_title ?? '',
           about_me: profile.about_me ?? '',
           photo_url: profile.photo_url ?? '',
-          clinic_name: clinic?.name ?? null,
-          clinic_slug: clinic?.slug ?? null,
+          clinic_name: (clinicData?.name as string | null) ?? null,
+          clinic_slug: (clinicData?.slug as string | null) ?? null,
+          clinic_banner_url: clinicData?.website_banner_enabled !== false ? ((clinicData?.website_banner_url as string | null) ?? null) : null,
+          clinic_banner_text: clinicData?.website_banner_enabled !== false ? ((clinicData?.website_banner_text as string | null) ?? null) : null,
           booking_token: booking?.booking_token ?? null,
           booking_enabled: booking?.booking_enabled ?? false,
         },

@@ -162,9 +162,17 @@ export default { async fetch(request: Request) {
 
         let clinicResult = await db
           .from('clinics')
-          .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled')
+          .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_banner_url, website_banner_text, website_banner_enabled, website_enabled')
           .or(`slug.eq.${slug},slug.eq.${rawSlug},slug.ilike.${slug.replace(/-/g, '')}`)
           .maybeSingle();
+
+        if (clinicResult.error && clinicResult.error.message?.includes('column')) {
+          clinicResult = await db
+            .from('clinics')
+            .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled')
+            .or(`slug.eq.${slug},slug.eq.${rawSlug}`)
+            .maybeSingle();
+        }
 
         if (clinicResult.error && clinicResult.error.message?.includes('column')) {
           clinicResult = await db
@@ -246,13 +254,45 @@ export default { async fetch(request: Request) {
             specialties,
             phone: clinic.website_phone ?? '',
             email: clinic.website_email ?? '',
+            bannerUrl: ((clinic as Record<string, unknown>).website_banner_url as string | null | undefined) ?? null,
+            bannerText: ((clinic as Record<string, unknown>).website_banner_text as string | null | undefined) ?? null,
+            bannerEnabled: ((clinic as Record<string, unknown>).website_banner_enabled as boolean | null | undefined) !== false,
             bookingUrl: defaultBooking,
             doctors,
           },
           isManager,
         }, { headers: { 'Cache-Control': 'no-store' } });
       }
-      if (action === 'public-profile') { const db = database(); const profile = await getBookingProfile(db, bookingToken); const { data: clinician } = await db.from('clinician_profiles').select('display_name, professional_title, about_me, photo_url, clinic:clinics(name)').eq('id', profile.clinician_id).single(); const clinic = clinician?.clinic as unknown as { name?: string } | null; return Response.json({ clinicianName: clinician?.display_name ?? 'Your clinician', professionalTitle: clinician?.professional_title ?? '', aboutMe: clinician?.about_me ?? '', photoUrl: clinician?.photo_url ?? '', clinicName: clinic?.name ?? '', timezone: profile.timezone, durationMinutes: profile.duration_minutes, bookingReason: profile.booking_reason }); }
+      if (action === 'public-profile') {
+        const db = database();
+        const profile = await getBookingProfile(db, bookingToken);
+        let { data: clinician } = await db
+          .from('clinician_profiles')
+          .select('display_name, professional_title, about_me, photo_url, clinic:clinics(name, website_banner_url, website_banner_text, website_banner_enabled)')
+          .eq('id', profile.clinician_id)
+          .maybeSingle();
+        if (!clinician) {
+          const fallback = await db
+            .from('clinician_profiles')
+            .select('display_name, professional_title, about_me, photo_url, clinic:clinics(name)')
+            .eq('id', profile.clinician_id)
+            .single();
+          clinician = fallback.data as typeof clinician;
+        }
+        const clinic = clinician?.clinic as unknown as { name?: string; website_banner_url?: string; website_banner_text?: string; website_banner_enabled?: boolean } | null;
+        return Response.json({
+          clinicianName: clinician?.display_name ?? 'Your clinician',
+          professionalTitle: clinician?.professional_title ?? '',
+          aboutMe: clinician?.about_me ?? '',
+          photoUrl: clinician?.photo_url ?? '',
+          clinicName: clinic?.name ?? '',
+          clinicBannerUrl: clinic?.website_banner_enabled !== false ? (clinic?.website_banner_url ?? null) : null,
+          clinicBannerText: clinic?.website_banner_enabled !== false ? (clinic?.website_banner_text ?? null) : null,
+          timezone: profile.timezone,
+          durationMinutes: profile.duration_minutes,
+          bookingReason: profile.booking_reason,
+        });
+      }
       if (action === 'public-slots') { const db = database(); const profile = await getBookingProfile(db, bookingToken); return Response.json({ slots: await slotsForDate(db, profile, url.searchParams.get('date') ?? ''), timezone: profile.timezone }); }
       return Response.json({ error: 'Unknown booking request.' }, { status: 400 });
     }

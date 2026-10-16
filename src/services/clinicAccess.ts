@@ -389,7 +389,7 @@ export async function createPatientInvitation(invitation: PatientInvitation) {
 
 export type BookingAvailabilityDay = { day: number; enabled: boolean; start: string; end: string };
 export type ClinicianBookingSettings = { booking_token: string; bookingUrl: string; timezone: string; duration_minutes: number; weekly_availability: BookingAvailabilityDay[]; booking_enabled: boolean; booking_reason: string };
-export type PublicBookingProfile = { clinicianName: string; professionalTitle: string; aboutMe: string; photoUrl: string; clinicName: string; timezone: string; durationMinutes: number; bookingReason: string };
+export type PublicBookingProfile = { clinicianName: string; professionalTitle: string; aboutMe: string; photoUrl: string; clinicName: string; clinicBannerUrl?: string | null; clinicBannerText?: string | null; timezone: string; durationMinutes: number; bookingReason: string };
 
 async function bookingRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, options);

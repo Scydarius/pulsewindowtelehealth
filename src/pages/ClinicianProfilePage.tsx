@@ -11,6 +11,7 @@ import {
   Eye,
   FileText,
   LoaderCircle,
+  Megaphone,
   Save,
   ShieldCheck,
   Trash2,
@@ -30,6 +31,8 @@ type Profile = {
   photo_url: string;
   clinic_name: string | null;
   clinic_slug?: string | null;
+  clinic_banner_url?: string | null;
+  clinic_banner_text?: string | null;
   booking_token?: string | null;
   booking_enabled?: boolean;
 };
@@ -42,6 +45,8 @@ export function ClinicianProfilePage() {
     photo_url: '',
     clinic_name: null,
     clinic_slug: null,
+    clinic_banner_url: null,
+    clinic_banner_text: null,
     booking_token: null,
     booking_enabled: false,
   });
@@ -430,7 +435,33 @@ export function ClinicianProfilePage() {
 
           {/* Tab 1: Booking Card */}
           {previewMode === 'booking' ? (
-            <div className="mock-booking-card">
+            <div className="mock-booking-card" style={{ overflow: 'hidden' }}>
+              {profile.clinic_banner_text && (
+                <div style={{
+                  padding: '8px 14px',
+                  background: '#171717',
+                  color: '#fff',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderBottom: '1px solid #333',
+                  lineHeight: 1.3
+                }}>
+                  <Megaphone size={12} style={{ flexShrink: 0, color: '#38bdf8' }} />
+                  <span>{profile.clinic_banner_text}</span>
+                </div>
+              )}
+              {profile.clinic_banner_url && (
+                <div style={{ width: '100%', height: '110px', overflow: 'hidden', background: '#171717', borderBottom: '1px solid #e5e5dc' }}>
+                  <img
+                    src={profile.clinic_banner_url}
+                    alt={profile.clinic_name || 'Clinic Banner'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+              )}
               <span className="mock-card-badge">
                 <ShieldCheck size={12} /> AHPRA Registered Clinician
               </span>
