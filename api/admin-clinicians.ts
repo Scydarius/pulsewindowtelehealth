@@ -9,6 +9,55 @@ const originFor = (request: Request) => (process.env.APP_URL || new URL(request.
 const appUrl = (request: Request, path: string) => `${originFor(request)}${path}`;
 const slugify = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 63);
 
+const BANNER_TAG_REGEX = /<!-- CLINIC_BANNER:([\s\S]*?) -->/;
+
+function encodeClinicBanner(
+  about: string | null | undefined,
+  banner: { url?: string | null; text?: string | null; enabled?: boolean }
+): string {
+  const cleanAbout = (about || '').replace(BANNER_TAG_REGEX, '').trim();
+  const bannerData = {
+    u: banner.url?.trim() || null,
+    t: banner.text?.trim() || null,
+    e: banner.enabled !== false,
+  };
+  if (!bannerData.u && !bannerData.t && bannerData.e) {
+    return cleanAbout;
+  }
+  const tag = `\n<!-- CLINIC_BANNER:${JSON.stringify(bannerData)} -->`;
+  return cleanAbout ? `${cleanAbout}${tag}` : tag;
+}
+
+function decodeClinicBanner(
+  about: string | null | undefined,
+  existingUrl?: string | null,
+  existingText?: string | null,
+  existingEnabled?: boolean | null
+): { url: string | null; text: string | null; enabled: boolean; cleanAbout: string } {
+  const cleanAbout = (about || '').replace(BANNER_TAG_REGEX, '').trim();
+  const match = (about || '').match(BANNER_TAG_REGEX);
+  let tagUrl: string | null = null;
+  let tagText: string | null = null;
+  let tagEnabled = true;
+
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (typeof parsed.u === 'string' && parsed.u.trim()) tagUrl = parsed.u.trim();
+      if (typeof parsed.t === 'string' && parsed.t.trim()) tagText = parsed.t.trim();
+      if (typeof parsed.e === 'boolean') tagEnabled = parsed.e;
+    } catch {
+      // ignore JSON parse error
+    }
+  }
+
+  const url = existingUrl?.trim() || tagUrl || null;
+  const text = existingText?.trim() || tagText || null;
+  const enabled = existingEnabled !== undefined && existingEnabled !== null ? existingEnabled : tagEnabled;
+
+  return { url, text, enabled, cleanAbout };
+}
+
 const isPlatformSuperAdminEmail = (email?: string | null) => {
   if (!email) return false;
   const normalized = email.toLowerCase().trim();
@@ -132,13 +181,23 @@ async function handle(request: Request) {
       const { db, profile } = await signedIn(request);
       let clinicData: Record<string, unknown> | null = null;
       if (profile.clinic_id) {
-        let clinicQuery = await db.from('clinics').select('name, slug, website_banner_url, website_banner_text, website_banner_enabled').eq('id', profile.clinic_id).maybeSingle();
+        let clinicQuery = await db.from('clinics').select('name, slug, website_about, website_banner_url, website_banner_text, website_banner_enabled').eq('id', profile.clinic_id).maybeSingle();
         if (clinicQuery.error && clinicQuery.error.message?.includes('column')) {
-          const fallback = await db.from('clinics').select('name, slug').eq('id', profile.clinic_id).maybeSingle();
+          const fallback = await db.from('clinics').select('name, slug, website_about').eq('id', profile.clinic_id).maybeSingle();
           clinicQuery = fallback as typeof clinicQuery;
+          if (clinicQuery.error && clinicQuery.error.message?.includes('column')) {
+            const minFallback = await db.from('clinics').select('name, slug').eq('id', profile.clinic_id).maybeSingle();
+            clinicQuery = minFallback as typeof clinicQuery;
+          }
         }
         clinicData = (clinicQuery.data as Record<string, unknown> | null) ?? null;
       }
+      const bannerDecoded = decodeClinicBanner(
+        clinicData?.website_about as string | null | undefined,
+        clinicData?.website_banner_url as string | null | undefined,
+        clinicData?.website_banner_text as string | null | undefined,
+        clinicData?.website_banner_enabled as boolean | null | undefined
+      );
       const { data: booking } = await db.from('clinician_booking_profiles').select('booking_token, booking_enabled').eq('clinician_id', profile.id).maybeSingle();
       return Response.json({
         profile: {
@@ -148,8 +207,8 @@ async function handle(request: Request) {
           photo_url: profile.photo_url ?? '',
           clinic_name: (clinicData?.name as string | null) ?? null,
           clinic_slug: (clinicData?.slug as string | null) ?? null,
-          clinic_banner_url: clinicData?.website_banner_enabled !== false ? ((clinicData?.website_banner_url as string | null) ?? null) : null,
-          clinic_banner_text: clinicData?.website_banner_enabled !== false ? ((clinicData?.website_banner_text as string | null) ?? null) : null,
+          clinic_banner_url: bannerDecoded.enabled ? bannerDecoded.url : null,
+          clinic_banner_text: bannerDecoded.enabled ? bannerDecoded.text : null,
           booking_token: booking?.booking_token ?? null,
           booking_enabled: booking?.booking_enabled ?? false,
         },
@@ -193,7 +252,9 @@ async function handle(request: Request) {
         profileResult = await fallbackQuery;
       }
 
+      let bannerMigrationPending = false;
       if (clinicResult.error && (clinicResult.error.message?.includes('column') || clinicResult.error.code === '42703')) {
+        bannerMigrationPending = true;
         let fallbackClinicQuery = db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled, created_at').order('name');
         if (!isSuperAdmin && profile.clinic_id) fallbackClinicQuery = fallbackClinicQuery.eq('id', profile.clinic_id);
         clinicResult = await fallbackClinicQuery;
@@ -202,9 +263,14 @@ async function handle(request: Request) {
           if (!isSuperAdmin && profile.clinic_id) secondFallback = secondFallback.eq('id', profile.clinic_id);
           clinicResult = await secondFallback;
           if (clinicResult.error && (clinicResult.error.message?.includes('column') || clinicResult.error.code === '42703')) {
-            let minimalQuery = db.from('clinics').select('id, name, slug, public_domain, created_at').order('name');
+            let minimalQuery = db.from('clinics').select('id, name, slug, public_domain, website_about, created_at').order('name');
             if (!isSuperAdmin && profile.clinic_id) minimalQuery = minimalQuery.eq('id', profile.clinic_id);
             clinicResult = await minimalQuery;
+            if (clinicResult.error && (clinicResult.error.message?.includes('column') || clinicResult.error.code === '42703')) {
+              let bareQuery = db.from('clinics').select('id, name, slug, public_domain, created_at').order('name');
+              if (!isSuperAdmin && profile.clinic_id) bareQuery = bareQuery.eq('id', profile.clinic_id);
+              clinicResult = await bareQuery;
+            }
           }
         }
       }
@@ -237,12 +303,29 @@ async function handle(request: Request) {
       const clinicNameMap = new Map((allClinicsResult.data ?? []).map((c) => [c.id, c.name]));
       const clinicianNameMap = new Map(clinicians.map((c) => [c.id, c.display_name]));
 
+      const parsedClinics = ((clinicResult.data ?? []) as Record<string, unknown>[]).map((item) => {
+        const decoded = decodeClinicBanner(
+          item.website_about as string | null | undefined,
+          item.website_banner_url as string | null | undefined,
+          item.website_banner_text as string | null | undefined,
+          item.website_banner_enabled as boolean | null | undefined
+        );
+        return {
+          ...item,
+          website_about: decoded.cleanAbout,
+          website_banner_url: decoded.url,
+          website_banner_text: decoded.text,
+          website_banner_enabled: decoded.enabled,
+        };
+      });
+
       return Response.json({
         isPlatformAdmin: Boolean(profile.is_platform_admin),
         isClinicManager: Boolean(profile.is_admin && !profile.is_platform_admin),
         currentClinicId: profile.clinic_id ?? null,
-        clinics: clinicResult.data ?? [],
+        clinics: parsedClinics,
         allClinics: allClinicsResult.data ?? [],
+        bannerMigrationPending,
         clinicians: clinicians.map((item) => {
           const b = bookingMap.get(item.id);
           return {
@@ -325,13 +408,19 @@ async function handle(request: Request) {
       if (!profile.is_platform_admin) throw new Error('Only Ventricura platform administrators (Ramsay and Sid) can create new clinics.');
       const slug = slugify(body.clinicSlug || body.clinicName);
       if (!slug) throw new Error('A valid clinic URL label is required.');
+      const bannerPayload = {
+        url: body.websiteBannerUrl,
+        text: body.websiteBannerText,
+        enabled: body.websiteBannerEnabled !== false,
+      };
+      const aboutEncoded = encodeClinicBanner(body.websiteAbout, bannerPayload);
       const insertData: Record<string, unknown> = {
         name: body.clinicName.trim(),
         slug,
         public_domain: null,
         website_headline: body.websiteHeadline?.trim() || null,
         website_intro: body.websiteIntro?.trim() || null,
-        website_about: body.websiteAbout?.trim() || null,
+        website_about: aboutEncoded,
         website_address: body.websiteAddress?.trim() || null,
         website_specialties: body.websiteSpecialties?.trim() || null,
         website_phone: body.websitePhone?.trim() || null,
@@ -365,12 +454,18 @@ async function handle(request: Request) {
       if (!profile.is_platform_admin && (!profile.clinic_id || body.clinicId !== profile.clinic_id)) {
         throw new Error('You do not have permission to update this clinic.');
       }
+      const bannerPayload = {
+        url: body.websiteBannerUrl,
+        text: body.websiteBannerText,
+        enabled: body.websiteBannerEnabled !== false,
+      };
+      const aboutEncoded = encodeClinicBanner(body.websiteAbout, bannerPayload);
       const update: Record<string, unknown> = {
         name: body.clinicName.trim(),
         slug: slugify(body.clinicSlug || body.clinicName),
         website_headline: body.websiteHeadline?.trim() || null,
         website_intro: body.websiteIntro?.trim() || null,
-        website_about: body.websiteAbout?.trim() || null,
+        website_about: aboutEncoded,
         website_address: body.websiteAddress?.trim() || null,
         website_specialties: body.websiteSpecialties?.trim() || null,
         website_phone: body.websitePhone?.trim() || null,
@@ -382,8 +477,10 @@ async function handle(request: Request) {
         updated_at: new Date().toISOString()
       };
       if (body.publicDomain !== undefined && profile.is_platform_admin) update.public_domain = body.publicDomain.trim().toLowerCase() || null;
+      let bannerColumnsMissing = false;
       let { error } = await db.from('clinics').update(update).eq('id', body.clinicId);
       if (error && (error.message?.includes('column') || error.code === '42703')) {
+        bannerColumnsMissing = true;
         delete update.website_banner_url;
         delete update.website_banner_text;
         delete update.website_banner_enabled;
@@ -397,7 +494,13 @@ async function handle(request: Request) {
         }
       }
       if (error) throw new Error(error.message);
-      return Response.json({ message: 'Clinic website updated.' });
+      return Response.json({
+        message: bannerColumnsMissing
+          ? 'Clinic website and banner saved successfully (embedded storage active).'
+          : 'Clinic website updated.',
+        bannerSaved: true,
+        bannerMigrationPending: bannerColumnsMissing,
+      });
     }
     if (!body.clinicianId) throw new Error('Clinician and action are required.');
     const { data: target } = await db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id, professional_title, about_me').eq('id', body.clinicianId).maybeSingle();

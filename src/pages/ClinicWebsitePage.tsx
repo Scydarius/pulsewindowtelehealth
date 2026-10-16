@@ -17,7 +17,6 @@ import {
   Stethoscope,
   User,
   UserCog,
-  UserPlus,
   Video,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -78,6 +77,16 @@ const DEFAULT_VENTRICURA_SITE: ClinicSite = {
   doctors: [],
 };
 
+function getLocalClinicBanner(clinicIdOrSlug: string): { url: string | null; text: string | null; enabled: boolean } | null {
+  try {
+    const raw = localStorage.getItem(`ventricura_banner_${clinicIdOrSlug}`);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 export function ClinicWebsitePage({ slug }: { slug: string }) {
   const [clinic, setClinic] = useState<ClinicSite | null>(null);
   const [error, setError] = useState('');
@@ -98,19 +107,49 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
         const body = (await response.json().catch(() => null)) as { clinic?: ClinicSite; isManager?: boolean; error?: string } | null;
         if (!response.ok || !body?.clinic) {
           if (slug === 'ventricura' || !slug) {
-            if (active) setClinic(DEFAULT_VENTRICURA_SITE);
+            const cached = getLocalClinicBanner('ventricura') || getLocalClinicBanner('ventricura-telehealth');
+            if (active) {
+              setClinic({
+                ...DEFAULT_VENTRICURA_SITE,
+                bannerUrl: cached?.url ?? DEFAULT_VENTRICURA_SITE.bannerUrl,
+                bannerText: cached?.text ?? DEFAULT_VENTRICURA_SITE.bannerText,
+                bannerEnabled: cached?.enabled !== undefined ? cached.enabled : DEFAULT_VENTRICURA_SITE.bannerEnabled,
+              });
+            }
             return;
           }
           throw new Error(body?.error ?? 'Clinic page not found.');
         }
         if (active) {
-          setClinic(body.clinic);
+          let bannerUrl = body.clinic.bannerUrl;
+          let bannerText = body.clinic.bannerText;
+          let bannerEnabled = body.clinic.bannerEnabled !== false;
+          if (!bannerUrl) {
+            const cached = getLocalClinicBanner(body.clinic.slug) || getLocalClinicBanner(body.clinic.id);
+            if (cached) {
+              bannerUrl = cached.url;
+              if (!bannerText && cached.text) bannerText = cached.text;
+              if (cached.enabled !== undefined) bannerEnabled = cached.enabled;
+            }
+          }
+          setClinic({
+            ...body.clinic,
+            bannerUrl,
+            bannerText,
+            bannerEnabled,
+          });
           if (body.isManager) setIsManager(true);
         }
       } catch (reason) {
         if (active) {
           if (slug === 'ventricura' || !slug) {
-            setClinic(DEFAULT_VENTRICURA_SITE);
+            const cached = getLocalClinicBanner('ventricura') || getLocalClinicBanner('ventricura-telehealth');
+            setClinic({
+              ...DEFAULT_VENTRICURA_SITE,
+              bannerUrl: cached?.url ?? DEFAULT_VENTRICURA_SITE.bannerUrl,
+              bannerText: cached?.text ?? DEFAULT_VENTRICURA_SITE.bannerText,
+              bannerEnabled: cached?.enabled !== undefined ? cached.enabled : DEFAULT_VENTRICURA_SITE.bannerEnabled,
+            });
           } else {
             setError(reason instanceof Error ? reason.message : 'Clinic page not found.');
           }
@@ -203,7 +242,13 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
       {clinic.bannerUrl && clinic.bannerEnabled !== false && (
         <div className="clinic-site-wrapper" style={{ marginTop: '24px', marginBottom: '-40px', position: 'relative', zIndex: 2 }}>
           <div className="clinic-cover-banner-wrapper">
-            <img src={clinic.bannerUrl} alt={`${clinic.name} clinical banner`} />
+            <img
+              src={clinic.bannerUrl}
+              alt={`${clinic.name} clinical banner`}
+              onError={(e) => {
+                (e.currentTarget.parentElement?.parentElement as HTMLElement | null)?.style.setProperty('display', 'none');
+              }}
+            />
             <div className="clinic-cover-banner-overlay" />
           </div>
         </div>

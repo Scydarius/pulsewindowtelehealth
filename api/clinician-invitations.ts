@@ -23,6 +23,38 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => (
 const defaultAvailability: AvailabilityDay[] = [1, 2, 3, 4, 5, 6, 0].map((day) => ({ day, enabled: day >= 1 && day <= 5, start: '09:00', end: '17:00' }));
 const slugify = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 63);
 
+const BANNER_TAG_REGEX = /<!-- CLINIC_BANNER:([\s\S]*?) -->/;
+
+function decodeClinicBanner(
+  about: string | null | undefined,
+  existingUrl?: string | null,
+  existingText?: string | null,
+  existingEnabled?: boolean | null
+): { url: string | null; text: string | null; enabled: boolean; cleanAbout: string } {
+  const cleanAbout = (about || '').replace(BANNER_TAG_REGEX, '').trim();
+  const match = (about || '').match(BANNER_TAG_REGEX);
+  let tagUrl: string | null = null;
+  let tagText: string | null = null;
+  let tagEnabled = true;
+
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (typeof parsed.u === 'string' && parsed.u.trim()) tagUrl = parsed.u.trim();
+      if (typeof parsed.t === 'string' && parsed.t.trim()) tagText = parsed.t.trim();
+      if (typeof parsed.e === 'boolean') tagEnabled = parsed.e;
+    } catch {
+      // ignore JSON parse error
+    }
+  }
+
+  const url = existingUrl?.trim() || tagUrl || null;
+  const text = existingText?.trim() || tagText || null;
+  const enabled = existingEnabled !== undefined && existingEnabled !== null ? existingEnabled : tagEnabled;
+
+  return { url, text, enabled, cleanAbout };
+}
+
 function dateParts(date: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
   const value = (kind: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === kind)?.value ?? '00';
@@ -266,15 +298,21 @@ export default { async fetch(request: Request) {
         const clinicId = typeof clinicRecord?.id === 'string' ? clinicRecord.id : 'ventricura-telehealth';
         const clinicName = typeof clinicRecord?.name === 'string' ? clinicRecord.name : 'Ventricura Telehealth';
         const clinicSlug = typeof clinicRecord?.slug === 'string' ? clinicRecord.slug : 'ventricura';
+        const decodedBanner = decodeClinicBanner(
+          clinicRecord?.website_about as string | null | undefined,
+          clinicRecord?.website_banner_url as string | null | undefined,
+          clinicRecord?.website_banner_text as string | null | undefined,
+          clinicRecord?.website_banner_enabled as boolean | null | undefined
+        );
         const headline = (clinicRecord?.website_headline as string) || 'Specialist telehealth & contactless vitals consultations.';
         const intro = (clinicRecord?.website_intro as string) || 'A unified clinical workspace connecting patients with qualified medical practitioners, backed by camera-assisted vital metrics.';
-        const about = (clinicRecord?.website_about as string) || 'Ventricura delivers browser-based telehealth consultations with contactless vitals extraction, structured clinical notes, and integrated appointment scheduling. Patients connect securely with accredited medical practitioners from any device.';
+        const about = decodedBanner.cleanAbout || (isVentricura ? 'Ventricura delivers browser-based telehealth consultations with contactless vitals extraction, structured clinical notes, and integrated appointment scheduling. Patients connect securely with accredited medical practitioners from any device.' : '');
         const address = (clinicRecord?.website_address as string) || (isVentricura ? 'Level 1, 115 King William Street, Adelaide SA 5000' : '');
         const phone = (clinicRecord?.website_phone as string) || (isVentricura ? '1300 000 836' : '');
         const email = (clinicRecord?.website_email as string) || (isVentricura ? 'admin@ventricura.com' : '');
-        const bannerUrl = (clinicRecord?.website_banner_url as string) || null;
-        const bannerText = (clinicRecord?.website_banner_text as string) || null;
-        const bannerEnabled = clinicRecord?.website_banner_enabled !== false;
+        const bannerUrl = decodedBanner.url;
+        const bannerText = decodedBanner.text;
+        const bannerEnabled = decodedBanner.enabled !== false;
 
         const rawSpecialties = clinicRecord?.website_specialties as string | null | undefined;
         let specialties: string[] = [];
@@ -393,26 +431,40 @@ export default { async fetch(request: Request) {
         const profile = await getBookingProfile(db, bookingToken);
         let { data: clinician } = await db
           .from('clinician_profiles')
-          .select('display_name, professional_title, about_me, photo_url, clinic:clinics(name, website_banner_url, website_banner_text, website_banner_enabled)')
+          .select('display_name, professional_title, about_me, photo_url, clinic:clinics(name, website_about, website_banner_url, website_banner_text, website_banner_enabled)')
           .eq('id', profile.clinician_id)
           .maybeSingle();
         if (!clinician) {
           const fallback = await db
             .from('clinician_profiles')
-            .select('display_name, professional_title, about_me, photo_url, clinic:clinics(name)')
+            .select('display_name, professional_title, about_me, photo_url, clinic:clinics(name, website_about)')
             .eq('id', profile.clinician_id)
             .single();
           clinician = fallback.data as typeof clinician;
+          if (!clinician) {
+            const minFallback = await db
+              .from('clinician_profiles')
+              .select('display_name, professional_title, about_me, photo_url, clinic:clinics(name)')
+              .eq('id', profile.clinician_id)
+              .single();
+            clinician = minFallback.data as typeof clinician;
+          }
         }
-        const clinic = clinician?.clinic as unknown as { name?: string; website_banner_url?: string; website_banner_text?: string; website_banner_enabled?: boolean } | null;
+        const clinic = clinician?.clinic as unknown as { name?: string; website_about?: string; website_banner_url?: string; website_banner_text?: string; website_banner_enabled?: boolean } | null;
+        const decoded = decodeClinicBanner(
+          clinic?.website_about,
+          clinic?.website_banner_url,
+          clinic?.website_banner_text,
+          clinic?.website_banner_enabled
+        );
         return Response.json({
           clinicianName: clinician?.display_name ?? 'Your clinician',
           professionalTitle: clinician?.professional_title ?? '',
           aboutMe: clinician?.about_me ?? '',
           photoUrl: clinician?.photo_url ?? '',
           clinicName: clinic?.name ?? '',
-          clinicBannerUrl: clinic?.website_banner_enabled !== false ? (clinic?.website_banner_url ?? null) : null,
-          clinicBannerText: clinic?.website_banner_enabled !== false ? (clinic?.website_banner_text ?? null) : null,
+          clinicBannerUrl: decoded.enabled ? decoded.url : null,
+          clinicBannerText: decoded.enabled ? decoded.text : null,
           timezone: profile.timezone,
           durationMinutes: profile.duration_minutes,
           bookingReason: profile.booking_reason,

@@ -3,13 +3,13 @@ import {
   Building2,
   CalendarDays,
   Camera,
-  CheckCircle2,
   CircleAlert,
+  Copy,
+  Database,
   ExternalLink,
   Image,
   KeyRound,
   LoaderCircle,
-  MapPin,
   Save,
   ShieldCheck,
   Sparkles,
@@ -23,6 +23,34 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getClinicianAccessToken } from '../services/clinicAccess';
 import { supabase } from '../services/supabase';
+
+const BANNER_SQL_MIGRATION = `-- Run this in Supabase SQL Editor to enable native clinic banner columns:
+alter table public.clinics
+  add column if not exists website_banner_url text,
+  add column if not exists website_banner_text text,
+  add column if not exists website_banner_enabled boolean not null default true;
+
+notify pgrst, 'reload schema';`;
+
+function getLocalClinicBanner(clinicIdOrSlug: string): { url: string | null; text: string | null; enabled: boolean } | null {
+  try {
+    const raw = localStorage.getItem(`ventricura_banner_${clinicIdOrSlug}`);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function setLocalClinicBanner(clinicId: string, slug: string, banner: { url: string | null; text: string | null; enabled: boolean }) {
+  try {
+    const serialized = JSON.stringify(banner);
+    if (clinicId) localStorage.setItem(`ventricura_banner_${clinicId}`, serialized);
+    if (slug) localStorage.setItem(`ventricura_banner_${slug}`, serialized);
+  } catch {
+    // best-effort
+  }
+}
 
 const CLINIC_BANNER_PRESETS = [
   { label: 'Modern Practice', url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1600&q=80' },
@@ -102,6 +130,8 @@ export function AdminCliniciansPage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [workingId, setWorkingId] = useState('');
+  const [bannerMigrationPending, setBannerMigrationPending] = useState(false);
+  const [copiedBannerSql, setCopiedBannerSql] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -117,12 +147,36 @@ export function AdminCliniciansPage() {
         currentClinicId?: string | null;
         isPlatformAdmin?: boolean;
         isClinicManager?: boolean;
+        bannerMigrationPending?: boolean;
         error?: string;
       };
       if (!response.ok) throw new Error(body.error ?? 'Unable to load clinicians.');
       setClinicians(body.clinicians ?? []);
       setPatients(body.patients ?? []);
-      setClinics(body.clinics ?? []);
+      if (body.bannerMigrationPending !== undefined) {
+        setBannerMigrationPending(Boolean(body.bannerMigrationPending));
+      }
+      const loadedClinics = (body.clinics ?? []).map((clinic) => {
+        let bannerUrl = clinic.website_banner_url;
+        let bannerText = clinic.website_banner_text;
+        let bannerEnabled = clinic.website_banner_enabled;
+
+        if (!bannerUrl) {
+          const cached = getLocalClinicBanner(clinic.id) || getLocalClinicBanner(clinic.slug);
+          if (cached) {
+            bannerUrl = cached.url;
+            if (!bannerText && cached.text) bannerText = cached.text;
+            if (bannerEnabled === undefined) bannerEnabled = cached.enabled;
+          }
+        }
+        return {
+          ...clinic,
+          website_banner_url: bannerUrl,
+          website_banner_text: bannerText,
+          website_banner_enabled: bannerEnabled !== false,
+        };
+      });
+      setClinics(loadedClinics);
       setAllClinics(body.allClinics ?? []);
       setIsPlatformAdmin(body.isPlatformAdmin === true);
       setIsClinicManager(body.isClinicManager === true || (!body.isPlatformAdmin && (body.clinicians?.some((c) => c.is_admin) ?? false)));
@@ -236,34 +290,42 @@ export function AdminCliniciansPage() {
         .upload(path, file, { upsert: false, contentType: file.type });
       if (uploadError) throw new Error(uploadError.message);
       const { data } = supabase.storage.from('clinician-avatars').getPublicUrl(path);
+      const publicBannerUrl = data.publicUrl;
+
       setClinics((items) =>
-        items.map((item) => (item.id === clinicId ? { ...item, website_banner_url: data.publicUrl } : item))
+        items.map((item) => (item.id === clinicId ? { ...item, website_banner_url: publicBannerUrl } : item))
       );
+
       const targetClinic = clinics.find((c) => c.id === clinicId);
       if (targetClinic) {
-        try {
-          await request('PATCH', {
-            action: 'update_clinic',
-            clinicId: targetClinic.id,
-            clinicName: targetClinic.name,
-            clinicSlug: targetClinic.slug,
-            websiteHeadline: targetClinic.website_headline,
-            websiteIntro: targetClinic.website_intro,
-            websiteAbout: targetClinic.website_about,
-            websiteAddress: targetClinic.website_address,
-            websiteSpecialties: targetClinic.website_specialties,
-            websitePhone: targetClinic.website_phone,
-            websiteEmail: targetClinic.website_email,
-            websiteBannerUrl: data.publicUrl,
-            websiteBannerText: targetClinic.website_banner_text,
-            websiteBannerEnabled: targetClinic.website_banner_enabled !== false,
-            websiteEnabled: targetClinic.website_enabled !== false,
-          });
-        } catch {
-          // best-effort auto-save; user can also click "Save clinic website"
-        }
+        setLocalClinicBanner(targetClinic.id, targetClinic.slug, {
+          url: publicBannerUrl,
+          text: targetClinic.website_banner_text ?? null,
+          enabled: targetClinic.website_banner_enabled !== false,
+        });
+
+        const res = await request('PATCH', {
+          action: 'update_clinic',
+          clinicId: targetClinic.id,
+          clinicName: targetClinic.name,
+          clinicSlug: targetClinic.slug,
+          websiteHeadline: targetClinic.website_headline,
+          websiteIntro: targetClinic.website_intro,
+          websiteAbout: targetClinic.website_about,
+          websiteAddress: targetClinic.website_address,
+          websiteSpecialties: targetClinic.website_specialties,
+          websitePhone: targetClinic.website_phone,
+          websiteEmail: targetClinic.website_email,
+          websiteBannerUrl: publicBannerUrl,
+          websiteBannerText: targetClinic.website_banner_text,
+          websiteBannerEnabled: targetClinic.website_banner_enabled !== false,
+          websiteEnabled: targetClinic.website_enabled !== false,
+        });
+        setMessage(res || 'Banner image uploaded and saved successfully.');
+      } else {
+        setMessage('Banner image uploaded successfully.');
       }
-      setMessage('Banner image uploaded and saved successfully.');
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to upload banner.');
     } finally {
@@ -277,25 +339,30 @@ export function AdminCliniciansPage() {
     setError('');
     setMessage('');
     try {
-      setMessage(
-        await request('PATCH', {
-          action: 'update_clinic',
-          clinicId: clinic.id,
-          clinicName: clinic.name,
-          clinicSlug: clinic.slug,
-          websiteHeadline: clinic.website_headline,
-          websiteIntro: clinic.website_intro,
-          websiteAbout: clinic.website_about,
-          websiteAddress: clinic.website_address,
-          websiteSpecialties: clinic.website_specialties,
-          websitePhone: clinic.website_phone,
-          websiteEmail: clinic.website_email,
-          websiteBannerUrl: clinic.website_banner_url,
-          websiteBannerText: clinic.website_banner_text,
-          websiteBannerEnabled: clinic.website_banner_enabled !== false,
-          websiteEnabled: clinic.website_enabled !== false,
-        })
-      );
+      setLocalClinicBanner(clinic.id, clinic.slug, {
+        url: clinic.website_banner_url ?? null,
+        text: clinic.website_banner_text ?? null,
+        enabled: clinic.website_banner_enabled !== false,
+      });
+
+      const res = await request('PATCH', {
+        action: 'update_clinic',
+        clinicId: clinic.id,
+        clinicName: clinic.name,
+        clinicSlug: clinic.slug,
+        websiteHeadline: clinic.website_headline,
+        websiteIntro: clinic.website_intro,
+        websiteAbout: clinic.website_about,
+        websiteAddress: clinic.website_address,
+        websiteSpecialties: clinic.website_specialties,
+        websitePhone: clinic.website_phone,
+        websiteEmail: clinic.website_email,
+        websiteBannerUrl: clinic.website_banner_url,
+        websiteBannerText: clinic.website_banner_text,
+        websiteBannerEnabled: clinic.website_banner_enabled !== false,
+        websiteEnabled: clinic.website_enabled !== false,
+      });
+      setMessage(res || 'Clinic website updated.');
       setEditingClinic(null);
       await load();
     } catch (reason) {
@@ -470,6 +537,46 @@ export function AdminCliniciansPage() {
                 <Building2 size={18} /> Add medical centre
               </button>
             </form>
+          )}
+
+          {bannerMigrationPending && (
+            <div
+              style={{
+                margin: '16px 0',
+                padding: '14px 18px',
+                background: '#fefce8',
+                border: '1px solid #fde047',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Database size={18} style={{ color: '#ca8a04', flexShrink: 0 }} />
+                <div>
+                  <strong style={{ fontSize: '0.85rem', color: '#854d0e', display: 'block' }}>
+                    Database Notice: Banners Active via Resilient Storage
+                  </strong>
+                  <span style={{ fontSize: '0.78rem', color: '#713f12' }}>
+                    Your clinic banners and announcements are safely saved and live on all patient pages. You can also run the Supabase SQL migration to enable native database columns.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="button button-small button-secondary"
+                onClick={() => {
+                  navigator.clipboard.writeText(BANNER_SQL_MIGRATION);
+                  setCopiedBannerSql(true);
+                  setTimeout(() => setCopiedBannerSql(false), 3000);
+                }}
+              >
+                <Copy size={13} /> {copiedBannerSql ? 'SQL Copied!' : 'Copy Supabase SQL'}
+              </button>
+            </div>
           )}
 
           <div className="clinic-site-list">
