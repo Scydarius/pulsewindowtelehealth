@@ -1183,14 +1183,22 @@ notify pgrst, 'reload schema';`;
         </div>
 
         <table className="print-table">
+          <colgroup>
+            <col style={{ width: '28%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '26%' }} />
+            <col style={{ width: '13%' }} />
+          </colgroup>
           <thead>
             <tr>
-              <th>#</th>
               <th>Medication & Active Ingredient</th>
               <th>Dose</th>
               <th>Frequency</th>
-              <th>Repeats</th>
-              <th style={{ textAlign: 'center' }}>PBS Subsidised</th>
+              <th style={{ textAlign: 'center' }}>Repeats</th>
+              <th style={{ textAlign: 'center' }}>PBS</th>
               <th>Directions for Patient</th>
               <th>Prescribed By / Date</th>
             </tr>
@@ -1198,22 +1206,23 @@ notify pgrst, 'reload schema';`;
           <tbody>
             {activeMedications.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '16px' }}>
                   No active medications recorded for this patient.
                 </td>
               </tr>
             ) : (
-              activeMedications.map((m, idx) => (
+              activeMedications.map((m) => (
                 <tr key={m.id}>
-                  <td>{idx + 1}</td>
                   <td>
                     <strong>{m.medication_name}</strong>
                     {m.generic_name && <div className="print-sub">{m.generic_name}</div>}
                     {m.artg_id && <div className="print-sub-aust">{m.artg_id}</div>}
                   </td>
-                  <td>{m.dose}</td>
+                  <td className="print-cell-dose">
+                    <strong>{m.dose}</strong>
+                  </td>
                   <td>{m.frequency}</td>
-                  <td>{m.repeats}</td>
+                  <td style={{ textAlign: 'center' }}>{m.repeats}</td>
                   <td style={{ textAlign: 'center' }}>
                     {m.is_pbs ? (
                       <span className="print-pbs-badge print-pbs-tick" title="PBS Subsidised">✓</span>
@@ -1221,7 +1230,7 @@ notify pgrst, 'reload schema';`;
                       <span className="print-pbs-badge print-pbs-cross" title="Non-PBS / Private">✗</span>
                     )}
                   </td>
-                  <td>{m.directions || '—'}</td>
+                  <td className="print-cell-directions">{m.directions || '—'}</td>
                   <td>
                     {m.prescribed_by_name}
                     <div className="print-sub">{new Date(m.prescribed_date).toLocaleDateString('en-AU')}</div>
@@ -1236,6 +1245,12 @@ notify pgrst, 'reload schema';`;
           <div className="print-ceased-section">
             <h3>Recently Ceased / Inactive Regimens</h3>
             <table className="print-table print-ceased-table">
+              <colgroup>
+                <col style={{ width: '30%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '35%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Medication</th>

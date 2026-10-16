@@ -352,6 +352,7 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
     .clinical-notes-card p:last-child { margin-bottom: 0; }
     table.report-table {
       width: 100%;
+      table-layout: fixed;
       border-collapse: collapse;
       font-size: 7.6pt;
       margin-top: 6px;
@@ -371,6 +372,12 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
       padding: 5px 6px;
       border-bottom: 1px solid #e2e8f0;
       vertical-align: top;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+    table.report-table tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .generic-sub, .freq-sub {
       color: #64748b;
@@ -528,6 +535,15 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
     </div>
     <section>
       <table class="report-table">
+        <colgroup>
+          <col style="width: 27%;" />
+          <col style="width: 10%;" />
+          <col style="width: 14%;" />
+          <col style="width: 27%;" />
+          <col style="width: 5%;" />
+          <col style="width: 6%;" />
+          <col style="width: 11%;" />
+        </colgroup>
         <thead>
           <tr>
             <th>Medication & Generic</th>
@@ -535,7 +551,7 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
             <th>Dose & Frequency</th>
             <th>Patient Directions</th>
             <th style="text-align: center;">Repeats</th>
-            <th style="text-align: center;">PBS Subsidised</th>
+            <th style="text-align: center;">PBS</th>
             <th>Prescribing Doctor</th>
           </tr>
         </thead>
@@ -551,6 +567,13 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
     </div>
     <section>
       <table class="report-table">
+        <colgroup>
+          <col style="width: 24%;" />
+          <col style="width: 19%;" />
+          <col style="width: 19%;" />
+          <col style="width: 18%;" />
+          <col style="width: 20%;" />
+        </colgroup>
         <thead>
           <tr>
             <th>Timestamp</th>
@@ -708,15 +731,15 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
   <meta charset="utf-8" />
   <title>Patient Clinical Health Summary — ${escapeHtml(data.patientName)}</title>
   <style>
-    @page { size: A4 portrait; margin: 12mm 14mm 14mm; }
+    @page { size: A4 portrait; margin: 9mm 12mm 10mm; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       color: #0f172a;
       background: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 8.8pt;
-      line-height: 1.45;
+      font-size: 8.2pt;
+      line-height: 1.35;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -724,50 +747,57 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      padding-bottom: 12px;
-      border-bottom: 2.5px solid #0f172a;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #0f172a;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
-    .report-logo { max-height: 38px; width: auto; object-fit: contain; display: block; margin-bottom: 4px; }
-    .clinic-sub-name { font-size: 10pt; font-weight: 700; color: #0f172a; }
-    .header-accreditation { font-size: 6.8pt; font-weight: 600; color: #475569; text-transform: uppercase; margin-top: 3px; }
-    .header-audit-meta { text-align: right; font-size: 7.2pt; color: #475569; }
-    .doc-type-badge { display: inline-block; background: #0f172a; color: #ffffff; font-size: 7pt; font-weight: 800; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; margin-bottom: 4px; }
-    .pbs-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 10pt; font-weight: 800; line-height: 1; }
+    .report-logo { max-height: 36px; width: auto; object-fit: contain; display: block; margin-bottom: 2px; }
+    .clinic-sub-name { font-size: 9.5pt; font-weight: 700; color: #0f172a; }
+    .header-accreditation { font-size: 6.5pt; font-weight: 600; color: #475569; text-transform: uppercase; margin-top: 2px; }
+    .header-audit-meta { text-align: right; font-size: 7pt; color: #475569; }
+    .doc-type-badge { display: inline-block; background: #0f172a; color: #ffffff; font-size: 6.8pt; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 2px; margin-bottom: 3px; }
+    .pbs-badge { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; font-size: 9pt; font-weight: 800; line-height: 1; }
     .pbs-tick { color: #15803d; background: #dcfce7; border: 1px solid #86efac; }
     .pbs-cross { color: #b91c1c; background: #fee2e2; border: 1px solid #fca5a5; }
     .patient-box {
-      margin: 14px 0;
-      padding: 12px 14px;
+      margin: 8px 0;
+      padding: 8px 12px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
-      border-left: 4px solid #0284c7;
+      border-left: 3.5px solid #0284c7;
       display: grid;
       grid-template-columns: 1.3fr 1fr;
-      gap: 12px;
+      gap: 10px;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
-    .patient-box h1 { margin: 0 0 3px; font-size: 14pt; font-weight: 850; color: #0f172a; }
-    .patient-box p { margin: 0; font-size: 8.2pt; color: #475569; }
+    .patient-box h1 { margin: 0 0 2px; font-size: 13pt; font-weight: 850; color: #0f172a; }
+    .patient-box p { margin: 0; font-size: 7.8pt; color: #475569; }
     .section-title {
-      font-size: 8.5pt;
+      font-size: 8pt;
       font-weight: 850;
-      letter-spacing: .06em;
+      letter-spacing: .05em;
       text-transform: uppercase;
       color: #0f172a;
       border-bottom: 1.5px solid #cbd5e1;
-      padding-bottom: 3px;
-      margin: 16px 0 8px;
+      padding-bottom: 2px;
+      margin: 10px 0 4px;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
-    table.report-table { width: 100%; border-collapse: collapse; font-size: 7.6pt; margin-top: 6px; }
-    table.report-table th { background: #f1f5f9; color: #334155; font-size: 6.8pt; font-weight: 800; text-transform: uppercase; padding: 5px 6px; text-align: left; border-bottom: 1.5px solid #0f172a; }
-    table.report-table td { padding: 5px 6px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-    .generic-sub, .freq-sub { color: #64748b; font-size: 7pt; }
-    .aust-pill { font-family: monospace; font-size: 6.6pt; font-weight: 700; background: #e0f2fe; color: #0369a1; padding: 1px 4px; border-radius: 2px; }
+    table.report-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 7.4pt; margin-top: 4px; }
+    table.report-table th { background: #f1f5f9; color: #334155; font-size: 6.8pt; font-weight: 800; text-transform: uppercase; padding: 4px 5px; text-align: left; border-bottom: 1.5px solid #0f172a; }
+    table.report-table td { padding: 4px 5px; border-bottom: 1px solid #e2e8f0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
+    table.report-table tr { page-break-inside: avoid; break-inside: avoid; }
+    .generic-sub, .freq-sub { color: #64748b; font-size: 6.8pt; }
+    .aust-pill { font-family: monospace; font-size: 6.5pt; font-weight: 700; background: #e0f2fe; color: #0369a1; padding: 1px 3px; border-radius: 2px; }
     .pbs-sub { font-size: 6.8pt; font-weight: 700; color: #047857; }
-    .empty-cell { text-align: center; color: #64748b; padding: 10px; font-style: italic; }
-    .signature-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; margin-top: 24px; padding-top: 12px; border-top: 1px solid #cbd5e1; page-break-inside: avoid; }
-    .signature-box .sig-line { border-bottom: 1px solid #0f172a; height: 24px; margin-top: 6px; }
+    .empty-cell { text-align: center; color: #64748b; padding: 8px; font-style: italic; }
+    .signature-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-top: 14px; padding-top: 8px; border-top: 1px solid #cbd5e1; page-break-inside: avoid; break-inside: avoid; }
+    .signature-box .sig-line { border-bottom: 1px solid #0f172a; height: 18px; margin-top: 4px; }
     .signature-box span { font-size: 6.8pt; font-weight: 700; text-transform: uppercase; color: #64748b; }
-    footer.report-footer { margin-top: 20px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 6.8pt; color: #94a3b8; }
+    footer.report-footer { margin-top: 10px; padding-top: 4px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 6.6pt; color: #94a3b8; page-break-inside: avoid; break-inside: avoid; }
   </style>
 </head>
 <body>
@@ -797,6 +827,15 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
 
     <div class="section-title">Active Pharmacotherapy Regimen (ARTG Listings)</div>
     <table class="report-table">
+      <colgroup>
+        <col style="width: 27%;" />
+        <col style="width: 10%;" />
+        <col style="width: 14%;" />
+        <col style="width: 27%;" />
+        <col style="width: 5%;" />
+        <col style="width: 6%;" />
+        <col style="width: 11%;" />
+      </colgroup>
       <thead>
         <tr>
           <th>Medication & Generic</th>
@@ -804,7 +843,7 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
           <th>Dose & Frequency</th>
           <th>Directions</th>
           <th style="text-align: center;">Repeats</th>
-          <th style="text-align: center;">PBS Subsidised</th>
+          <th style="text-align: center;">PBS</th>
           <th>Prescribing Doctor</th>
         </tr>
       </thead>
@@ -813,6 +852,13 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
 
     <div class="section-title">Longitudinal Consultation & Telehealth History Across Clinics</div>
     <table class="report-table">
+      <colgroup>
+        <col style="width: 13%;" />
+        <col style="width: 28%;" />
+        <col style="width: 21%;" />
+        <col style="width: 18%;" />
+        <col style="width: 20%;" />
+      </colgroup>
       <thead>
         <tr>
           <th>Date</th>
