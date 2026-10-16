@@ -26,7 +26,7 @@ export default async function clinicianAccess(request: VercelRequest, response: 
     const { db, clinician } = await requireClinician(authRequest);
     let { data: profile, error } = await db
       .from('clinician_profiles')
-      .select('display_name, is_admin, is_platform_admin, clinic_id, photo_url')
+      .select('display_name, professional_title, is_admin, is_platform_admin, clinic_id, photo_url, clinic:clinics(id, name, slug)')
       .eq('id', clinician.id)
       .maybeSingle();
 
@@ -41,7 +41,20 @@ export default async function clinicianAccess(request: VercelRequest, response: 
     }
 
     if (error || !profile) throw new Error('This account is not an authorised clinician.');
-    return response.status(200).json({ clinician: { id: clinician.id, displayName: profile.display_name, isAdmin: profile.is_admin === true, isPlatformAdmin: profile.is_platform_admin === true, clinicId: profile.clinic_id ?? null, photoUrl: profile.photo_url ?? null } });
+    const clinicObj = (profile as unknown as { clinic?: { id?: string; name?: string; slug?: string } | null })?.clinic;
+    return response.status(200).json({
+      clinician: {
+        id: clinician.id,
+        displayName: profile.display_name,
+        professionalTitle: (profile as unknown as { professional_title?: string | null })?.professional_title ?? null,
+        isAdmin: profile.is_admin === true,
+        isPlatformAdmin: profile.is_platform_admin === true,
+        clinicId: profile.clinic_id ?? null,
+        clinicName: clinicObj?.name ?? 'Ventricura Telehealth',
+        clinicSlug: clinicObj?.slug ?? 'ventricura',
+        photoUrl: profile.photo_url ?? null,
+      },
+    });
   } catch (error) {
     return response.status(403).json({ error: error instanceof Error ? error.message : 'Clinician access could not be verified.' });
   }

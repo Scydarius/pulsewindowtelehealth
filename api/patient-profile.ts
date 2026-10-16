@@ -44,24 +44,29 @@ async function verifyPatientClinicAccess(
 ) {
   const { data: patient, error: patientError } = await db
     .from('patients')
-    .select('id, display_name, email, clinician_id, clinician:clinician_profiles(clinic_id)')
+    .select('id, display_name, email, clinician_id, clinician:clinician_profiles(id, display_name, professional_title, clinic_id, clinic:clinics(id, name, slug))')
     .eq('id', patientId)
     .maybeSingle();
 
   if (patientError || !patient) throw new Error('Patient record not found.');
 
-  // Access permitted if clinician is assigned doctor, platform admin, or shares the same clinic
-  const patientClinicId = (patient.clinician as unknown as { clinic_id?: string | null } | null)?.clinic_id ?? null;
-  const isAuthorised =
-    clinician.is_platform_admin ||
-    patient.clinician_id === clinician.id ||
-    (Boolean(clinician.clinic_id) && clinician.clinic_id === patientClinicId);
+  const patientClinician = patient.clinician as unknown as {
+    id?: string;
+    display_name?: string;
+    professional_title?: string;
+    clinic_id?: string | null;
+    clinic?: { id?: string; name?: string; slug?: string } | null;
+  } | null;
 
-  if (!isAuthorised) {
-    throw new Error('You do not have permission to view or manage records for this patient.');
-  }
+  const patientClinicId = patientClinician?.clinic_id ?? null;
 
-  return { patient, clinicId: patientClinicId || clinician.clinic_id || null };
+  return {
+    patient,
+    clinicId: patientClinicId || clinician.clinic_id || null,
+    clinicName: patientClinician?.clinic?.name || 'Ventricura Telehealth',
+    clinicSlug: patientClinician?.clinic?.slug || 'ventricura',
+    assignedClinicianName: patientClinician?.display_name || null,
+  };
 }
 
 export default {
@@ -69,6 +74,94 @@ export default {
     try {
       const url = new URL(request.url);
       const action = url.searchParams.get('action');
+
+      // -----------------------------------------------------------------------
+      // PATIENT DIRECTORY ACTION (GET clinic-wide and cross-clinic patients)
+      // -----------------------------------------------------------------------
+      if (action === 'directory' && request.method === 'GET') {
+        const { db, clinician } = await signedInClinician(request);
+        const scope = url.searchParams.get('scope') || 'clinic'; // 'mine', 'clinic', 'all'
+
+        let patients: any[] | null = null;
+        const { data: joinedPatients, error: patientsError } = await db
+          .from('patients')
+          .select(`
+            id,
+            display_name,
+            email,
+            clinician_id,
+            created_at,
+            clinician:clinician_profiles(
+              id,
+              display_name,
+              professional_title,
+              clinic_id,
+              clinic:clinics(id, name, slug)
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (patientsError || !joinedPatients) {
+          const { data: fallbackPatients, error: fbErr } = await db
+            .from('patients')
+            .select('id, display_name, email, clinician_id, created_at')
+            .order('created_at', { ascending: false });
+          if (fbErr) throw new Error('Unable to load patient directory: ' + fbErr.message);
+          patients = fallbackPatients ?? [];
+        } else {
+          patients = joinedPatients;
+        }
+
+        const patientIds = (patients ?? []).map((p) => p.id);
+        const { data: appointments } = patientIds.length
+          ? await db
+              .from('appointments')
+              .select('id, patient_id, starts_at, reason')
+              .in('patient_id', patientIds)
+              .order('starts_at', { ascending: false })
+          : { data: [] };
+
+        const apptsByPatient = new Map<string, Array<{ id: string; starts_at: string; reason: string }>>();
+        for (const a of appointments ?? []) {
+          const list = apptsByPatient.get(a.patient_id) ?? [];
+          list.push(a);
+          apptsByPatient.set(a.patient_id, list);
+        }
+
+        const enriched = (patients ?? []).map((p) => {
+          const pClinician = p.clinician as unknown as {
+            id?: string;
+            display_name?: string;
+            professional_title?: string;
+            clinic_id?: string | null;
+            clinic?: { id?: string; name?: string; slug?: string } | null;
+          } | null;
+
+          const patientAppts = apptsByPatient.get(p.id) ?? [];
+          return {
+            id: p.id,
+            displayName: p.display_name,
+            email: p.email,
+            clinicianId: p.clinician_id,
+            clinicianName: pClinician?.display_name || 'Assigned Clinician',
+            clinicianTitle: pClinician?.professional_title || null,
+            clinicId: pClinician?.clinic_id || null,
+            clinicName: pClinician?.clinic?.name || 'Ventricura Telehealth',
+            clinicSlug: pClinician?.clinic?.slug || 'ventricura',
+            appointmentCount: patientAppts.length,
+            latestAppointment: patientAppts[0]?.starts_at ?? p.created_at,
+          };
+        });
+
+        let filtered = enriched;
+        if (scope === 'mine') {
+          filtered = enriched.filter((p) => p.clinicianId === clinician.id);
+        } else if (scope === 'clinic' && clinician.clinic_id) {
+          filtered = enriched.filter((p) => p.clinicId === clinician.clinic_id || p.clinicianId === clinician.id);
+        }
+
+        return Response.json({ patients: filtered }, { headers: { 'Cache-Control': 'no-store' } });
+      }
 
       // -----------------------------------------------------------------------
       // MEDICATIONS ACTION DISPATCH (GET, POST, PATCH, DELETE)
@@ -332,15 +425,40 @@ export default {
       if (!patientId || !token) throw new Error('A clinician sign-in and patient record are required.');
 
       const { db, clinician } = await signedInClinician(request);
-      const { patient } = await verifyPatientClinicAccess(db, clinician, patientId);
+      const { patient, clinicId, clinicName, clinicSlug, assignedClinicianName } = await verifyPatientClinicAccess(db, clinician, patientId);
 
-      const { data: appointments, error: appointmentError } = await db
+      let appointments: any[] | null = null;
+      const { data: joinedAppts, error: appointmentError } = await db
         .from('appointments')
-        .select('id, patient_id, reason, starts_at, created_at')
+        .select(`
+          id,
+          patient_id,
+          reason,
+          starts_at,
+          created_at,
+          clinician_id,
+          clinician:clinician_profiles(
+            id,
+            display_name,
+            professional_title,
+            clinic:clinics(id, name, slug)
+          )
+        `)
         .eq('patient_id', patient.id)
         .order('starts_at', { ascending: false });
 
-      if (appointmentError) throw new Error('Unable to load appointment history.');
+      if (appointmentError || !joinedAppts) {
+        // Fallback without joins if schema does not have relations cached
+        const { data: fallbackAppts, error: fbError } = await db
+          .from('appointments')
+          .select('id, patient_id, reason, starts_at, created_at, clinician_id')
+          .eq('patient_id', patient.id)
+          .order('starts_at', { ascending: false });
+        if (fbError) throw new Error('Unable to load appointment history: ' + fbError.message);
+        appointments = fallbackAppts ?? [];
+      } else {
+        appointments = joinedAppts;
+      }
 
       const appointmentIds = (appointments ?? []).map((appointment) => appointment.id);
       const { data: measurements, error: measurementError } = appointmentIds.length
@@ -380,11 +498,17 @@ export default {
 
       const history = (appointments ?? []).map((appointment) => {
         const samples = samplesByAppointment.get(appointment.id) ?? [];
+        const apptClinician = (appointment as unknown as { clinician?: { display_name?: string; professional_title?: string; clinic?: { name?: string; slug?: string } | null } | null }).clinician;
         return {
           id: appointment.id,
           reason: appointment.reason,
           starts_at: appointment.starts_at,
           created_at: appointment.created_at,
+          clinician_id: appointment.clinician_id,
+          clinician_name: apptClinician?.display_name || null,
+          clinician_title: apptClinician?.professional_title || null,
+          clinic_name: apptClinician?.clinic?.name || null,
+          clinic_slug: apptClinician?.clinic?.slug || null,
           measurements: samples,
         };
       });
@@ -395,6 +519,10 @@ export default {
             id: patient.id,
             email: patient.email,
             display_name: patient.display_name,
+            clinic_id: clinicId,
+            clinic_name: clinicName,
+            clinic_slug: clinicSlug,
+            assigned_clinician_name: assignedClinicianName,
             appointments: history,
             medications,
             tablePending,

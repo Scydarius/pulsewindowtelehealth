@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   BookOpen,
+  Building2,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -55,6 +56,7 @@ import {
   type ArtgMedication,
   type ClinicalAlert,
 } from '../utils/artgMedications';
+import { generatePatientSummaryReportHtml, printHtmlReport } from '../utils/clinicalReports';
 
 const number = (value: number | null, digits = 0) => (value === null ? '—' : value.toFixed(digits));
 const dateTime = (value: string) =>
@@ -523,6 +525,20 @@ notify pgrst, 'reload schema';`;
     window.print();
   };
 
+  const handlePrintSummaryReport = () => {
+    if (!patient) return;
+    const html = generatePatientSummaryReportHtml({
+      patientId,
+      patientName: patient.display_name,
+      patientEmail: patient.email,
+      clinicName: patient.clinic_name ?? undefined,
+      assignedClinicianName: patient.assigned_clinician_name ?? undefined,
+      appointments: patient.appointments,
+      medications,
+    });
+    printHtmlReport(`Patient Summary — ${patient.display_name}`, html);
+  };
+
   const activeMedications = useMemo(
     () => medications.filter((m) => m.status === 'active'),
     [medications]
@@ -604,7 +620,19 @@ notify pgrst, 'reload schema';`;
               .slice(0, 2)}
           </div>
           <div>
-            <p className="eyebrow">Patient profile</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '2px' }}>
+              <p className="eyebrow" style={{ margin: 0 }}>Patient profile</p>
+              {patient.clinic_name && (
+                <span className="patient-clinic-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e0f2fe', color: '#0369a1', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '3px' }}>
+                  <Building2 size={12} /> {patient.clinic_name}
+                </span>
+              )}
+              {patient.assigned_clinician_name && (
+                <span className="patient-doctor-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', color: '#334155', fontSize: '0.72rem', fontWeight: 650, padding: '2px 8px', borderRadius: '3px' }}>
+                  <Stethoscope size={12} /> {patient.assigned_clinician_name}
+                </span>
+              )}
+            </div>
             <h1>{patient.display_name}</h1>
             <p>
               <Mail size={15} /> {patient.email}
@@ -612,6 +640,14 @@ notify pgrst, 'reload schema';`;
           </div>
         </div>
         <div className="patient-profile-hero-actions">
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={handlePrintSummaryReport}
+            title="Generate and print comprehensive medical health summary report"
+          >
+            <Printer size={15} /> Clinical summary report
+          </button>
           <button
             type="button"
             className="button button-secondary patient-remove-hero-btn"
@@ -1091,7 +1127,15 @@ notify pgrst, 'reload schema';`;
                     <div className="patient-history-main">
                       <div>
                         <strong>{details.reason || 'Consultation'}</strong>
-                        <span>{dateTime(appointment.starts_at)}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#64748b', marginTop: '2px', flexWrap: 'wrap' }}>
+                          <span>{dateTime(appointment.starts_at)}</span>
+                          {appointment.clinician_name && (
+                            <span>• Dr. {appointment.clinician_name.replace(/^Dr\.?\s*/i, '')}</span>
+                          )}
+                          {appointment.clinic_name && (
+                            <span>• {appointment.clinic_name}</span>
+                          )}
+                        </div>
                       </div>
                       <div className="patient-history-actions">
                         <Link

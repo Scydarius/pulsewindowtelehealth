@@ -80,9 +80,16 @@ async function slotsForDate(db: SupabaseClient, profile: BookingProfile, date: s
     result.push(new Date(cursor).toISOString());
   }
   return result;
-}
 async function createAppointment(input: { db: SupabaseClient; clinicianId: string; patientName: string; patientEmail: string; reason: string; patientNote?: string; startsAt: Date; request: Request }) {
-  const patientEmail = input.patientEmail.trim().toLowerCase(); const { data: existingPatients, error: patientLookupError } = await input.db.from('patients').select('id').eq('clinician_id', input.clinicianId).eq('email', patientEmail).order('created_at', { ascending: true }).limit(1); if (patientLookupError) throw new Error('Could not look up the patient record.'); let patient = existingPatients?.[0];
+  const patientEmail = input.patientEmail.trim().toLowerCase();
+  const { data: existingPatients, error: patientLookupError } = await input.db
+    .from('patients')
+    .select('id')
+    .ilike('email', patientEmail)
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (patientLookupError) throw new Error('Could not look up the patient record.');
+  let patient = existingPatients?.[0];
   if (patient) { const { error } = await input.db.from('patients').update({ display_name: input.patientName.trim() }).eq('id', patient.id); if (error) throw new Error('Could not update the patient record.'); } else { const { data, error } = await input.db.from('patients').insert({ clinician_id: input.clinicianId, display_name: input.patientName.trim(), email: patientEmail }).select('id').single(); if (error || !data) throw new Error('Could not save the patient record.'); patient = data; }
   const patientNote = input.patientNote?.trim().slice(0, 2000);
   const appointmentReason = `${input.reason.trim()}${patientNote ? `\n\nPatient notes: ${patientNote}` : ''}`;

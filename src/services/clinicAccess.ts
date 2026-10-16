@@ -15,7 +15,41 @@ export async function getClinicianAccessToken() {
   return session.access_token;
 }
 
-export type ApprovedClinician = { id: string; displayName: string; isAdmin: boolean; isPlatformAdmin?: boolean; clinicId?: string | null; photoUrl?: string | null };
+export type ApprovedClinician = {
+  id: string;
+  displayName: string;
+  professionalTitle?: string | null;
+  isAdmin: boolean;
+  isPlatformAdmin?: boolean;
+  clinicId?: string | null;
+  clinicName?: string | null;
+  clinicSlug?: string | null;
+  photoUrl?: string | null;
+};
+
+export type DirectoryPatient = {
+  id: string;
+  displayName: string;
+  email: string;
+  clinicianId?: string | null;
+  clinicianName?: string | null;
+  clinicianTitle?: string | null;
+  clinicId?: string | null;
+  clinicName?: string | null;
+  clinicSlug?: string | null;
+  appointmentCount: number;
+  latestAppointment: string;
+};
+
+export async function loadClinicPatients(scope: 'mine' | 'clinic' | 'all' = 'clinic'): Promise<DirectoryPatient[]> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch(`/api/patient-profile?action=directory&scope=${encodeURIComponent(scope)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = (await response.json().catch(() => ({}))) as { patients?: DirectoryPatient[]; error?: string };
+  if (!response.ok || !body.patients) throw new Error(body.error ?? 'Unable to load patients.');
+  return body.patients;
+}
 
 /** Confirm that an authenticated account is an administrator-approved clinician. */
 export async function verifyClinicianAccess(accessToken?: string): Promise<ApprovedClinician> {
@@ -65,7 +99,22 @@ export type PatientProfile = {
   id?: string;
   email: string;
   display_name: string;
-  appointments: Array<{ id: string; reason: string; starts_at: string; created_at: string; measurements: SavedMeasurement[] }>;
+  clinic_id?: string | null;
+  clinic_name?: string | null;
+  clinic_slug?: string | null;
+  assigned_clinician_name?: string | null;
+  appointments: Array<{
+    id: string;
+    reason: string;
+    starts_at: string;
+    created_at: string;
+    clinician_id?: string;
+    clinician_name?: string | null;
+    clinician_title?: string | null;
+    clinic_name?: string | null;
+    clinic_slug?: string | null;
+    measurements: SavedMeasurement[];
+  }>;
   medications?: PatientMedication[];
   tablePending?: boolean;
 };

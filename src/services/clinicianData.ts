@@ -1,6 +1,12 @@
 import { supabase } from './supabase';
 
-export type ClinicianProfile = { id: string; display_name: string };
+export type ClinicianProfile = {
+  id: string;
+  display_name: string;
+  clinic_id?: string | null;
+  clinic_name?: string | null;
+  clinic_slug?: string | null;
+};
 export type ClinicAppointment = {
   id: string;
   room_name: string;
@@ -40,12 +46,36 @@ export async function loadClinicianWorkspace() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Please sign in to open the clinician workspace.');
 
-  const { data: profile, error: profileError } = await supabase
+  let profileData: ClinicianProfile | null = null;
+  const { data: profileWithClinic, error: clinicError } = await supabase
     .from('clinician_profiles')
-    .select('id, display_name')
+    .select('id, display_name, clinic_id, clinic:clinics(id, name, slug)')
     .eq('id', user.id)
     .maybeSingle();
-  if (profileError || !profile) throw new Error('This account is not an authorised clinician.');
+
+  if (!clinicError && profileWithClinic) {
+    const clinic = profileWithClinic.clinic as { id?: string; name?: string; slug?: string } | null;
+    profileData = {
+      id: profileWithClinic.id,
+      display_name: profileWithClinic.display_name,
+      clinic_id: profileWithClinic.clinic_id ?? clinic?.id ?? null,
+      clinic_name: clinic?.name ?? null,
+      clinic_slug: clinic?.slug ?? null,
+    };
+  } else {
+    const { data: profileBasic, error: basicError } = await supabase
+      .from('clinician_profiles')
+      .select('id, display_name')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (basicError || !profileBasic) throw new Error('This account is not an authorised clinician.');
+    profileData = {
+      id: profileBasic.id,
+      display_name: profileBasic.display_name,
+    };
+  }
+
+  const profile = profileData;
 
   const appointmentsResult = await supabase
     .from('appointments')

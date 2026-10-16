@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, BookmarkCheck, CalendarClock, CalendarDays, Check, CheckCircle2, CircleAlert, Copy, LoaderCircle, MessageSquareText, RotateCcw, Search, ShieldOff, Trash2, UsersRound, Video, X } from 'lucide-react';
+import { Activity, ArrowRight, BookmarkCheck, Building2, CalendarClock, CalendarDays, Check, CheckCircle2, CircleAlert, Copy, Globe, LoaderCircle, MessageSquareText, RotateCcw, Search, ShieldOff, Stethoscope, Trash2, UsersRound, Video, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
@@ -6,7 +6,7 @@ import { InvitePatientForm, type ExistingPatientOption } from '../components/Inv
 import { ClinicianAvailabilityPanel } from '../components/ClinicianAvailabilityPanel';
 import { CopyButton } from '../components/CopyButton';
 import { type ClinicAppointment, type ClinicianProfile, isAppointmentNeedingReview, loadClinicianWorkspace } from '../services/clinicianData';
-import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, deletePatient, revokePatientInvitation, updateAppointmentReviewStatus } from '../services/clinicAccess';
+import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, deletePatient, loadClinicPatients, revokePatientInvitation, updateAppointmentReviewStatus, type DirectoryPatient } from '../services/clinicAccess';
 
 type WorkspaceView = 'overview' | 'patients' | 'appointments' | 'measurements' | 'availability' | 'calendar';
 const workspaceView = (value: string | null): WorkspaceView => value === 'patients' || value === 'appointments' || value === 'measurements' || value === 'availability' || value === 'calendar' ? value : 'overview';
@@ -31,6 +31,8 @@ export function ClinicianPage() {
   const [scheduleTab, setScheduleTab] = useState<ScheduleSubTab>(() => rawView === 'calendar' ? 'calendar' : rawView === 'availability' ? 'availability' : 'appointments');
   const [profile, setProfile] = useState<ClinicianProfile>();
   const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
+  const [directoryPatients, setDirectoryPatients] = useState<DirectoryPatient[]>([]);
+  const [patientScope, setPatientScope] = useState<'clinic' | 'mine' | 'all'>('clinic');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [replacementLinks, setReplacementLinks] = useState<Record<string, string>>({});
@@ -61,11 +63,25 @@ export function ClinicianPage() {
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
-    try { const workspace = await loadClinicianWorkspace(); setProfile(workspace.profile); setAppointments(workspace.appointments); }
+    try {
+      const [workspace, dirPatients] = await Promise.all([
+        loadClinicianWorkspace(),
+        loadClinicPatients(patientScope).catch(() => []),
+      ]);
+      setProfile(workspace.profile);
+      setAppointments(workspace.appointments);
+      setDirectoryPatients(dirPatients);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to open the clinician workspace.'); }
     finally { setLoading(false); }
-  }, []);
+  }, [patientScope]);
   useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
+
+  useEffect(() => {
+    loadClinicPatients(patientScope)
+      .then(setDirectoryPatients)
+      .catch(() => {});
+  }, [patientScope]);
 
   useEffect(() => {
     const onReviewUpdated = (e: Event) => {
@@ -138,7 +154,55 @@ export function ClinicianPage() {
   const patientGroups = useMemo(() => Array.from(appointments.filter((appointment) => appointment.patient?.email).reduce((groups, appointment) => {
     const email = appointment.patient!.email.trim().toLowerCase(); const current = groups.get(email) ?? []; current.push(appointment); groups.set(email, current); return groups;
   }, new Map<string, ClinicAppointment[]>()).values()).map((records) => ({ records: [...records].sort((a, b) => new Date(b.starts_at).valueOf() - new Date(a.starts_at).valueOf()), patient: records[0].patient! })), [appointments]);
-  const patientOptions = useMemo<ExistingPatientOption[]>(() => patientGroups.map((group) => ({ id: group.patient.id, displayName: group.patient.display_name, email: group.patient.email, appointmentCount: group.records.length })), [patientGroups]);
+
+  const patientOptions = useMemo<ExistingPatientOption[]>(() => {
+    const map = new Map<string, ExistingPatientOption>();
+    for (const dp of directoryPatients) {
+      map.set(dp.email.toLowerCase().trim(), {
+        id: dp.id,
+        displayName: dp.displayName,
+        email: dp.email,
+        appointmentCount: dp.appointmentCount,
+      });
+    }
+    for (const group of patientGroups) {
+      const email = group.patient.email.toLowerCase().trim();
+      if (!map.has(email)) {
+        map.set(email, {
+          id: group.patient.id,
+          displayName: group.patient.display_name,
+          email: group.patient.email,
+          appointmentCount: group.records.length,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [directoryPatients, patientGroups]);
+
+  const displayedDirectoryPatients = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (directoryPatients.length > 0) {
+      return directoryPatients.filter((p) =>
+        !term ||
+        [p.displayName, p.email, p.clinicName, p.clinicianName].some((v) => v?.toLowerCase().includes(term))
+      );
+    }
+    return patientGroups
+      .filter((g) => !term || [g.patient.display_name, g.patient.email].some((v) => v.toLowerCase().includes(term)))
+      .map((g) => ({
+        id: g.patient.id,
+        displayName: g.patient.display_name,
+        email: g.patient.email,
+        clinicianId: null,
+        clinicianName: null,
+        clinicianTitle: null,
+        clinicId: null,
+        clinicName: profile?.clinic_name || 'Ventricura Telehealth',
+        clinicSlug: profile?.clinic_slug || 'ventricura',
+        appointmentCount: g.records.length,
+        latestAppointment: g.records[0]?.starts_at || new Date().toISOString(),
+      }));
+  }, [directoryPatients, patientGroups, search, profile]);
   const visibleAppointments = appointments.filter((appointment) => {
     const term = search.trim().toLowerCase();
     return !term || [appointment.patient?.display_name, appointment.patient?.email, appointment.reason].filter(Boolean).some((value) => value!.toLowerCase().includes(term));
@@ -214,13 +278,128 @@ export function ClinicianPage() {
     <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view === 'appointments' ? 'Schedule' : view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search name, email, or reason…" />{search && <button type="button" className="text-button" onClick={() => setSearch('')} aria-label="Clear search" style={{ padding: 0, margin: 0, border: 0, background: 'none' }}><X size={15} /></button>}</label></div></section>
     <section className="summary-strip workspace-summary">
       <Link to="/clinician?view=appointments"><div><CalendarClock /></div><span><strong>{todayAppointments.length}</strong>Appointments today</span><ArrowRight size={16} /></Link>
-      <Link to="/clinician?view=patients"><div><UsersRound /></div><span><strong>{patientGroups.length}</strong>Active patients</span><ArrowRight size={16} /></Link>
+      <Link to="/clinician?view=patients"><div><UsersRound /></div><span><strong>{directoryPatients.length || patientGroups.length}</strong>Active patients</span><ArrowRight size={16} /></Link>
       <Link to="/clinician?view=measurements"><div><Activity /></div><span><strong>{reviewQueue.length}</strong>Needs review</span><ArrowRight size={16} /></Link>
       <Link to="/clinician?view=calendar"><div><CalendarDays /></div><span><strong>{scheduled.length}</strong>Upcoming calls</span><ArrowRight size={16} /></Link>
     </section>
 
     {view === 'overview' && <><section className="command-centre"><div className="command-centre-main"><div className="section-heading"><div><p className="eyebrow">Today / schedule</p><h2>Your next appointments</h2><p>Join a call, check the patient record, or manage access without leaving this view.</p></div><button className="text-button" onClick={() => selectScheduleTab('calendar')}>Open calendar <ArrowRight size={16} /></button></div><div className="command-list">{scheduled.slice(0, 3).map(commandAppointmentRow)}{scheduled.length === 0 && <EmptyAppointments />}</div></div><aside className="command-centre-action"><p className="eyebrow">Quick action</p><h2>Create an appointment</h2><p>Add a new patient or schedule a follow-up for an existing patient.</p><InvitePatientForm patients={patientOptions} onCreated={() => void load()} triggerVariant="primary" /></aside></section><section className="panel review-queue-panel"><div className="section-heading"><div><p className="eyebrow">Review queue</p><h2>Patient readings ready</h2><p>Open the session record, review measurements, and document follow-up.</p></div><Link className="text-button" to="/clinician?view=measurements">View all <ArrowRight size={16} /></Link></div><MeasurementList appointments={reviewQueue.slice(0, 4)} onRemoveFromReview={handleRemoveFromReview} /></section></>}
-    {view === 'patients' && <section className="panel"><div className="section-heading"><div><p className="eyebrow">Patient directory</p><h2>Active patients</h2><p>Every appointment for the same email is grouped under one patient card.</p></div><InvitePatientForm patients={patientOptions} onCreated={() => void load()} /></div><div className="patient-directory">{patientGroups.filter((group) => !search.trim() || [group.patient.display_name, group.patient.email].some((value) => value.toLowerCase().includes(search.trim().toLowerCase()))).map((group) => <article key={group.patient.email} className="patient-directory-card patient-directory-card-grouped"><div className="patient-avatar">{group.patient.display_name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><strong>{group.patient.display_name}</strong><span>{group.patient.email}</span><small>{group.records.length} appointment{group.records.length === 1 ? '' : 's'} · latest {new Date(group.records[0].starts_at).toLocaleDateString()}</small></div><div className="patient-directory-actions"><Link className="button button-secondary button-small" to={`/clinician/patient?id=${encodeURIComponent(group.patient.id)}`}>Open profile <ArrowRight size={15} /></Link><button type="button" className="text-button danger-action patient-remove-btn" disabled={deletingPatient === group.patient.id} onClick={() => void handleRemovePatient(group.patient)} title="Remove patient from active list">{deletingPatient === group.patient.id ? <LoaderCircle size={13} className="spin" /> : <Trash2 size={13} />} Remove</button></div></article>)}{patientGroups.length === 0 && <EmptyAppointments />}</div></section>}
+    {view === 'patients' && (
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Patient directory</p>
+            <h2>Active patients</h2>
+            <p>Unified patient profiles accessible across doctors and clinic practices.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div className="patient-scope-selector" style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '4px', gap: '3px' }}>
+              <button
+                type="button"
+                className={`patient-scope-btn ${patientScope === 'clinic' ? 'active' : ''}`}
+                onClick={() => setPatientScope('clinic')}
+                style={{
+                  border: 'none',
+                  background: patientScope === 'clinic' ? '#ffffff' : 'transparent',
+                  fontWeight: patientScope === 'clinic' ? 700 : 500,
+                  fontSize: '0.78rem',
+                  padding: '5px 11px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  boxShadow: patientScope === 'clinic' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  color: patientScope === 'clinic' ? '#0f172a' : '#64748b',
+                }}
+              >
+                <Building2 size={13} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '4px' }} />
+                Clinic patients
+              </button>
+              <button
+                type="button"
+                className={`patient-scope-btn ${patientScope === 'mine' ? 'active' : ''}`}
+                onClick={() => setPatientScope('mine')}
+                style={{
+                  border: 'none',
+                  background: patientScope === 'mine' ? '#ffffff' : 'transparent',
+                  fontWeight: patientScope === 'mine' ? 700 : 500,
+                  fontSize: '0.78rem',
+                  padding: '5px 11px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  boxShadow: patientScope === 'mine' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  color: patientScope === 'mine' ? '#0f172a' : '#64748b',
+                }}
+              >
+                <Stethoscope size={13} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '4px' }} />
+                My patients
+              </button>
+              <button
+                type="button"
+                className={`patient-scope-btn ${patientScope === 'all' ? 'active' : ''}`}
+                onClick={() => setPatientScope('all')}
+                style={{
+                  border: 'none',
+                  background: patientScope === 'all' ? '#ffffff' : 'transparent',
+                  fontWeight: patientScope === 'all' ? 700 : 500,
+                  fontSize: '0.78rem',
+                  padding: '5px 11px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  boxShadow: patientScope === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  color: patientScope === 'all' ? '#0f172a' : '#64748b',
+                }}
+              >
+                <Globe size={13} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '4px' }} />
+                All clinics
+              </button>
+            </div>
+            <InvitePatientForm patients={patientOptions} onCreated={() => void load()} />
+          </div>
+        </div>
+        <div className="patient-directory">
+          {displayedDirectoryPatients.map((p) => (
+            <article key={p.email} className="patient-directory-card patient-directory-card-grouped">
+              <div className="patient-avatar">
+                {p.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2)}
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <strong>{p.displayName}</strong>
+                  {p.clinicName && (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 650, color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '3px' }}>
+                      {p.clinicName}
+                    </span>
+                  )}
+                  {p.clinicianName && (
+                    <span style={{ fontSize: '0.7rem', color: '#475569', background: '#f1f5f9', padding: '1px 6px', borderRadius: '3px' }}>
+                      Dr. {p.clinicianName.replace(/^Dr\.?\s*/i, '')}
+                    </span>
+                  )}
+                </div>
+                <span>{p.email}</span>
+                <small>
+                  {p.appointmentCount} consultation{p.appointmentCount === 1 ? '' : 's'} · latest {new Date(p.latestAppointment).toLocaleDateString()}
+                </small>
+              </div>
+              <div className="patient-directory-actions">
+                <Link className="button button-secondary button-small" to={`/clinician/patient?id=${encodeURIComponent(p.id)}`}>
+                  Open profile <ArrowRight size={15} />
+                </Link>
+                <button
+                  type="button"
+                  className="text-button danger-action patient-remove-btn"
+                  disabled={deletingPatient === p.id}
+                  onClick={() => void handleRemovePatient({ id: p.id, display_name: p.displayName, email: p.email })}
+                  title="Remove patient from active list"
+                >
+                  {deletingPatient === p.id ? <LoaderCircle size={13} className="spin" /> : <Trash2 size={13} />} Remove
+                </button>
+              </div>
+            </article>
+          ))}
+          {displayedDirectoryPatients.length === 0 && <EmptyAppointments />}
+        </div>
+      </section>
+    )}
     {view === 'appointments' && <div className="schedule-unified-container">
       <nav className="schedule-tab-nav" aria-label="Schedule views">
         <button className={scheduleTab === 'appointments' ? 'active' : ''} onClick={() => selectScheduleTab('appointments')}>
