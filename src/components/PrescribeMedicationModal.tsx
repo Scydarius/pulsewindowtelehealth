@@ -3,7 +3,9 @@ import {
   AlertTriangle,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
   HeartPulse,
+  Info,
   LoaderCircle,
   Pill,
   ShieldAlert,
@@ -41,6 +43,8 @@ const FREQUENCY_PRESETS = [
   'With meals',
 ];
 
+const REPEATS_PRESETS = [0, 1, 2, 3, 5];
+
 export type PrescribeMedicationModalProps = {
   patientId: string;
   patientName: string;
@@ -75,6 +79,8 @@ export function PrescribeMedicationModal({
   const [repeats, setRepeats] = useState<number>(5);
   const [isPbs, setIsPbs] = useState(true);
   const [notes, setNotes] = useState('');
+  const [showOptionalDetails, setShowOptionalDetails] = useState(false);
+  const [rightTab, setRightTab] = useState<'safety' | 'monograph' | 'counseling'>('safety');
   const [savingMedication, setSavingMedication] = useState(false);
   const [prescribeError, setPrescribeError] = useState('');
 
@@ -100,6 +106,7 @@ export function PrescribeMedicationModal({
       setIsPbs(initialMedication.is_pbs !== false);
       setNotes(initialMedication.notes || '');
       setPrescribedDate(new Date().toISOString().slice(0, 10));
+      setShowOptionalDetails(Boolean(initialMedication.notes));
     } else {
       setSelectedArtg(null);
       setArtgQuery('');
@@ -116,6 +123,7 @@ export function PrescribeMedicationModal({
       setRepeats(5);
       setIsPbs(true);
       setNotes('');
+      setShowOptionalDetails(false);
       setPrescribeError('');
     }
   }, [isOpen, initialMedication]);
@@ -140,7 +148,7 @@ export function PrescribeMedicationModal({
     }
     const results = searchArtgMedications(value, {
       category: cat === 'All' ? undefined : cat,
-      limit: 14,
+      limit: 10,
     });
     setArtgResults(results);
   };
@@ -165,6 +173,7 @@ export function PrescribeMedicationModal({
     setIsPbs(pbsCalc.isPbs);
     setArtgQuery('');
     setArtgResults([]);
+    setRightTab('safety');
   };
 
   const handleRepeatsChange = (val: number) => {
@@ -202,6 +211,7 @@ export function PrescribeMedicationModal({
       if (trimmed.toLowerCase().includes(use.toLowerCase())) return trimmed;
       return `${trimmed}, ${use}`;
     });
+    setShowOptionalDetails(true);
   };
 
   const handleCopyCounselingToDirections = () => {
@@ -291,19 +301,24 @@ export function PrescribeMedicationModal({
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="modal-container prescribe-medication-modal"
+        className="modal-container prescribe-medication-modal clean-prescribe-modal"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="prescribe-modal-title"
       >
-        <div className="modal-header">
-          <div>
-            <p className="eyebrow">Australian Clinical Prescribing</p>
-            <h3 id="prescribe-modal-title">Prescribe Medication</h3>
-            <p className="modal-subtitle">
-              Prescribe for <strong>{patientName || 'Patient'}</strong>. Search the Australian Register of
-              Therapeutic Goods (ARTG) or specify a custom medicine.
+        {/* CLEAN MODAL HEADER */}
+        <div className="modal-header clean-modal-header">
+          <div className="clean-modal-header-text">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="clean-rx-icon-badge">
+                <Pill size={16} />
+              </span>
+              <h3 id="prescribe-modal-title">Electronic Prescription</h3>
+              <span className="clean-patient-badge">Patient: {patientName || 'Patient'}</span>
+            </div>
+            <p className="clean-modal-subtitle">
+              Issue an Australian electronic script or recorded medication therapy.
             </p>
           </div>
           <button
@@ -312,527 +327,527 @@ export function PrescribeMedicationModal({
             onClick={onClose}
             aria-label="Close"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handlePrescribeSubmit} className="prescribe-form">
+        <form onSubmit={handlePrescribeSubmit} className="prescribe-form clean-prescribe-body">
           {prescribeError && <div className="form-error-banner">{prescribeError}</div>}
 
-          <div className="prescribe-workstation-grid">
-            {/* LEFT COLUMN: PRESCRIBING WORKSPACE & CONTROLS */}
-            <div className="prescribe-workspace-left">
-              {/* Specialty Category Filter Pills */}
-              <div className="artg-category-bar">
-                <span className="artg-cat-label">Filter by Clinical Specialty:</span>
-                <div className="artg-cat-scroll">
-                  {distinctCategories.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      className={`artg-cat-pill ${selectedCategory === cat ? 'active' : ''}`}
-                      onClick={() => handleSelectCategory(cat)}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* ARTG Quick Search */}
-              <div className="form-group artg-search-group">
-                <label htmlFor="artg-search-input">
-                  Search Australian Register of Therapeutic Goods (ARTG)
-                </label>
-                <div className="artg-search-input-wrapper">
-                  <input
-                    id="artg-search-input"
-                    type="text"
-                    placeholder="Search brand, generic, drug class, or clinical indication (e.g. Lipitor, Metformin, Asthma, Gout, Migraine)..."
-                    value={artgQuery}
-                    onChange={(e) => handleArtgSearch(e.target.value)}
-                    autoComplete="off"
-                  />
-                  {artgQuery && (
-                    <button
-                      type="button"
-                      className="artg-clear-query-btn"
-                      onClick={() => handleArtgSearch('')}
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Dropdown Suggestions */}
-                {artgResults.length > 0 && (
-                  <div className="artg-suggestions-dropdown">
-                    <div className="artg-suggestions-header">
-                      <span>
-                        ARTG Indexed Medicines ({artgResults.length} matches
-                        {selectedCategory !== 'All' ? ` in ${selectedCategory}` : ''})
+          <div className="clean-workstation-layout">
+            {/* ================================================================= */}
+            {/* LEFT COLUMN: PRESCRIBING FORM & DISPENSING INSTRUCTIONS */}
+            {/* ================================================================= */}
+            <div className="clean-form-column">
+              {/* DRUG SELECTOR OR HERO CARD */}
+              {selectedArtg ? (
+                <div className="clean-drug-hero-card">
+                  <div className="clean-drug-hero-left">
+                    <div className="clean-drug-hero-title-row">
+                      <strong>{selectedArtg.name}</strong>
+                      <span className="clean-badge aust">{selectedArtg.id}</span>
+                      <span className={`clean-badge schedule ${selectedArtg.schedule.toLowerCase()}`}>
+                        {selectedArtg.schedule}
                       </span>
+                      {selectedArtg.pbs ? (
+                        <span className="clean-badge pbs">PBS</span>
+                      ) : (
+                        <span className="clean-badge private">Private</span>
+                      )}
+                      {selectedArtg.safeScriptMonitored && (
+                        <span className="clean-badge safescript">
+                          <ShieldAlert size={11} /> SafeScript
+                        </span>
+                      )}
                     </div>
-                    {artgResults.map((item) => (
-                      <div
-                        key={item.id}
-                        className="artg-suggestion-item"
-                        onClick={() => handleSelectArtg(item)}
-                      >
-                        <div className="artg-item-main">
-                          <div className="artg-item-top-row">
-                            <strong>{item.name}</strong>
-                            {item.safeScriptMonitored && (
-                              <span className="safescript-tiny-pill" title="SafeScript Monitored">
-                                SafeScript
-                              </span>
-                            )}
-                          </div>
-                          <span className="artg-item-sub">
-                            {item.generic} • {item.strength} {item.form} • {item.drugClass}
-                          </span>
-                          {item.indication && (
-                            <span className="artg-item-indication-snippet">
-                              Indication: {item.indication}
-                            </span>
-                          )}
-                        </div>
-                        <div className="artg-item-badges">
-                          <span className={`schedule-badge ${item.schedule.toLowerCase()}`}>
-                            {item.schedule}
-                          </span>
-                          {item.pregnancyCategory && (
-                            <span
-                              className={`med-preg-badge ${getPregnancyDescription(item.pregnancyCategory).badgeClass}`}
-                              title={getPregnancyDescription(item.pregnancyCategory).detail}
-                            >
-                              Cat {item.pregnancyCategory}
-                            </span>
-                          )}
-                          {item.pbs ? (
-                            <span className="pbs-pill">PBS</span>
-                          ) : (
-                            <span className="non-pbs-pill">Private</span>
-                          )}
-                          <span className="aust-pill">{item.id}</span>
-                        </div>
-                      </div>
-                    ))}
+                    <div className="clean-drug-hero-meta">
+                      <span>{selectedArtg.generic}</span>
+                      <span>•</span>
+                      <span>{selectedArtg.strength} {selectedArtg.form}</span>
+                      <span>•</span>
+                      <span>{selectedArtg.drugClass}</span>
+                    </div>
                   </div>
-                )}
-              </div>
+                  <button
+                    type="button"
+                    className="clean-change-drug-button"
+                    onClick={handleClearSelectedArtg}
+                  >
+                    Change Medicine
+                  </button>
+                </div>
+              ) : (
+                <div className="clean-search-box">
+                  <label htmlFor="clean-artg-search" className="clean-field-label">
+                    Search Australian Register of Therapeutic Goods (ARTG)
+                  </label>
+                  <div className="clean-search-row">
+                    <div className="clean-search-input-wrapper">
+                      <input
+                        id="clean-artg-search"
+                        type="text"
+                        placeholder="Type medicine brand, generic or condition (e.g. Lipitor, Metformin, Asthma)…"
+                        value={artgQuery}
+                        onChange={(e) => handleArtgSearch(e.target.value)}
+                        autoComplete="off"
+                        className="clean-text-input"
+                      />
+                      {artgQuery && (
+                        <button
+                          type="button"
+                          className="clean-clear-btn"
+                          onClick={() => handleArtgSearch('')}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => handleSelectCategory(e.target.value)}
+                      className="clean-specialty-select"
+                      title="Filter by specialty"
+                    >
+                      {distinctCategories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat === 'All' ? 'All Specialties' : cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* 1-Click Common Clinical Dosing Presets */}
-              {selectedArtg?.commonDoses && selectedArtg.commonDoses.length > 0 && (
-                <div className="dose-presets-container">
-                  <div className="dose-presets-label">
-                    <Sparkles size={13} color="#2563eb" />
-                    <span>Common Clinical Doses (Click to populate)</span>
-                  </div>
-                  <div className="dose-presets-list">
-                    {selectedArtg.commonDoses.map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        className="dose-preset-chip"
-                        onClick={() => handleApplyDosePreset(preset)}
-                        title={`Apply dose: ${preset.dose}, ${preset.frequency}`}
-                      >
-                        <strong>{preset.label}</strong>
-                        <span>{preset.frequency}</span>
-                      </button>
-                    ))}
-                  </div>
+                  {/* Dropdown Suggestions */}
+                  {artgResults.length > 0 && (
+                    <div className="clean-search-dropdown">
+                      <div className="clean-dropdown-header">
+                        <span>{artgResults.length} matching Australian medications</span>
+                      </div>
+                      {artgResults.map((item) => (
+                        <div
+                          key={item.id}
+                          className="clean-dropdown-item"
+                          onClick={() => handleSelectArtg(item)}
+                        >
+                          <div className="clean-item-text">
+                            <div className="clean-item-name-row">
+                              <strong>{item.name}</strong>
+                              <span className="clean-badge aust">{item.id}</span>
+                              <span className={`clean-badge schedule ${item.schedule.toLowerCase()}`}>
+                                {item.schedule}
+                              </span>
+                              {item.pbs && <span className="clean-badge pbs">PBS</span>}
+                            </div>
+                            <span className="clean-item-sub">
+                              {item.generic} • {item.strength} {item.form} • {item.drugClass}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Form Input Fields */}
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label htmlFor="med-name-input">Medication / Brand Name *</label>
+              {/* MANUAL OVERRIDE INPUTS (If custom medicine or fine-tuning) */}
+              <div className="clean-form-grid-2">
+                <div className="clean-field">
+                  <label htmlFor="clean-med-name" className="clean-field-label">
+                    Medicine / Brand Name *
+                  </label>
                   <input
-                    id="med-name-input"
+                    id="clean-med-name"
                     type="text"
                     required
-                    placeholder="e.g. Lipitor 20mg or Atorvastatin 20mg"
+                    placeholder="e.g. Lipitor 20mg"
                     value={medicationName}
                     onChange={(e) => setMedicationName(e.target.value)}
+                    className="clean-text-input"
                   />
                 </div>
-                <div className="form-group">
-                  <label htmlFor="med-generic-input">Active Ingredient / Generic Name</label>
+                <div className="clean-field">
+                  <label htmlFor="clean-generic-name" className="clean-field-label">
+                    Active Ingredient
+                  </label>
                   <input
-                    id="med-generic-input"
+                    id="clean-generic-name"
                     type="text"
                     placeholder="e.g. Atorvastatin calcium"
                     value={genericName}
                     onChange={(e) => setGenericName(e.target.value)}
+                    className="clean-text-input"
                   />
                 </div>
               </div>
 
-              <div className="form-row-3">
-                <div className="form-group">
-                  <label htmlFor="med-dose-input">Dose *</label>
+              {/* DOSAGE & FREQUENCY */}
+              <div className="clean-form-grid-2">
+                <div className="clean-field">
+                  <div className="clean-field-label-row">
+                    <label htmlFor="clean-dose-input" className="clean-field-label">
+                      Dose *
+                    </label>
+                    {selectedArtg?.commonDoses && selectedArtg.commonDoses.length > 0 && (
+                      <span className="clean-field-hint">Quick dose presets:</span>
+                    )}
+                  </div>
                   <input
-                    id="med-dose-input"
+                    id="clean-dose-input"
                     type="text"
                     required
-                    placeholder="e.g. 20 mg or 1 tablet"
+                    placeholder="e.g. 20 mg"
                     value={dose}
                     onChange={(e) => setDose(e.target.value)}
+                    className="clean-text-input"
                   />
+                  {selectedArtg?.commonDoses && selectedArtg.commonDoses.length > 0 && (
+                    <div className="clean-quick-dose-row">
+                      {selectedArtg.commonDoses.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          className={`clean-quick-chip ${dose === preset.dose ? 'active' : ''}`}
+                          onClick={() => handleApplyDosePreset(preset)}
+                          title={`Set dose to ${preset.dose} ${preset.frequency}`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="med-frequency-input">Frequency *</label>
+                <div className="clean-field">
+                  <label htmlFor="clean-frequency-input" className="clean-field-label">
+                    Frequency *
+                  </label>
                   <input
-                    id="med-frequency-input"
+                    id="clean-frequency-input"
                     type="text"
                     required
-                    list="frequency-presets-modal"
+                    list="clean-frequency-list"
                     placeholder="e.g. Once daily"
                     value={frequency}
                     onChange={(e) => setFrequency(e.target.value)}
+                    className="clean-text-input"
                   />
-                  <datalist id="frequency-presets-modal">
+                  <datalist id="clean-frequency-list">
                     {FREQUENCY_PRESETS.map((p) => (
                       <option key={p} value={p} />
                     ))}
                   </datalist>
                 </div>
-
-                <div className="form-group">
-                  <label htmlFor="med-repeats-input">
-                    Repeats Authorised
-                    {selectedArtg && (
-                      <span className="repeats-limit-hint">
-                        (PBS max: {selectedArtg.maxPbsRepeats ?? 5})
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    id="med-repeats-input"
-                    type="number"
-                    min="0"
-                    max="11"
-                    value={repeats}
-                    onChange={(e) => handleRepeatsChange(parseInt(e.target.value, 10) || 0)}
-                  />
-                </div>
               </div>
 
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label htmlFor="med-prescribed-date">Prescription Date *</label>
+              {/* DIRECTIONS FOR PATIENT */}
+              <div className="clean-field">
+                <div className="clean-field-label-row">
+                  <label htmlFor="clean-directions-input" className="clean-field-label">
+                    Patient Instructions / Directions
+                  </label>
+                  {selectedArtg?.counselingAdvice && (
+                    <button
+                      type="button"
+                      className="clean-inline-action-btn"
+                      onClick={handleCopyCounselingToDirections}
+                    >
+                      <Sparkles size={12} /> Add counseling advice
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  id="clean-directions-input"
+                  rows={2}
+                  placeholder="e.g. Take one tablet once daily at night with water."
+                  value={directions}
+                  onChange={(e) => setDirections(e.target.value)}
+                  className="clean-textarea"
+                />
+              </div>
+
+              {/* REPEATS & PBS STATUS */}
+              <div className="clean-form-grid-3">
+                <div className="clean-field">
+                  <label className="clean-field-label">
+                    Repeats Authorised
+                    {selectedArtg?.maxPbsRepeats !== undefined && (
+                      <span className="clean-field-hint"> (PBS max: {selectedArtg.maxPbsRepeats})</span>
+                    )}
+                  </label>
+                  <div className="clean-repeats-button-group">
+                    {REPEATS_PRESETS.map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        className={`clean-repeat-btn ${repeats === r ? 'active' : ''}`}
+                        onClick={() => handleRepeatsChange(r)}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                    <input
+                      type="number"
+                      min="0"
+                      max="11"
+                      value={repeats}
+                      onChange={(e) => handleRepeatsChange(parseInt(e.target.value, 10) || 0)}
+                      className="clean-repeat-custom-input"
+                      title="Custom repeats"
+                    />
+                  </div>
+                </div>
+
+                <div className="clean-field">
+                  <label htmlFor="clean-prescribe-date" className="clean-field-label">
+                    Prescription Date
+                  </label>
                   <input
-                    id="med-prescribed-date"
+                    id="clean-prescribe-date"
                     type="date"
                     required
                     value={prescribedDate}
                     onChange={(e) => setPrescribedDate(e.target.value)}
+                    className="clean-text-input"
                   />
                 </div>
 
-                <div className="form-group med-checkbox-group">
-                  <label className="checkbox-container">
+                <div className="clean-field">
+                  <label className="clean-field-label">PBS Benefit</label>
+                  <label className="clean-checkbox-tile">
                     <input
                       type="checkbox"
                       checked={isPbs}
                       onChange={(e) => setIsPbs(e.target.checked)}
                     />
-                    <span className="checkbox-text">
-                      <strong>PBS Subsidised Prescription</strong>
-                      <small>Auto-calculated from ARTG listing & repeats</small>
-                    </span>
+                    <div className="clean-checkbox-text">
+                      <strong>PBS Subsidised</strong>
+                      <span>{smartPbsInfo.reason}</span>
+                    </div>
                   </label>
-
-                  {/* Smart PBS auto-toggle feedback box */}
-                  <div
-                    className={`smart-pbs-status-box ${smartPbsInfo.isPbs ? 'pbs-active' : 'pbs-inactive'} ${smartPbsInfo.exceedsMax ? 'exceeds-max' : ''}`}
-                  >
-                    <span className="smart-pbs-icon">
-                      {smartPbsInfo.isPbs ? '✓' : smartPbsInfo.exceedsMax ? '⚠️' : 'ℹ'}
-                    </span>
-                    <span className="smart-pbs-reason-text">{smartPbsInfo.reason}</span>
-                  </div>
                 </div>
               </div>
 
-              <div className="form-group">
-                <div className="label-with-action">
-                  <label htmlFor="med-directions-input">Directions for Patient / Instructions</label>
-                  {selectedArtg?.counselingAdvice && (
-                    <button
-                      type="button"
-                      className="helper-action-link"
-                      onClick={handleCopyCounselingToDirections}
-                      title="Insert clinical counseling advice into directions"
-                    >
-                      <Sparkles size={12} /> Insert Patient Counseling Advice
-                    </button>
-                  )}
-                </div>
-                <textarea
-                  id="med-directions-input"
-                  rows={2}
-                  placeholder="e.g. Take one tablet once daily at night, with or without food. Swallow whole."
-                  value={directions}
-                  onChange={(e) => setDirections(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <div className="label-with-action">
-                  <label htmlFor="med-notes-input">Clinical Notes / Indication (Optional)</label>
-                  {clinicalUses.length > 0 && (
-                    <span className="helper-label-hint">Click clinical use to add:</span>
-                  )}
-                </div>
-                {clinicalUses.length > 0 && (
-                  <div className="clinical-uses-chip-row">
-                    {clinicalUses.map((use, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        className="clinical-use-chip"
-                        onClick={() => handleApplyIndicationChip(use)}
-                        title={`Add "${use}" to clinical notes`}
-                      >
-                        + {use}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <textarea
-                  id="med-notes-input"
-                  rows={2}
-                  placeholder="e.g. Primary prevention of cardiovascular event. Review lipid profile in 3 months."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-
-              {/* Clinical Advisory Pearl / Warning Note */}
-              {selectedArtg?.warningNote && (
-                <div className="clinical-pearl-banner">
-                  <AlertCircle size={15} color="#d97706" />
-                  <span>
-                    <strong>Clinical Advisory:</strong> {selectedArtg.warningNote}
+              {/* OPTIONAL CLINICAL INDICATION TOGGLE */}
+              <div className="clean-collapsible-section">
+                <button
+                  type="button"
+                  className="clean-collapsible-trigger"
+                  onClick={() => setShowOptionalDetails((v) => !v)}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Info size={14} /> Clinical Indication & Prescriber Notes (Optional)
                   </span>
-                </div>
-              )}
+                  <ChevronDown
+                    size={16}
+                    style={{
+                      transform: showOptionalDetails ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.15s ease',
+                    }}
+                  />
+                </button>
 
-              {/* Real-Time Clinical Safety & Interaction Alerts */}
-              {clinicalAlerts.length > 0 && (
-                <div className="clinical-alerts-wrapper">
-                  {clinicalAlerts.map((alert, idx) => (
-                    <div key={idx} className={`clinical-alert-banner ${alert.severity}`}>
-                      <div className="clinical-alert-icon">
-                        <AlertTriangle size={18} />
-                      </div>
-                      <div className="clinical-alert-content">
-                        <strong>{alert.title}</strong>
-                        <p>{alert.detail}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* RIGHT COLUMN: CLINICAL DRUG MONOGRAPH & DECISION SUPPORT PANEL */}
-            <div className="prescribe-workspace-right">
-              {selectedArtg ? (
-                <div className="artg-monograph-card">
-                  <div className="monograph-top-banner">
-                    <div className="monograph-top-left">
-                      <div className="monograph-brand-title">
-                        <ShieldCheck size={18} color="#16a34a" />
-                        <strong>{selectedArtg.name}</strong>
-                        <span className="aust-pill">{selectedArtg.id}</span>
-                        <span className={`schedule-badge ${selectedArtg.schedule.toLowerCase()}`}>
-                          {selectedArtg.schedule}
-                        </span>
-                        {selectedArtg.safeScriptMonitored && (
-                          <span
-                            className="safescript-pill"
-                            title="Monitored Medicine (SafeScript / ScriptCheck)"
-                          >
-                            <ShieldAlert size={12} /> SafeScript Monitored
-                          </span>
-                        )}
-                      </div>
-                      <div className="monograph-top-meta">
-                        <span>Active: <strong>{selectedArtg.generic}</strong></span>
-                        <span>•</span>
-                        <span>Class: {selectedArtg.drugClass}</span>
-                        <span>•</span>
-                        <span>Category: {selectedArtg.category}</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="selected-artg-remove"
-                      onClick={handleClearSelectedArtg}
-                      title="Change ARTG selection"
-                    >
-                      Change Drug
-                    </button>
-                  </div>
-
-                  {/* Clinical Highlights Grid */}
-                  <div className="monograph-body-grid">
-                    {/* TGA Pregnancy Category Alert */}
-                    {selectedArtg.pregnancyCategory && (
-                      <div
-                        className={`monograph-alert-box ${getPregnancyDescription(selectedArtg.pregnancyCategory).severity}`}
-                      >
-                        <div className="monograph-alert-icon">
-                          <HeartPulse size={16} />
-                        </div>
-                        <div className="monograph-alert-text">
-                          <strong>
-                            TGA {getPregnancyDescription(selectedArtg.pregnancyCategory).title}
-                          </strong>
-                          <p>{getPregnancyDescription(selectedArtg.pregnancyCategory).detail}</p>
+                {showOptionalDetails && (
+                  <div className="clean-collapsible-content">
+                    {clinicalUses.length > 0 && (
+                      <div className="clean-indication-chips-box">
+                        <span className="clean-field-hint">Common indications for this drug:</span>
+                        <div className="clean-indication-chips">
+                          {clinicalUses.map((use, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              className="clean-indication-chip"
+                              onClick={() => handleApplyIndicationChip(use)}
+                            >
+                              + {use}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     )}
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Ongoing lipid management. Review pathology in 3 months."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="clean-textarea"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
 
-                    {/* Indications & Mechanism of Action */}
-                    <div className="monograph-grid-2col">
-                      {selectedArtg.indication && (
-                        <div className="monograph-field-box">
-                          <div className="field-lbl-row">
-                            <span className="field-lbl">Approved Clinical Indications</span>
-                          </div>
-                          <p>{selectedArtg.indication}</p>
-                          {clinicalUses.length > 0 && (
-                            <div className="monograph-use-tags">
-                              {clinicalUses.map((u, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  className="monograph-use-tag-btn"
-                                  onClick={() => handleApplyIndicationChip(u)}
-                                  title={`Click to copy "${u}" to prescription note`}
-                                >
-                                  + {u}
-                                </button>
-                              ))}
+            {/* ================================================================= */}
+            {/* RIGHT COLUMN: CLINICAL DECISION SUPPORT & MONOGRAPH TABS */}
+            {/* ================================================================= */}
+            <div className="clean-decision-column">
+              {selectedArtg ? (
+                <div className="clean-monograph-card">
+                  {/* Segmented tab bar */}
+                  <div className="clean-monograph-tab-bar">
+                    <button
+                      type="button"
+                      className={`clean-tab-btn ${rightTab === 'safety' ? 'active' : ''}`}
+                      onClick={() => setRightTab('safety')}
+                    >
+                      <ShieldAlert size={14} /> Safety & Alerts
+                      {clinicalAlerts.length > 0 && (
+                        <span className="clean-alert-count-pill">{clinicalAlerts.length}</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className={`clean-tab-btn ${rightTab === 'monograph' ? 'active' : ''}`}
+                      onClick={() => setRightTab('monograph')}
+                    >
+                      <BookOpen size={14} /> Pharmacology
+                    </button>
+                    <button
+                      type="button"
+                      className={`clean-tab-btn ${rightTab === 'counseling' ? 'active' : ''}`}
+                      onClick={() => setRightTab('counseling')}
+                    >
+                      <HeartPulse size={14} /> Counseling
+                    </button>
+                  </div>
+
+                  {/* TAB 1: SAFETY & INTERACTIONS */}
+                  {rightTab === 'safety' && (
+                    <div className="clean-tab-content">
+                      {/* Clinical interaction alerts */}
+                      {clinicalAlerts.length > 0 ? (
+                        <div className="clean-alerts-list">
+                          {clinicalAlerts.map((alert, idx) => (
+                            <div key={idx} className={`clean-alert-item ${alert.severity}`}>
+                              <AlertTriangle size={16} className="clean-alert-icon" />
+                              <div>
+                                <strong>{alert.title}</strong>
+                                <p>{alert.detail}</p>
+                              </div>
                             </div>
-                          )}
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="clean-safe-strip">
+                          <CheckCircle2 size={16} color="#16a34a" />
+                          <span>No critical drug-drug interactions detected with current active medications.</span>
                         </div>
                       )}
-                      {selectedArtg.mechanismOfAction && (
-                        <div className="monograph-field-box">
-                          <span className="field-lbl">Mechanism of Action</span>
-                          <p>{selectedArtg.mechanismOfAction}</p>
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Counseling Advice & Contraindications */}
-                    <div className="monograph-grid-2col">
-                      {selectedArtg.counselingAdvice && (
-                        <div className="monograph-field-box counseling">
-                          <div className="field-lbl-row">
-                            <span className="field-lbl">Patient Counseling & Administration</span>
-                            <button
-                              type="button"
-                              className="copy-into-dir-btn"
-                              onClick={handleCopyCounselingToDirections}
-                              title="Copy into patient directions"
-                            >
-                              Use in Directions
-                            </button>
-                          </div>
-                          <p>{selectedArtg.counselingAdvice}</p>
+                      {/* TGA Pregnancy Category */}
+                      {selectedArtg.pregnancyCategory && (
+                        <div className="clean-info-block">
+                          <span className="clean-info-title">
+                            TGA Pregnancy Category {selectedArtg.pregnancyCategory}
+                          </span>
+                          <p>{getPregnancyDescription(selectedArtg.pregnancyCategory).detail}</p>
                         </div>
                       )}
+
+                      {/* Warnings and Cautions */}
+                      {selectedArtg.warningNote && (
+                        <div className="clean-warning-block">
+                          <AlertCircle size={15} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+                          <div>
+                            <strong>Clinical Warning:</strong> {selectedArtg.warningNote}
+                          </div>
+                        </div>
+                      )}
+
                       {selectedArtg.cautionsAndContraindications && (
-                        <div className="monograph-field-box cautions">
-                          <span className="field-lbl">Precautions & Contraindications</span>
+                        <div className="clean-info-block">
+                          <span className="clean-info-title">Precautions & Contraindications</span>
                           <p>{selectedArtg.cautionsAndContraindications}</p>
                         </div>
                       )}
                     </div>
+                  )}
 
-                    {/* Adverse effects, Monitoring & PBS note */}
-                    <div className="monograph-details-list">
-                      {selectedArtg.adverseEffects && (
-                        <div className="monograph-detail-row">
-                          <strong>Adverse Reactions:</strong> <span>{selectedArtg.adverseEffects}</span>
+                  {/* TAB 2: PHARMACOLOGY & MONOGRAPH */}
+                  {rightTab === 'monograph' && (
+                    <div className="clean-tab-content">
+                      {selectedArtg.indication && (
+                        <div className="clean-info-block">
+                          <span className="clean-info-title">Approved Clinical Indications</span>
+                          <p>{selectedArtg.indication}</p>
                         </div>
                       )}
+
+                      {selectedArtg.mechanismOfAction && (
+                        <div className="clean-info-block">
+                          <span className="clean-info-title">Mechanism of Action</span>
+                          <p>{selectedArtg.mechanismOfAction}</p>
+                        </div>
+                      )}
+
                       {selectedArtg.monitoringAdvice && (
-                        <div className="monograph-detail-row">
-                          <strong>Clinical Monitoring:</strong>{' '}
-                          <span>{selectedArtg.monitoringAdvice}</span>
+                        <div className="clean-info-block">
+                          <span className="clean-info-title">Clinical Monitoring</span>
+                          <p>{selectedArtg.monitoringAdvice}</p>
                         </div>
                       )}
+
+                      {selectedArtg.adverseEffects && (
+                        <div className="clean-info-block">
+                          <span className="clean-info-title">Adverse Reactions</span>
+                          <p>{selectedArtg.adverseEffects}</p>
+                        </div>
+                      )}
+
                       {selectedArtg.pbsRestrictionNote && (
-                        <div className="monograph-detail-row">
-                          <strong>PBS Subsidised Listing:</strong>{' '}
-                          <span>
+                        <div className="clean-info-block">
+                          <span className="clean-info-title">PBS Listing & Restrictions</span>
+                          <p>
                             {selectedArtg.pbsListingType ? `[${selectedArtg.pbsListingType}] ` : ''}
                             {selectedArtg.pbsRestrictionNote}
-                          </span>
-                        </div>
-                      )}
-                      {selectedArtg.storageAdvice && (
-                        <div className="monograph-detail-row">
-                          <strong>Storage & Handling:</strong> <span>{selectedArtg.storageAdvice}</span>
+                          </p>
                         </div>
                       )}
                     </div>
-                  </div>
+                  )}
+
+                  {/* TAB 3: PATIENT COUNSELING */}
+                  {rightTab === 'counseling' && (
+                    <div className="clean-tab-content">
+                      {selectedArtg.counselingAdvice && (
+                        <div className="clean-info-block">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span className="clean-info-title">Patient Counseling & Administration</span>
+                            <button
+                              type="button"
+                              className="clean-inline-action-btn"
+                              onClick={handleCopyCounselingToDirections}
+                            >
+                              Insert in Directions
+                            </button>
+                          </div>
+                          <p style={{ marginTop: '6px' }}>{selectedArtg.counselingAdvice}</p>
+                        </div>
+                      )}
+
+                      {selectedArtg.storageAdvice && (
+                        <div className="clean-info-block">
+                          <span className="clean-info-title">Storage & Handling</span>
+                          <p>{selectedArtg.storageAdvice}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="monograph-placeholder-card">
-                  <Stethoscope size={44} color="#0284c7" className="placeholder-icon" />
+                <div className="clean-monograph-empty-state">
+                  <Stethoscope size={36} color="#94a3b8" />
                   <h4>Australian Clinical Drug Reference</h4>
                   <p>
-                    Search or filter by clinical specialty on the left to select any medicine from the{' '}
-                    <strong>Australian Register of Therapeutic Goods (ARTG)</strong> catalog.
+                    Search or select an Australian medicine on the left to review real-time drug interaction checks,
+                    TGA pregnancy classifications, PBS restrictions, and clinical monographs.
                   </p>
-                  <div className="placeholder-features-list">
-                    <div className="placeholder-feature">
-                      <ShieldCheck size={16} color="#16a34a" />
-                      <div>
-                        <strong>401+ Formulations Indexed</strong>
-                        <span>Full Australian TGA registration numbers & PBS listing types</span>
-                      </div>
-                    </div>
-                    <div className="placeholder-feature">
-                      <HeartPulse size={16} color="#dc2626" />
-                      <div>
-                        <strong>TGA Pregnancy Classifications</strong>
-                        <span>Categories A, B1, B2, B3, C, D, X with safety guidance</span>
-                      </div>
-                    </div>
-                    <div className="placeholder-feature">
-                      <AlertTriangle size={16} color="#d97706" />
-                      <div>
-                        <strong>Decision Support & Interaction Alerts</strong>
-                        <span>Triple Whammy AKI risk, duplicate active ingredients, S8 SafeScript</span>
-                      </div>
-                    </div>
-                    <div className="placeholder-feature">
-                      <BookOpen size={16} color="#2563eb" />
-                      <div>
-                        <strong>1-Click Clinical Indications & Pearls</strong>
-                        <span>Quick-populate clinical indications & counseling instructions</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="modal-footer">
+          {/* CLEAN MODAL FOOTER */}
+          <div className="modal-footer clean-modal-footer">
             <button
               type="button"
               className="button button-secondary"
@@ -848,7 +863,7 @@ export function PrescribeMedicationModal({
             >
               {savingMedication ? (
                 <>
-                  <LoaderCircle size={16} className="spin" /> Recording prescription…
+                  <LoaderCircle size={16} className="spin" /> Prescribing…
                 </>
               ) : (
                 <>
