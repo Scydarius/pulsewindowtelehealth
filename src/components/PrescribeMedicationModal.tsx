@@ -252,6 +252,13 @@ export function PrescribeMedicationModal({
     );
   }, [medicationName, genericName, brandName, selectedArtg, activeExistingMeds]);
 
+  // Proactively focus on safety tab whenever clinical alerts are detected
+  useEffect(() => {
+    if (clinicalAlerts.length > 0) {
+      setRightTab('safety');
+    }
+  }, [clinicalAlerts.length]);
+
   const handlePrescribeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!medicationName.trim()) {
@@ -445,6 +452,28 @@ export function PrescribeMedicationModal({
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* INLINE CLINICAL SAFETY & INTERACTION WARNING BANNER */}
+              {clinicalAlerts.length > 0 && (
+                <div className="clean-inline-safety-banner" role="alert">
+                  <div className="clean-inline-safety-header">
+                    <AlertTriangle size={18} className="clean-inline-safety-icon" />
+                    <span>Clinical Safety Alert ({clinicalAlerts.length} warning{clinicalAlerts.length === 1 ? '' : 's'} detected)</span>
+                  </div>
+                  <div className="clean-inline-safety-list">
+                    {clinicalAlerts.map((alert, idx) => (
+                      <div key={idx} className={`clean-inline-safety-row ${alert.severity}`}>
+                        <div className="clean-inline-safety-badge">
+                          {alert.severity === 'high' ? 'CRITICAL' : 'CAUTION'}
+                        </div>
+                        <div>
+                          <strong>{alert.title}</strong> — <span>{alert.detail}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -832,6 +861,28 @@ export function PrescribeMedicationModal({
                       )}
                     </div>
                   )}
+                </div>
+              ) : clinicalAlerts.length > 0 ? (
+                <div className="clean-monograph-card">
+                  <div className="clean-monograph-tab-bar">
+                    <button type="button" className="clean-tab-btn active">
+                      <ShieldAlert size={14} /> Safety & Alerts
+                      <span className="clean-alert-count-pill">{clinicalAlerts.length}</span>
+                    </button>
+                  </div>
+                  <div className="clean-tab-content">
+                    <div className="clean-alerts-list">
+                      {clinicalAlerts.map((alert, idx) => (
+                        <div key={idx} className={`clean-alert-item ${alert.severity}`}>
+                          <AlertTriangle size={16} className="clean-alert-icon" />
+                          <div>
+                            <strong>{alert.title}</strong>
+                            <p>{alert.detail}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="clean-monograph-empty-state">
