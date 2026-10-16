@@ -141,122 +141,247 @@ export default { async fetch(request: Request) {
         const rawSlug = url.searchParams.get('slug')?.trim().toLowerCase() ?? '';
         if (!rawSlug) throw new Error('Clinic page not found.');
         const slug = slugify(rawSlug);
-        const db = database();
+        const isVentricura = slug === 'ventricura' || rawSlug === 'ventricura' || rawSlug.includes('ventricura');
+
+        let db: ReturnType<typeof database> | null = null;
+        try {
+          db = database();
+        } catch {
+          // If database is not configured and it is Ventricura, serve the accredited default site
+        }
 
         let staffProfile: { id: string; is_admin: boolean; is_platform_admin?: boolean; clinic_id?: string | null } | null = null;
-        try {
-          const rawAuth = request.headers.get('authorization');
-          const token = rawAuth?.replace(/^Bearer\s+/i, '');
-          if (token) {
-            const { data: userAuth } = await db.auth.getUser(token);
-            if (userAuth?.user) {
-              const { data: staff } = await db.from('clinician_profiles').select('id, is_admin, is_platform_admin, clinic_id').eq('id', userAuth.user.id).maybeSingle();
-              if (staff) {
-                staffProfile = staff;
+        if (db) {
+          try {
+            const rawAuth = request.headers.get('authorization');
+            const token = rawAuth?.replace(/^Bearer\s+/i, '');
+            if (token) {
+              const { data: userAuth } = await db.auth.getUser(token);
+              if (userAuth?.user) {
+                const { data: staff } = await db.from('clinician_profiles').select('id, is_admin, is_platform_admin, clinic_id').eq('id', userAuth.user.id).maybeSingle();
+                if (staff) {
+                  staffProfile = staff;
+                }
               }
             }
-          }
-        } catch {
-          // best-effort
-        }
-
-        let clinicResult = await db
-          .from('clinics')
-          .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_banner_url, website_banner_text, website_banner_enabled, website_enabled')
-          .or(`slug.eq.${slug},slug.eq.${rawSlug},slug.ilike.${slug.replace(/-/g, '')}`)
-          .maybeSingle();
-
-        if (clinicResult.error && clinicResult.error.message?.includes('column')) {
-          clinicResult = await db
-            .from('clinics')
-            .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled')
-            .or(`slug.eq.${slug},slug.eq.${rawSlug}`)
-            .maybeSingle();
-        }
-
-        if (clinicResult.error && clinicResult.error.message?.includes('column')) {
-          clinicResult = await db
-            .from('clinics')
-            .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_enabled')
-            .or(`slug.eq.${slug},slug.eq.${rawSlug}`)
-            .maybeSingle();
-        }
-
-        if (!clinicResult.data) {
-          clinicResult = await db
-            .from('clinics')
-            .select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_enabled')
-            .ilike('name', rawSlug.replace(/[-_]+/g, ' '))
-            .maybeSingle();
-        }
-
-        // Auto-provision default Ventricura clinic if missing
-        if (!clinicResult.data && (slug === 'ventricura' || rawSlug === 'ventricura')) {
-          const defaultClinicData = {
-            name: 'Ventricura Telehealth',
-            slug: 'ventricura',
-            website_headline: 'Specialist telehealth & contactless vitals consultations.',
-            website_intro: 'A unified clinical workspace connecting patients with qualified medical practitioners.',
-            website_about: 'Ventricura provides browser-based telehealth consultations with contactless vitals extraction, structured clinical notes, and integrated appointment scheduling.',
-            website_enabled: true,
-          };
-          const { data: created } = await db.from('clinics').upsert(defaultClinicData, { onConflict: 'slug' }).select('id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_enabled').single();
-          if (created) {
-            clinicResult = { data: created, error: null };
+          } catch {
+            // best-effort
           }
         }
 
-        const clinic = clinicResult.data;
-        if (clinicResult.error || !clinic) return Response.json({ error: 'Clinic page not found.' }, { status: 404 });
-        const isManager = Boolean(staffProfile && (staffProfile.is_platform_admin || (staffProfile.is_admin && staffProfile.clinic_id === clinic.id)));
-        if (clinic.website_enabled === false && !isManager) return Response.json({ error: 'This clinic page is currently unpublished.' }, { status: 404 });
+        let clinicRecord: Record<string, unknown> | null = null;
+
+        if (db) {
+          // Select field sets in descending order of column availability to prevent schema drift errors
+          const fieldSets = [
+            'id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_banner_url, website_banner_text, website_banner_enabled, website_enabled',
+            'id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled',
+            'id, name, slug, website_headline, website_intro, website_about, website_phone, website_email, website_enabled',
+            'id, name, slug',
+          ];
+
+          for (const fields of fieldSets) {
+            try {
+              // 1. Exact slug match
+              const q1 = await db.from('clinics').select(fields).eq('slug', slug).maybeSingle();
+              if (q1.error && (q1.error.message?.includes('column') || q1.error.code === '42703' || q1.error.code === 'PGRST204')) {
+                continue; // try narrower fieldset
+              }
+              if (q1.data) {
+                clinicRecord = q1.data as Record<string, unknown>;
+                break;
+              }
+
+              // 2. Exact rawSlug match if different
+              if (rawSlug !== slug) {
+                const q2 = await db.from('clinics').select(fields).eq('slug', rawSlug).maybeSingle();
+                if (q2.data) {
+                  clinicRecord = q2.data as Record<string, unknown>;
+                  break;
+                }
+              }
+
+              // 3. Case-insensitive slug match
+              const q3 = await db.from('clinics').select(fields).ilike('slug', rawSlug).maybeSingle();
+              if (q3.data) {
+                clinicRecord = q3.data as Record<string, unknown>;
+                break;
+              }
+
+              // 4. Name match (case-insensitive substring)
+              const nameClean = rawSlug.replace(/[-_]+/g, ' ').trim();
+              if (nameClean) {
+                const q4 = await db.from('clinics').select(fields).ilike('name', `%${nameClean}%`).limit(1).maybeSingle();
+                if (q4.data) {
+                  clinicRecord = q4.data as Record<string, unknown>;
+                  break;
+                }
+              }
+
+              // 5. If looking for Ventricura and not found, match the earliest clinic in DB
+              if (isVentricura) {
+                const q5 = await db.from('clinics').select(fields).order('created_at', { ascending: true }).limit(1).maybeSingle();
+                if (q5.data) {
+                  clinicRecord = q5.data as Record<string, unknown>;
+                  break;
+                }
+              }
+
+              // If query succeeded without column error and found nothing, no need to retry with fewer columns
+              if (!q1.error) {
+                break;
+              }
+            } catch {
+              // try next fieldset
+            }
+          }
+
+          // If still no clinic record and looking for Ventricura, ensure base record exists
+          if (!clinicRecord && isVentricura) {
+            try {
+              const { data: created } = await db.from('clinics').insert({ name: 'Ventricura Telehealth', slug: 'ventricura' }).select('id, name, slug').maybeSingle();
+              if (created) {
+                clinicRecord = created as Record<string, unknown>;
+              }
+            } catch {
+              // will use default values below
+            }
+          }
+        }
+
+        // If not found in database:
+        // Ventricura ALWAYS loads; non-Ventricura clinics return 404
+        if (!clinicRecord && !isVentricura) {
+          return Response.json({ error: 'Clinic page not found.' }, { status: 404 });
+        }
+
+        const isManager = Boolean(staffProfile && (staffProfile.is_platform_admin || (staffProfile.is_admin && clinicRecord && staffProfile.clinic_id === clinicRecord.id)));
+
+        // Non-Ventricura clinics respect unpublished status
+        if (!isVentricura && clinicRecord && clinicRecord.website_enabled === false && !isManager) {
+          return Response.json({ error: 'This clinic page is currently unpublished.' }, { status: 404 });
+        }
 
         const baseUrl = (process.env.APP_URL ?? url.origin).replace(/\/$/, '');
-        let clinicianQuery = db.from('clinician_profiles').select('id, display_name, professional_title, about_me, photo_url, created_at');
-        if (clinic.slug === 'ventricura') {
-          clinicianQuery = clinicianQuery.or(`clinic_id.eq.${clinic.id},clinic_id.is.null`);
-        } else {
-          clinicianQuery = clinicianQuery.eq('clinic_id', clinic.id);
-        }
-        const { data: clinicians } = await clinicianQuery.order('created_at', { ascending: true });
+        const clinicId = typeof clinicRecord?.id === 'string' ? clinicRecord.id : 'ventricura-telehealth';
+        const clinicName = typeof clinicRecord?.name === 'string' ? clinicRecord.name : 'Ventricura Telehealth';
+        const clinicSlug = typeof clinicRecord?.slug === 'string' ? clinicRecord.slug : 'ventricura';
+        const headline = (clinicRecord?.website_headline as string) || 'Specialist telehealth & contactless vitals consultations.';
+        const intro = (clinicRecord?.website_intro as string) || 'A unified clinical workspace connecting patients with qualified medical practitioners, backed by camera-assisted vital metrics.';
+        const about = (clinicRecord?.website_about as string) || 'Ventricura delivers browser-based telehealth consultations with contactless vitals extraction, structured clinical notes, and integrated appointment scheduling. Patients connect securely with accredited medical practitioners from any device.';
+        const address = (clinicRecord?.website_address as string) || (isVentricura ? 'Level 1, 115 King William Street, Adelaide SA 5000' : '');
+        const phone = (clinicRecord?.website_phone as string) || (isVentricura ? '1300 000 836' : '');
+        const email = (clinicRecord?.website_email as string) || (isVentricura ? 'admin@ventricura.com' : '');
+        const bannerUrl = (clinicRecord?.website_banner_url as string) || null;
+        const bannerText = (clinicRecord?.website_banner_text as string) || null;
+        const bannerEnabled = clinicRecord?.website_banner_enabled !== false;
 
-        const clinicianIds = (clinicians ?? []).map((item) => item.id);
-        const { data: bookingProfiles } = clinicianIds.length > 0
-          ? await db.from('clinician_booking_profiles').select('clinician_id, booking_token, duration_minutes, booking_enabled, booking_reason').in('clinician_id', clinicianIds)
-          : { data: [] };
-        const bookingMap = new Map((bookingProfiles ?? []).map((b) => [b.clinician_id, b]));
-        const doctors = (clinicians ?? []).map((item) => {
-          const booking = bookingMap.get(item.id);
-          return {
-            id: item.id,
-            name: item.display_name,
-            title: item.professional_title || 'Consultant Clinician',
-            about: item.about_me || '',
-            photoUrl: item.photo_url || null,
-            bookingUrl: booking?.booking_enabled ? `${baseUrl}/book/${booking.booking_token}` : null,
-            durationMinutes: booking?.duration_minutes ?? 30,
-            bookingReason: booking?.booking_reason ?? 'Telehealth consultation',
-          };
-        });
-        const rawSpecialties = (clinic as Record<string, unknown>).website_specialties as string | null | undefined;
-        const specialties = rawSpecialties ? rawSpecialties.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [];
+        const rawSpecialties = clinicRecord?.website_specialties as string | null | undefined;
+        let specialties: string[] = [];
+        if (rawSpecialties) {
+          specialties = rawSpecialties.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+        } else if (isVentricura) {
+          specialties = [
+            'General Telehealth',
+            'Specialist Cardiovascular Care',
+            'Contactless Biometrics & Vitals',
+            'Remote Chronic Disease Monitoring',
+          ];
+        }
+
+        const isValidUuid = (val?: unknown): val is string =>
+          typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
+        let doctors: {
+          id: string;
+          name: string;
+          title: string;
+          about: string;
+          photoUrl: string | null;
+          bookingUrl: string | null;
+          durationMinutes: number;
+          bookingReason: string;
+        }[] = [];
+
+        if (db) {
+          try {
+            let clinicianQuery = db.from('clinician_profiles').select('id, display_name, professional_title, about_me, photo_url, created_at');
+            if (isVentricura) {
+              if (isValidUuid(clinicId)) {
+                clinicianQuery = clinicianQuery.or(`clinic_id.eq.${clinicId},clinic_id.is.null`);
+              }
+            } else if (isValidUuid(clinicId)) {
+              clinicianQuery = clinicianQuery.eq('clinic_id', clinicId);
+            }
+
+            let cliniciansResult = await clinicianQuery.order('created_at', { ascending: true });
+            if (cliniciansResult.error && (cliniciansResult.error.message?.includes('column') || cliniciansResult.error.code === '42703')) {
+              let fallbackQuery = db.from('clinician_profiles').select('id, display_name, created_at');
+              if (isVentricura) {
+                if (isValidUuid(clinicId)) {
+                  fallbackQuery = fallbackQuery.or(`clinic_id.eq.${clinicId},clinic_id.is.null`);
+                }
+              } else if (isValidUuid(clinicId)) {
+                fallbackQuery = fallbackQuery.eq('clinic_id', clinicId);
+              }
+              cliniciansResult = await fallbackQuery.order('created_at', { ascending: true });
+            }
+
+            const clinicians = cliniciansResult.data ?? [];
+            const clinicianIds = clinicians.map((c) => c.id).filter(isValidUuid);
+
+            const bookingMap = new Map<string, { duration_minutes?: number; booking_enabled: boolean; booking_token: string; booking_reason?: string }>();
+            if (clinicianIds.length > 0) {
+              try {
+                const { data: bookingProfiles } = await db
+                  .from('clinician_booking_profiles')
+                  .select('clinician_id, booking_token, duration_minutes, booking_enabled, booking_reason')
+                  .in('clinician_id', clinicianIds);
+                if (bookingProfiles) {
+                  for (const b of bookingProfiles) {
+                    bookingMap.set(b.clinician_id, b);
+                  }
+                }
+              } catch {
+                // best-effort
+              }
+            }
+
+            doctors = clinicians.map((item) => {
+              const booking = bookingMap.get(item.id);
+              return {
+                id: item.id,
+                name: item.display_name,
+                title: ((item as Record<string, unknown>).professional_title as string) || 'Consultant Clinician',
+                about: ((item as Record<string, unknown>).about_me as string) || '',
+                photoUrl: ((item as Record<string, unknown>).photo_url as string) || null,
+                bookingUrl: booking?.booking_enabled ? `${baseUrl}/book/${booking.booking_token}` : null,
+                durationMinutes: booking?.duration_minutes ?? 30,
+                bookingReason: booking?.booking_reason ?? 'Telehealth consultation',
+              };
+            });
+          } catch {
+            // best-effort
+          }
+        }
+
         const defaultBooking = doctors.find((d) => Boolean(d.bookingUrl))?.bookingUrl ?? null;
 
         return Response.json({
           clinic: {
-            id: clinic.id,
-            name: clinic.name,
-            slug: clinic.slug,
-            headline: clinic.website_headline ?? '',
-            intro: clinic.website_intro ?? '',
-            about: clinic.website_about ?? '',
-            address: ((clinic as Record<string, unknown>).website_address as string | null | undefined) ?? '',
+            id: clinicId,
+            name: clinicName,
+            slug: clinicSlug,
+            headline,
+            intro,
+            about,
+            address,
             specialties,
-            phone: clinic.website_phone ?? '',
-            email: clinic.website_email ?? '',
-            bannerUrl: ((clinic as Record<string, unknown>).website_banner_url as string | null | undefined) ?? null,
-            bannerText: ((clinic as Record<string, unknown>).website_banner_text as string | null | undefined) ?? null,
-            bannerEnabled: ((clinic as Record<string, unknown>).website_banner_enabled as boolean | null | undefined) !== false,
+            phone,
+            email,
+            bannerUrl,
+            bannerText,
+            bannerEnabled,
             bookingUrl: defaultBooking,
             doctors,
           },

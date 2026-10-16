@@ -50,6 +50,7 @@ const RESERVED_TOP_PATHS = new Set([
   'demo',
   'contact',
   'clinicians',
+  'clinics',
   'privacy',
   'terms',
   'security',
@@ -81,6 +82,8 @@ export default function App() {
       <Route path="/demo" element={page(<LiveDemoPage />)} />
       <Route path="/contact" element={page(<ContactPage />)} />
       <Route path="/clinicians" element={page(<CliniciansPage />)} />
+      <Route path="/clinics" element={<Navigate to="/clinicians" replace />} />
+      <Route path="/clinic" element={<Navigate to="/ventricura" replace />} />
       <Route path="/privacy" element={page(<TrustPage kind="privacy" />)} />
       <Route path="/terms" element={page(<TrustPage kind="terms" />)} />
       <Route path="/security" element={page(<TrustPage kind="security" />)} />

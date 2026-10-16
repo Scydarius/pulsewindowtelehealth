@@ -193,15 +193,21 @@ async function handle(request: Request) {
         profileResult = await fallbackQuery;
       }
 
-      if (clinicResult.error && clinicResult.error.message?.includes('column')) {
+      if (clinicResult.error && (clinicResult.error.message?.includes('column') || clinicResult.error.code === '42703')) {
         let fallbackClinicQuery = db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name');
         if (!isSuperAdmin && profile.clinic_id) fallbackClinicQuery = fallbackClinicQuery.eq('id', profile.clinic_id);
         clinicResult = await fallbackClinicQuery;
+        if (clinicResult.error && (clinicResult.error.message?.includes('column') || clinicResult.error.code === '42703')) {
+          let minimalQuery = db.from('clinics').select('id, name, slug, public_domain, created_at').order('name');
+          if (!isSuperAdmin && profile.clinic_id) minimalQuery = minimalQuery.eq('id', profile.clinic_id);
+          clinicResult = await minimalQuery;
+        }
       }
 
       if (!clinicResult.error && (!clinicResult.data || clinicResult.data.length === 0)) {
         await db.from('clinics').insert({ name: 'Ventricura Telehealth', slug: 'ventricura' });
-        clinicResult = await db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name');
+        let refetch = db.from('clinics').select('id, name, slug, public_domain, created_at').order('name');
+        clinicResult = await refetch;
         allClinicsResult = await db.from('clinics').select('id, name, slug').order('name');
       }
 

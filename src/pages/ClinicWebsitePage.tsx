@@ -55,6 +55,29 @@ export type ClinicSite = {
   doctors: ClinicDoctor[];
 };
 
+const DEFAULT_VENTRICURA_SITE: ClinicSite = {
+  id: 'ventricura-telehealth',
+  name: 'Ventricura Telehealth',
+  slug: 'ventricura',
+  headline: 'Specialist telehealth & contactless vitals consultations.',
+  intro: 'A unified clinical workspace connecting patients with qualified medical practitioners, backed by camera-assisted vital metrics.',
+  about: 'Ventricura delivers browser-based telehealth consultations with contactless vitals extraction, structured clinical notes, and integrated appointment scheduling. Patients connect securely with accredited medical practitioners from any device.',
+  address: 'Level 1, 115 King William Street, Adelaide SA 5000',
+  specialties: [
+    'General Telehealth',
+    'Specialist Cardiovascular Care',
+    'Contactless Biometrics & Vitals',
+    'Remote Chronic Disease Monitoring',
+  ],
+  phone: '1300 000 836',
+  email: 'admin@ventricura.com',
+  bannerUrl: null,
+  bannerText: null,
+  bannerEnabled: true,
+  bookingUrl: null,
+  doctors: [],
+};
+
 export function ClinicWebsitePage({ slug }: { slug: string }) {
   const [clinic, setClinic] = useState<ClinicSite | null>(null);
   const [error, setError] = useState('');
@@ -72,16 +95,26 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
         const headers: Record<string, string> = {};
         if (token) headers.Authorization = `Bearer ${token}`;
         const response = await fetch(`/api/clinician-invitations?action=clinic-site&slug=${encodeURIComponent(slug)}`, { headers });
-        const body = (await response.json()) as { clinic?: ClinicSite; isManager?: boolean; error?: string };
-        if (!response.ok || !body.clinic) {
-          throw new Error(body.error ?? 'Clinic page not found.');
+        const body = (await response.json().catch(() => null)) as { clinic?: ClinicSite; isManager?: boolean; error?: string } | null;
+        if (!response.ok || !body?.clinic) {
+          if (slug === 'ventricura' || !slug) {
+            if (active) setClinic(DEFAULT_VENTRICURA_SITE);
+            return;
+          }
+          throw new Error(body?.error ?? 'Clinic page not found.');
         }
         if (active) {
           setClinic(body.clinic);
           if (body.isManager) setIsManager(true);
         }
       } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : 'Clinic page not found.');
+        if (active) {
+          if (slug === 'ventricura' || !slug) {
+            setClinic(DEFAULT_VENTRICURA_SITE);
+          } else {
+            setError(reason instanceof Error ? reason.message : 'Clinic page not found.');
+          }
+        }
       } finally {
         if (active) setLoading(false);
       }
