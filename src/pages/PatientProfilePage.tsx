@@ -635,14 +635,36 @@ notify pgrst, 'reload schema';`;
           ) : (
             displayedMedications.map((med) => {
               const isActive = med.status === 'active';
+              const cleanMedName = (med.medication_name || '').trim().toLowerCase();
+              const cleanBrand = (med.brand_name || '').trim().toLowerCase();
+              const cleanGeneric = (med.generic_name || '').trim().toLowerCase();
+
               const matchingArtg = med.artg_id
                 ? getArtgMedicationById(med.artg_id)
-                : ARTG_MEDICATIONS.find(
-                    (m) =>
-                      (med.generic_name && m.generic.toLowerCase().includes(med.generic_name.toLowerCase())) ||
-                      (med.brand_name && m.brand.toLowerCase() === med.brand_name.toLowerCase()) ||
-                      m.name.toLowerCase() === med.medication_name.toLowerCase()
-                  );
+                : ARTG_MEDICATIONS.find((m) => {
+                    if (cleanBrand && m.brand.toLowerCase() === cleanBrand) return true;
+                    if (cleanMedName && (m.name.toLowerCase() === cleanMedName || m.brand.toLowerCase() === cleanMedName)) return true;
+                    if (cleanGeneric) {
+                      const artgGeneric = m.generic.toLowerCase();
+                      if (artgGeneric === cleanGeneric) return true;
+                      const baseArtgGeneric = artgGeneric.split(/\s*\(|\s*\//)[0].trim();
+                      const baseInputGeneric = cleanGeneric.split(/\s*\(|\s*\//)[0].trim();
+                      if (baseArtgGeneric === baseInputGeneric && baseInputGeneric.length >= 3) return true;
+                    }
+                    return false;
+                  });
+
+              const hasMonograph = Boolean(
+                matchingArtg && (
+                  matchingArtg.indication ||
+                  matchingArtg.mechanismOfAction ||
+                  matchingArtg.counselingAdvice ||
+                  matchingArtg.cautionsAndContraindications ||
+                  matchingArtg.adverseEffects ||
+                  matchingArtg.monitoringAdvice ||
+                  matchingArtg.pbsRestrictionNote
+                )
+              );
               const isExpanded = expandedMonographId === med.id;
 
               return (
@@ -686,6 +708,11 @@ notify pgrst, 'reload schema';`;
                             Non-PBS
                           </span>
                         )}
+                        {!hasMonograph && (
+                          <span className="med-tag-badge standard-rx" title="Standard formulation — no extended ARTG monograph required">
+                            Standard Rx
+                          </span>
+                        )}
                         <span className={`med-status-tag ${med.status}`}>
                           {med.status === 'active' ? 'Active' : 'Ceased'}
                         </span>
@@ -696,7 +723,7 @@ notify pgrst, 'reload schema';`;
                     </div>
 
                     <div className="med-card-actions">
-                      {matchingArtg && (
+                      {hasMonograph && (
                         <button
                           type="button"
                           className={`button button-secondary button-small med-monograph-btn ${isExpanded ? 'active' : ''}`}
@@ -806,7 +833,7 @@ notify pgrst, 'reload schema';`;
                   )}
 
                   {/* Expandable Clinical Drug Monograph */}
-                  {isExpanded && matchingArtg && (
+                  {isExpanded && matchingArtg && hasMonograph && (
                     <div className="med-expanded-monograph">
                       <div className="monograph-expanded-header">
                         <div className="monograph-header-title">

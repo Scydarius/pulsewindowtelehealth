@@ -81,6 +81,7 @@ export function PrescribeMedicationModal({
   const [notes, setNotes] = useState('');
   const [showOptionalDetails, setShowOptionalDetails] = useState(false);
   const [rightTab, setRightTab] = useState<'safety' | 'monograph' | 'counseling'>('safety');
+  const [showReferencePane, setShowReferencePane] = useState(false);
   const [savingMedication, setSavingMedication] = useState(false);
   const [prescribeError, setPrescribeError] = useState('');
 
@@ -107,6 +108,14 @@ export function PrescribeMedicationModal({
       setNotes(initialMedication.notes || '');
       setPrescribedDate(new Date().toISOString().slice(0, 10));
       setShowOptionalDetails(Boolean(initialMedication.notes));
+      const hasMonograph = Boolean(
+        matchingArtg && (
+          matchingArtg.indication ||
+          matchingArtg.mechanismOfAction ||
+          matchingArtg.counselingAdvice
+        )
+      );
+      setShowReferencePane(hasMonograph);
     } else {
       setSelectedArtg(null);
       setArtgQuery('');
@@ -125,6 +134,7 @@ export function PrescribeMedicationModal({
       setNotes('');
       setShowOptionalDetails(false);
       setPrescribeError('');
+      setShowReferencePane(false);
     }
   }, [isOpen, initialMedication]);
 
@@ -174,6 +184,13 @@ export function PrescribeMedicationModal({
     setArtgQuery('');
     setArtgResults([]);
     setRightTab('safety');
+    const hasData = Boolean(
+      med.indication ||
+      med.mechanismOfAction ||
+      med.warningNote ||
+      med.cautionsAndContraindications
+    );
+    setShowReferencePane(hasData);
   };
 
   const handleRepeatsChange = (val: number) => {
@@ -227,6 +244,9 @@ export function PrescribeMedicationModal({
   const handleClearSelectedArtg = () => {
     setSelectedArtg(null);
     setArtgId('');
+    if (clinicalAlerts.length === 0) {
+      setShowReferencePane(false);
+    }
   };
 
   const smartPbsInfo = useMemo(() => {
@@ -252,10 +272,43 @@ export function PrescribeMedicationModal({
     );
   }, [medicationName, genericName, brandName, selectedArtg, activeExistingMeds]);
 
-  // Proactively focus on safety tab whenever clinical alerts are detected
+  const hasMonographData = useMemo(() => {
+    if (!selectedArtg) return false;
+    return Boolean(
+      selectedArtg.indication ||
+      selectedArtg.mechanismOfAction ||
+      selectedArtg.monitoringAdvice ||
+      selectedArtg.adverseEffects ||
+      selectedArtg.pbsRestrictionNote
+    );
+  }, [selectedArtg]);
+
+  const hasCounselingData = useMemo(() => {
+    if (!selectedArtg) return false;
+    return Boolean(selectedArtg.counselingAdvice || selectedArtg.storageAdvice);
+  }, [selectedArtg]);
+
+  const hasSafetyData = useMemo(() => {
+    return Boolean(
+      clinicalAlerts.length > 0 ||
+      selectedArtg?.pregnancyCategory ||
+      selectedArtg?.warningNote ||
+      selectedArtg?.cautionsAndContraindications ||
+      selectedArtg?.safeScriptMonitored
+    );
+  }, [clinicalAlerts.length, selectedArtg]);
+
+  const effectiveTab = useMemo<'safety' | 'monograph' | 'counseling'>(() => {
+    if (rightTab === 'monograph' && !hasMonographData) return 'safety';
+    if (rightTab === 'counseling' && !hasCounselingData) return 'safety';
+    return rightTab;
+  }, [rightTab, hasMonographData, hasCounselingData]);
+
+  // Proactively focus on safety tab and expand pane whenever clinical alerts are detected
   useEffect(() => {
     if (clinicalAlerts.length > 0) {
       setRightTab('safety');
+      setShowReferencePane(true);
     }
   }, [clinicalAlerts.length]);
 
@@ -328,20 +381,36 @@ export function PrescribeMedicationModal({
               Issue an Australian electronic script or recorded medication therapy.
             </p>
           </div>
-          <button
-            type="button"
-            className="modal-close-btn"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
+          <div className="clean-modal-header-actions">
+            <button
+              type="button"
+              className={`clean-ref-toggle-btn ${showReferencePane ? 'active' : ''}`}
+              onClick={() => setShowReferencePane((v) => !v)}
+              title={showReferencePane ? 'Hide clinical reference panel' : 'Show clinical reference panel'}
+            >
+              <BookOpen size={14} />
+              <span>{showReferencePane ? 'Hide Reference' : 'Clinical Reference'}</span>
+              {clinicalAlerts.length > 0 ? (
+                <span className="clean-alert-count-pill">{clinicalAlerts.length}</span>
+              ) : hasMonographData ? (
+                <span className="clean-monograph-pill">Monograph</span>
+              ) : null}
+            </button>
+            <button
+              type="button"
+              className="modal-close-btn"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handlePrescribeSubmit} className="prescribe-form clean-prescribe-body">
           {prescribeError && <div className="form-error-banner">{prescribeError}</div>}
 
-          <div className="clean-workstation-layout">
+          <div className={`clean-workstation-layout ${showReferencePane ? 'with-reference' : 'single-column'}`}>
             {/* ================================================================= */}
             {/* LEFT COLUMN: PRESCRIBING FORM & DISPENSING INSTRUCTIONS */}
             {/* ================================================================= */}
@@ -708,193 +777,227 @@ export function PrescribeMedicationModal({
             {/* ================================================================= */}
             {/* RIGHT COLUMN: CLINICAL DECISION SUPPORT & MONOGRAPH TABS */}
             {/* ================================================================= */}
-            <div className="clean-decision-column">
-              {selectedArtg ? (
-                <div className="clean-monograph-card">
-                  {/* Segmented tab bar */}
-                  <div className="clean-monograph-tab-bar">
-                    <button
-                      type="button"
-                      className={`clean-tab-btn ${rightTab === 'safety' ? 'active' : ''}`}
-                      onClick={() => setRightTab('safety')}
-                    >
-                      <ShieldAlert size={14} /> Safety & Alerts
-                      {clinicalAlerts.length > 0 && (
-                        <span className="clean-alert-count-pill">{clinicalAlerts.length}</span>
+            {/* ================================================================= */}
+            {/* RIGHT COLUMN: CLINICAL DECISION SUPPORT & MONOGRAPH TABS */}
+            {/* ================================================================= */}
+            {showReferencePane && (
+              <div className="clean-decision-column">
+                {selectedArtg ? (
+                  <div className="clean-monograph-card">
+                    {/* Segmented tab bar - only render tabs that have actual data */}
+                    <div className="clean-monograph-tab-bar">
+                      <button
+                        type="button"
+                        className={`clean-tab-btn ${effectiveTab === 'safety' ? 'active' : ''}`}
+                        onClick={() => setRightTab('safety')}
+                      >
+                        <ShieldAlert size={14} /> Safety & Alerts
+                        {clinicalAlerts.length > 0 && (
+                          <span className="clean-alert-count-pill">{clinicalAlerts.length}</span>
+                        )}
+                      </button>
+                      {hasMonographData && (
+                        <button
+                          type="button"
+                          className={`clean-tab-btn ${effectiveTab === 'monograph' ? 'active' : ''}`}
+                          onClick={() => setRightTab('monograph')}
+                        >
+                          <BookOpen size={14} /> Pharmacology
+                        </button>
                       )}
-                    </button>
-                    <button
-                      type="button"
-                      className={`clean-tab-btn ${rightTab === 'monograph' ? 'active' : ''}`}
-                      onClick={() => setRightTab('monograph')}
-                    >
-                      <BookOpen size={14} /> Pharmacology
-                    </button>
-                    <button
-                      type="button"
-                      className={`clean-tab-btn ${rightTab === 'counseling' ? 'active' : ''}`}
-                      onClick={() => setRightTab('counseling')}
-                    >
-                      <HeartPulse size={14} /> Counseling
-                    </button>
-                  </div>
+                      {hasCounselingData && (
+                        <button
+                          type="button"
+                          className={`clean-tab-btn ${effectiveTab === 'counseling' ? 'active' : ''}`}
+                          onClick={() => setRightTab('counseling')}
+                        >
+                          <HeartPulse size={14} /> Counseling
+                        </button>
+                      )}
+                    </div>
 
-                  {/* TAB 1: SAFETY & INTERACTIONS */}
-                  {rightTab === 'safety' && (
-                    <div className="clean-tab-content">
-                      {/* Clinical interaction alerts */}
-                      {clinicalAlerts.length > 0 ? (
-                        <div className="clean-alerts-list">
-                          {clinicalAlerts.map((alert, idx) => (
-                            <div key={idx} className={`clean-alert-item ${alert.severity}`}>
-                              <AlertTriangle size={16} className="clean-alert-icon" />
-                              <div>
-                                <strong>{alert.title}</strong>
-                                <p>{alert.detail}</p>
+                    {/* TAB 1: SAFETY & INTERACTIONS */}
+                    {effectiveTab === 'safety' && (
+                      <div className="clean-tab-content">
+                        {/* Clinical interaction alerts */}
+                        {clinicalAlerts.length > 0 ? (
+                          <div className="clean-alerts-list">
+                            {clinicalAlerts.map((alert, idx) => (
+                              <div key={idx} className={`clean-alert-item ${alert.severity}`}>
+                                <AlertTriangle size={16} className="clean-alert-icon" />
+                                <div>
+                                  <strong>{alert.title}</strong>
+                                  <p>{alert.detail}</p>
+                                </div>
                               </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="clean-safe-strip">
+                            <CheckCircle2 size={16} color="#16a34a" />
+                            <span>No critical drug-drug interactions detected with current active medications.</span>
+                          </div>
+                        )}
+
+                        {/* TGA Pregnancy Category */}
+                        {selectedArtg.pregnancyCategory && (
+                          <div className="clean-info-block">
+                            <span className="clean-info-title">
+                              TGA Pregnancy Category {selectedArtg.pregnancyCategory}
+                            </span>
+                            <p>{getPregnancyDescription(selectedArtg.pregnancyCategory).detail}</p>
+                          </div>
+                        )}
+
+                        {/* Warnings and Cautions */}
+                        {selectedArtg.warningNote && (
+                          <div className="clean-warning-block">
+                            <AlertCircle size={15} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+                            <div>
+                              <strong>Clinical Warning:</strong> {selectedArtg.warningNote}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="clean-safe-strip">
-                          <CheckCircle2 size={16} color="#16a34a" />
-                          <span>No critical drug-drug interactions detected with current active medications.</span>
-                        </div>
-                      )}
-
-                      {/* TGA Pregnancy Category */}
-                      {selectedArtg.pregnancyCategory && (
-                        <div className="clean-info-block">
-                          <span className="clean-info-title">
-                            TGA Pregnancy Category {selectedArtg.pregnancyCategory}
-                          </span>
-                          <p>{getPregnancyDescription(selectedArtg.pregnancyCategory).detail}</p>
-                        </div>
-                      )}
-
-                      {/* Warnings and Cautions */}
-                      {selectedArtg.warningNote && (
-                        <div className="clean-warning-block">
-                          <AlertCircle size={15} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
-                          <div>
-                            <strong>Clinical Warning:</strong> {selectedArtg.warningNote}
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {selectedArtg.cautionsAndContraindications && (
-                        <div className="clean-info-block">
-                          <span className="clean-info-title">Precautions & Contraindications</span>
-                          <p>{selectedArtg.cautionsAndContraindications}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* TAB 2: PHARMACOLOGY & MONOGRAPH */}
-                  {rightTab === 'monograph' && (
-                    <div className="clean-tab-content">
-                      {selectedArtg.indication && (
-                        <div className="clean-info-block">
-                          <span className="clean-info-title">Approved Clinical Indications</span>
-                          <p>{selectedArtg.indication}</p>
-                        </div>
-                      )}
-
-                      {selectedArtg.mechanismOfAction && (
-                        <div className="clean-info-block">
-                          <span className="clean-info-title">Mechanism of Action</span>
-                          <p>{selectedArtg.mechanismOfAction}</p>
-                        </div>
-                      )}
-
-                      {selectedArtg.monitoringAdvice && (
-                        <div className="clean-info-block">
-                          <span className="clean-info-title">Clinical Monitoring</span>
-                          <p>{selectedArtg.monitoringAdvice}</p>
-                        </div>
-                      )}
-
-                      {selectedArtg.adverseEffects && (
-                        <div className="clean-info-block">
-                          <span className="clean-info-title">Adverse Reactions</span>
-                          <p>{selectedArtg.adverseEffects}</p>
-                        </div>
-                      )}
-
-                      {selectedArtg.pbsRestrictionNote && (
-                        <div className="clean-info-block">
-                          <span className="clean-info-title">PBS Listing & Restrictions</span>
-                          <p>
-                            {selectedArtg.pbsListingType ? `[${selectedArtg.pbsListingType}] ` : ''}
-                            {selectedArtg.pbsRestrictionNote}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* TAB 3: PATIENT COUNSELING */}
-                  {rightTab === 'counseling' && (
-                    <div className="clean-tab-content">
-                      {selectedArtg.counselingAdvice && (
-                        <div className="clean-info-block">
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span className="clean-info-title">Patient Counseling & Administration</span>
-                            <button
-                              type="button"
-                              className="clean-inline-action-btn"
-                              onClick={handleCopyCounselingToDirections}
-                            >
-                              Insert in Directions
-                            </button>
+                        {selectedArtg.cautionsAndContraindications && (
+                          <div className="clean-info-block">
+                            <span className="clean-info-title">Precautions & Contraindications</span>
+                            <p>{selectedArtg.cautionsAndContraindications}</p>
                           </div>
-                          <p style={{ marginTop: '6px' }}>{selectedArtg.counselingAdvice}</p>
-                        </div>
-                      )}
+                        )}
 
-                      {selectedArtg.storageAdvice && (
-                        <div className="clean-info-block">
-                          <span className="clean-info-title">Storage & Handling</span>
-                          <p>{selectedArtg.storageAdvice}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : clinicalAlerts.length > 0 ? (
-                <div className="clean-monograph-card">
-                  <div className="clean-monograph-tab-bar">
-                    <button type="button" className="clean-tab-btn active">
-                      <ShieldAlert size={14} /> Safety & Alerts
-                      <span className="clean-alert-count-pill">{clinicalAlerts.length}</span>
-                    </button>
+                        {!hasMonographData && !hasCounselingData && (
+                          <div className="clean-info-block">
+                            <span className="clean-info-title">Standard ARTG Formulation</span>
+                            <p>
+                              No extended clinical monograph registered for this medicine. Prescribe using standard clinical protocols and AMH guidance.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TAB 2: PHARMACOLOGY & MONOGRAPH */}
+                    {effectiveTab === 'monograph' && hasMonographData && (
+                      <div className="clean-tab-content">
+                        {selectedArtg.indication && (
+                          <div className="clean-info-block">
+                            <span className="clean-info-title">Approved Clinical Indications</span>
+                            <p>{selectedArtg.indication}</p>
+                          </div>
+                        )}
+
+                        {selectedArtg.mechanismOfAction && (
+                          <div className="clean-info-block">
+                            <span className="clean-info-title">Mechanism of Action</span>
+                            <p>{selectedArtg.mechanismOfAction}</p>
+                          </div>
+                        )}
+
+                        {selectedArtg.monitoringAdvice && (
+                          <div className="clean-info-block">
+                            <span className="clean-info-title">Clinical Monitoring</span>
+                            <p>{selectedArtg.monitoringAdvice}</p>
+                          </div>
+                        )}
+
+                        {selectedArtg.adverseEffects && (
+                          <div className="clean-info-block">
+                            <span className="clean-info-title">Adverse Reactions</span>
+                            <p>{selectedArtg.adverseEffects}</p>
+                          </div>
+                        )}
+
+                        {selectedArtg.pbsRestrictionNote && (
+                          <div className="clean-info-block">
+                            <span className="clean-info-title">PBS Listing & Restrictions</span>
+                            <p>
+                              {selectedArtg.pbsListingType ? `[${selectedArtg.pbsListingType}] ` : ''}
+                              {selectedArtg.pbsRestrictionNote}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TAB 3: PATIENT COUNSELING */}
+                    {effectiveTab === 'counseling' && hasCounselingData && (
+                      <div className="clean-tab-content">
+                        {selectedArtg.counselingAdvice && (
+                          <div className="clean-info-block">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span className="clean-info-title">Patient Counseling & Administration</span>
+                              <button
+                                type="button"
+                                className="clean-inline-action-btn"
+                                onClick={handleCopyCounselingToDirections}
+                              >
+                                Insert in Directions
+                              </button>
+                            </div>
+                            <p style={{ marginTop: '6px' }}>{selectedArtg.counselingAdvice}</p>
+                          </div>
+                        )}
+
+                        {selectedArtg.storageAdvice && (
+                          <div className="clean-info-block">
+                            <span className="clean-info-title">Storage & Handling</span>
+                            <p>{selectedArtg.storageAdvice}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="clean-tab-content">
-                    <div className="clean-alerts-list">
-                      {clinicalAlerts.map((alert, idx) => (
-                        <div key={idx} className={`clean-alert-item ${alert.severity}`}>
-                          <AlertTriangle size={16} className="clean-alert-icon" />
-                          <div>
-                            <strong>{alert.title}</strong>
-                            <p>{alert.detail}</p>
+                ) : clinicalAlerts.length > 0 ? (
+                  <div className="clean-monograph-card">
+                    <div className="clean-monograph-tab-bar">
+                      <button type="button" className="clean-tab-btn active">
+                        <ShieldAlert size={14} /> Safety & Alerts
+                        <span className="clean-alert-count-pill">{clinicalAlerts.length}</span>
+                      </button>
+                    </div>
+                    <div className="clean-tab-content">
+                      <div className="clean-alerts-list">
+                        {clinicalAlerts.map((alert, idx) => (
+                          <div key={idx} className={`clean-alert-item ${alert.severity}`}>
+                            <AlertTriangle size={16} className="clean-alert-icon" />
+                            <div>
+                              <strong>{alert.title}</strong>
+                              <p>{alert.detail}</p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="clean-monograph-empty-state">
-                  <Stethoscope size={36} color="#94a3b8" />
-                  <h4>Australian Clinical Drug Reference</h4>
-                  <p>
-                    Search or select an Australian medicine on the left to review real-time drug interaction checks,
-                    TGA pregnancy classifications, PBS restrictions, and clinical monographs.
-                  </p>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="clean-monograph-card standard-ref-card">
+                    <div className="clean-standard-ref-header">
+                      <Info size={16} color="#0284c7" />
+                      <div>
+                        <strong>Standard Formulation Reference</strong>
+                        <p>No extended clinical monograph registered for this item</p>
+                      </div>
+                    </div>
+                    <div className="clean-tab-content">
+                      <div className="clean-info-block">
+                        <span className="clean-info-title">Clinical Prescribing Note</span>
+                        <p>
+                          Not all medications require an extended clinical monograph.
+                          Standard formulations, compounding items, over-the-counter preparations,
+                          and routine therapies can be safely prescribed using standard clinical protocols
+                          and Australian Medicines Handbook (AMH) guidelines.
+                        </p>
+                      </div>
+                      <div className="clean-safe-strip">
+                        <CheckCircle2 size={16} color="#16a34a" />
+                        <span>Prescription form ready. Enter dosage and administration instructions on the left.</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* CLEAN MODAL FOOTER */}
