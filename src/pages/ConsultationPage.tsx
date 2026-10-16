@@ -172,40 +172,51 @@ export function ConsultationPage() {
   return (
     <div className={`consultation-page ventricura-consultation ${role === 'clinician' ? 'clinician-consultation' : 'patient-consultation'} ${isFullscreen ? 'is-fullscreen' : ''}`}>
       <header className="consultation-heading consultation-toolbar">
-        <Link to={dashboardPath} className="back-link"><ArrowLeft size={18} /> Leave consultation</Link>
-        <div className="consultation-person">
-          <div className="avatar"><UserRound size={19} /></div>
-          <div>
-            <strong>
-              {role === 'clinician'
-                ? (effectivePatientDisplay !== 'Patient' ? `Consultation with ${effectivePatientDisplay}` : 'Clinician workspace')
-                : (effectiveClinicianDisplay !== 'Clinician' ? `Appointment with ${effectiveClinicianDisplay}` : 'Patient appointment')}
-            </strong>
-            <span>{role === 'clinician' ? 'Secure clinical consultation' : 'Secure video appointment'}</span>
+        <div className="consultation-toolbar-left">
+          <Link to={dashboardPath} className="back-link"><ArrowLeft size={18} /> Leave consultation</Link>
+          <div className="consultation-person">
+            <div className="avatar"><UserRound size={18} /></div>
+            <div>
+              <strong>
+                {role === 'clinician'
+                  ? (effectivePatientDisplay !== 'Patient' ? `Consultation with ${effectivePatientDisplay}` : 'Clinician workspace')
+                  : (effectiveClinicianDisplay !== 'Clinician' ? `Appointment with ${effectiveClinicianDisplay}` : 'Patient appointment')}
+              </strong>
+              <span>{role === 'clinician' ? 'Secure clinical consultation' : 'Secure video appointment'}</span>
+            </div>
           </div>
         </div>
-        {role === 'clinician' && (
-          <div className="consultation-flag-container">
-            <button
-              type="button"
-              className={`consult-flag-review-btn ${needsReview ? 'flagged' : ''}`}
-              onClick={() => void handleToggleReviewFlag()}
-              disabled={reviewSaving}
-              title={needsReview ? 'Patient flagged as Needs Review. Click to remove from review queue.' : 'Flag this patient as Needs Review for follow-up'}
-            >
-              {reviewSaving ? (
-                <LoaderCircle className="spin" size={14} />
-              ) : needsReview ? (
-                <BookmarkCheck size={14} />
-              ) : (
-                <BookmarkPlus size={14} />
-              )}
-              <span>{needsReview ? 'Needs review' : 'Flag for review'}</span>
-            </button>
-            {reviewNotice && <span className="consult-review-toast">{reviewNotice}</span>}
+
+        <div className="consultation-toolbar-center">
+          <div className="call-time" aria-label={`Call elapsed time: ${formatCallDuration(elapsedSeconds)}`}>
+            <span className="live-dot" />
+            <Clock3 size={15} />
+            <span>{formatCallDuration(elapsedSeconds)}</span>
           </div>
-        )}
-        <div className="consultation-toolbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '9px', justifySelf: 'end' }}>
+        </div>
+
+        <div className="consultation-toolbar-actions">
+          {role === 'clinician' && (
+            <div className="consultation-flag-container">
+              <button
+                type="button"
+                className={`consult-flag-review-btn ${needsReview ? 'flagged' : ''}`}
+                onClick={() => void handleToggleReviewFlag()}
+                disabled={reviewSaving}
+                title={needsReview ? 'Patient flagged as Needs Review. Click to remove from review queue.' : 'Flag this patient as Needs Review for follow-up'}
+              >
+                {reviewSaving ? (
+                  <LoaderCircle className="spin" size={14} />
+                ) : needsReview ? (
+                  <BookmarkCheck size={14} />
+                ) : (
+                  <BookmarkPlus size={14} />
+                )}
+                <span>{needsReview ? 'Needs review' : 'Flag for review'}</span>
+              </button>
+              {reviewNotice && <span className="consult-review-toast">{reviewNotice}</span>}
+            </div>
+          )}
           <button
             type="button"
             className="consultation-fullscreen-btn"
@@ -216,10 +227,6 @@ export function ConsultationPage() {
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
             <span>{isFullscreen ? 'Exit full screen' : 'Full screen'}</span>
           </button>
-          <div className="call-time" aria-label={`Call elapsed time: ${formatCallDuration(elapsedSeconds)}`}>
-            <span className="live-dot" />
-            <Clock3 size={16} /> {formatCallDuration(elapsedSeconds)}
-          </div>
         </div>
       </header>
 
