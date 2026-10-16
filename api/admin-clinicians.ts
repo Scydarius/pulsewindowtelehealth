@@ -129,8 +129,21 @@ async function handle(request: Request) {
     }
 
     if (request.method === 'GET' && action === 'self-profile') {
-      const { db, profile } = await signedIn(request); const { data: clinic } = profile.clinic_id ? await db.from('clinics').select('name').eq('id', profile.clinic_id).maybeSingle() : { data: null };
-      return Response.json({ profile: { display_name: profile.display_name, professional_title: profile.professional_title ?? '', about_me: profile.about_me ?? '', photo_url: profile.photo_url ?? '', clinic_name: clinic?.name ?? null } }, { headers: { 'Cache-Control': 'no-store' } });
+      const { db, profile } = await signedIn(request);
+      const { data: clinic } = profile.clinic_id ? await db.from('clinics').select('name, slug').eq('id', profile.clinic_id).maybeSingle() : { data: null };
+      const { data: booking } = await db.from('clinician_booking_profiles').select('booking_token, booking_enabled').eq('clinician_id', profile.id).maybeSingle();
+      return Response.json({
+        profile: {
+          display_name: profile.display_name,
+          professional_title: profile.professional_title ?? '',
+          about_me: profile.about_me ?? '',
+          photo_url: profile.photo_url ?? '',
+          clinic_name: clinic?.name ?? null,
+          clinic_slug: clinic?.slug ?? null,
+          booking_token: booking?.booking_token ?? null,
+          booking_enabled: booking?.booking_enabled ?? false,
+        },
+      }, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (request.method === 'GET') {
       const { db, profile } = await administrator(request);
