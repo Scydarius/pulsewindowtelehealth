@@ -1,11 +1,40 @@
-import { ArrowLeft, BookmarkCheck, BookmarkPlus, CheckCircle2, Clock3, LoaderCircle, Maximize2, Minimize2, Pill, UserRound, Video } from 'lucide-react';
+import {
+  Activity,
+  ArrowLeft,
+  BookmarkCheck,
+  BookmarkPlus,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  LoaderCircle,
+  Maximize2,
+  Minimize2,
+  Pill,
+  Play,
+  RotateCcw,
+  UserRound,
+  Video,
+  X,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { MeasurementPanel } from '../components/MeasurementPanel';
+import { PrescribeMedicationModal } from '../components/PrescribeMedicationModal';
 import { VideoRoom } from '../components/VideoRoom';
-import { fetchPatientInvitation, getAppointmentReviewStatus, updateAppointmentReviewStatus } from '../services/clinicAccess';
+import {
+  fetchPatientInvitation,
+  getAppointmentReviewStatus,
+  loadPatientMedications,
+  type PatientMedication,
+  updateAppointmentReviewStatus,
+} from '../services/clinicAccess';
 import { loadConsultationDetails } from '../services/clinicianData';
-import { subscribeToCameraCheck, type CameraCheckSyncState } from '../services/consultationSync';
+import {
+  broadcastCameraCheckRequest,
+  cancelCameraCheckRequest,
+  subscribeToCameraCheck,
+  type CameraCheckSyncState,
+} from '../services/consultationSync';
 
 function getCallStartTime(appointmentId: string): number {
   if (typeof window === 'undefined') return Date.now();
@@ -48,6 +77,7 @@ export function ConsultationPage() {
 
   const [clinicianName, setClinicianName] = useState(defaultClinicianName);
   const [patientName, setPatientName] = useState(defaultPatientName);
+  const [patientId, setPatientId] = useState<string | undefined>(undefined);
 
   const displayName = role === 'clinician' ? clinicianName : patientName;
   const dashboardPath = role === 'clinician' ? '/clinician' : '/join';
@@ -60,6 +90,15 @@ export function ConsultationPage() {
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewNotice, setReviewNotice] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Clinician camera check request state from the side dock
+  const [requestStatus, setRequestStatus] = useState<'idle' | 'waiting' | 'accepted' | 'declined'>('idle');
+
+  // Prescribing modal state & active medications
+  const [showPrescribeModal, setShowPrescribeModal] = useState(false);
+  const [prescribeNotice, setPrescribeNotice] = useState('');
+  const [medications, setMedications] = useState<PatientMedication[]>([]);
+  const [lastPrescribedMed, setLastPrescribedMed] = useState<PatientMedication | null>(null);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -92,7 +131,7 @@ export function ConsultationPage() {
     return () => window.clearInterval(interval);
   }, [appointmentId]);
 
-  // Load participant names and review status from appointment or patient invite
+  // Load participant names, patient ID, medications and review status
   useEffect(() => {
     let active = true;
     if (role === 'clinician') {
@@ -100,6 +139,16 @@ export function ConsultationPage() {
         if (!active || !details) return;
         if (details.clinicianName && details.clinicianName !== 'Clinician') setClinicianName(details.clinicianName);
         if (details.patientName && details.patientName !== 'Patient') setPatientName(details.patientName);
+        if (details.patientId) {
+          setPatientId(details.patientId);
+          void loadPatientMedications(details.patientId).then(({ medications: meds }) => {
+            if (active) setMedications(meds);
+          }).catch(() => {});
+        } else if (appointmentId) {
+          void loadPatientMedications(appointmentId).then(({ medications: meds }) => {
+            if (active) setMedications(meds);
+          }).catch(() => {});
+        }
         if (typeof details.needsReview === 'boolean') setNeedsReview(details.needsReview);
       }).catch(() => {});
 
@@ -154,7 +203,11 @@ export function ConsultationPage() {
       if (sync.clinicianName && sync.clinicianName !== 'Clinician') {
         setClinicianName(sync.clinicianName);
       }
+      if (sync.isRecording) {
+        setRequestStatus('accepted');
+      }
       if (sync.status === 'complete') {
+        setRequestStatus('idle');
         setShowCompleteNotice(true);
         // Automatically mark as needing review when a camera reading finishes
         setNeedsReview(true);
@@ -163,11 +216,43 @@ export function ConsultationPage() {
         return () => clearTimeout(timer);
       }
     });
-    return unsub;
+
+    // Listen for patient response to reading request
+    const onSyncMsg = (e: Event) => {
+      const custom = e as CustomEvent<{ type?: string; payload?: { appointmentId?: string; accepted?: boolean } }>;
+      const msg = custom.detail;
+      if (msg?.type === 'camera_check_response' && msg.payload?.appointmentId === appointmentId) {
+        if (msg.payload.accepted) {
+          setRequestStatus('accepted');
+        } else {
+          setRequestStatus('declined');
+        }
+      }
+    };
+    window.addEventListener('ventricura_camera_check_msg', onSyncMsg);
+
+    return () => {
+      unsub();
+      window.removeEventListener('ventricura_camera_check_msg', onSyncMsg);
+    };
   }, [appointmentId, role]);
 
   const effectivePatientDisplay = patientName !== 'Patient' ? patientName : 'Patient';
   const effectiveClinicianDisplay = clinicianName !== 'Clinician' ? clinicianName : 'Clinician';
+
+  const handleInitiateReading = () => {
+    setRequestStatus('waiting');
+    broadcastCameraCheckRequest(appointmentId, effectiveClinicianDisplay);
+  };
+
+  const handleCancelReading = () => {
+    setRequestStatus('idle');
+    cancelCameraCheckRequest(appointmentId);
+  };
+
+  const scrollToTelemetry = () => {
+    document.getElementById('consultation-telemetry-section')?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
     <div className={`consultation-page ventricura-consultation ${role === 'clinician' ? 'clinician-consultation' : 'patient-consultation'} ${isFullscreen ? 'is-fullscreen' : ''}`}>
@@ -197,25 +282,37 @@ export function ConsultationPage() {
 
         <div className="consultation-toolbar-actions">
           {role === 'clinician' && (
-            <div className="consultation-flag-container">
+            <>
               <button
                 type="button"
-                className={`consult-flag-review-btn ${needsReview ? 'flagged' : ''}`}
-                onClick={() => void handleToggleReviewFlag()}
-                disabled={reviewSaving}
-                title={needsReview ? 'Patient flagged as Needs Review. Click to remove from review queue.' : 'Flag this patient as Needs Review for follow-up'}
+                className="consult-toolbar-prescribe-btn"
+                onClick={() => setShowPrescribeModal(true)}
+                title={`Prescribe medication for ${effectivePatientDisplay}`}
               >
-                {reviewSaving ? (
-                  <LoaderCircle className="spin" size={14} />
-                ) : needsReview ? (
-                  <BookmarkCheck size={14} />
-                ) : (
-                  <BookmarkPlus size={14} />
-                )}
-                <span>{needsReview ? 'Needs review' : 'Flag for review'}</span>
+                <Pill size={14} />
+                <span>Prescribe</span>
+                {medications.length > 0 && <span className="hud-pill-count">{medications.length}</span>}
               </button>
-              {reviewNotice && <span className="consult-review-toast">{reviewNotice}</span>}
-            </div>
+              <div className="consultation-flag-container">
+                <button
+                  type="button"
+                  className={`consult-flag-review-btn ${needsReview ? 'flagged' : ''}`}
+                  onClick={() => void handleToggleReviewFlag()}
+                  disabled={reviewSaving}
+                  title={needsReview ? 'Patient flagged as Needs Review. Click to remove from review queue.' : 'Flag this patient as Needs Review for follow-up'}
+                >
+                  {reviewSaving ? (
+                    <LoaderCircle className="spin" size={14} />
+                  ) : needsReview ? (
+                    <BookmarkCheck size={14} />
+                  ) : (
+                    <BookmarkPlus size={14} />
+                  )}
+                  <span>{needsReview ? 'Needs review' : 'Flag for review'}</span>
+                </button>
+                {reviewNotice && <span className="consult-review-toast">{reviewNotice}</span>}
+              </div>
+            </>
           )}
           <button
             type="button"
@@ -231,6 +328,7 @@ export function ConsultationPage() {
       </header>
 
       <main className={`consultation-grid consultation-workspace ${role === 'patient' ? 'patient-consultation-grid' : ''}`}>
+        {/* TOP SECTION: WIDE FULL-WIDTH VIDEO PANEL + CLINICIAN HUD SIDE DOCK */}
         <section className="video-column consultation-video-panel">
           <div className="consultation-video-heading">
             <div>
@@ -286,18 +384,147 @@ export function ConsultationPage() {
             </div>
           )}
 
-          <VideoRoom
-            appointmentId={appointmentId}
-            displayName={displayName}
-            role={role}
-            invitationToken={invitationToken}
-            patientName={patientName}
-            clinicianName={clinicianName}
-            onLeave={role === 'patient' ? () => setMeasurementStopRequest((request) => request + 1) : undefined}
-          />
-          <div className="medication-context"><div><Pill /></div><span><strong>Appointment privacy</strong>This call is available only to the clinician and the holder of the secure patient link.</span></div>
+          <div className="consultation-video-stage-wrapper">
+            <div className="consultation-video-viewport">
+              <VideoRoom
+                appointmentId={appointmentId}
+                displayName={displayName}
+                role={role}
+                invitationToken={invitationToken}
+                patientName={patientName}
+                clinicianName={clinicianName}
+                onLeave={role === 'patient' ? () => setMeasurementStopRequest((request) => request + 1) : undefined}
+              />
+            </div>
+
+            {/* SIDE DOCK: Start reading and see live vitals right alongside video without scrolling past patient */}
+            {role === 'clinician' && (
+              <aside className="consultation-clinician-side-dock" aria-label="Clinical Telemetry HUD">
+                <div className="side-dock-top">
+                  <div className="side-dock-header">
+                    <span className="side-dock-title">TELEMETRY HUD</span>
+                    <span className={`side-dock-status-badge ${patientSync?.isRecording ? 'live' : patientSync?.heartRateBpm != null ? 'complete' : ''}`}>
+                      {patientSync?.isRecording ? '● CHECKING' : patientSync?.heartRateBpm != null ? 'LOCKED' : 'READY'}
+                    </span>
+                  </div>
+
+                  {/* Reading status / Vitals display */}
+                  {patientSync?.isRecording ? (
+                    <div className="side-dock-recording-card">
+                      <div className="side-dock-recording-header">
+                        <span className="side-dock-vital-label">RECORDING VITALS</span>
+                        <span className="side-dock-recording-countdown">{patientSync.secondsRemaining}s</span>
+                      </div>
+                      <div className="side-dock-progress-bar">
+                        <div className="side-dock-progress-fill" style={{ width: `${Math.max(5, patientSync.progress)}%` }} />
+                      </div>
+                      <p>
+                        {patientSync.motionDetected
+                          ? 'Motion detected — advise patient to settle'
+                          : patientSync.isCalibrating
+                          ? 'Establishing optical baseline'
+                          : 'Locking quality-weighted pulse'}
+                      </p>
+                      <button
+                        type="button"
+                        className="side-dock-cancel-btn"
+                        onClick={handleCancelReading}
+                      >
+                        <X size={13} /> Cancel reading
+                      </button>
+                    </div>
+                  ) : requestStatus === 'waiting' ? (
+                    <div className="side-dock-waiting-card">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <LoaderCircle className="spin" size={15} color="#d97706" />
+                        <strong>Awaiting patient consent…</strong>
+                      </div>
+                      <span>Consent prompt displayed on {effectivePatientDisplay}'s screen</span>
+                      <button
+                        type="button"
+                        className="side-dock-cancel-btn"
+                        onClick={handleCancelReading}
+                      >
+                        <X size={13} /> Cancel request
+                      </button>
+                    </div>
+                  ) : patientSync?.heartRateBpm != null ? (
+                    <div className="side-dock-vitals-card">
+                      <div className="side-dock-vitals-grid">
+                        <div className="side-dock-vital-item">
+                          <span className="side-dock-vital-label">PULSE</span>
+                          <span className="side-dock-vital-val">
+                            {Math.round(patientSync.heartRateBpm)} <small>BPM</small>
+                          </span>
+                        </div>
+                        <div className="side-dock-vital-item">
+                          <span className="side-dock-vital-label">BREATHING</span>
+                          <span className="side-dock-vital-val">
+                            {patientSync.respiratoryRate != null ? (Math.round(patientSync.respiratoryRate * 10) / 10).toFixed(1) : '--'} <small>/min</small>
+                          </span>
+                        </div>
+                      </div>
+                      <div className="side-dock-vital-meta">
+                        <span>Quality: {Math.round((patientSync.signalQuality ?? 0) * 100)}%</span>
+                        <span style={{ color: '#10b981', fontWeight: 700 }}>● Locked</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="side-dock-action-btn secondary"
+                        onClick={handleInitiateReading}
+                        title="Run another 30-second camera check"
+                      >
+                        <RotateCcw size={14} /> Start new reading
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="side-dock-idle-card">
+                      <strong>Contactless Vitals</strong>
+                      <span>30-second optical face camera check for pulse & respiration.</span>
+                      <button
+                        type="button"
+                        className="side-dock-action-btn primary"
+                        onClick={handleInitiateReading}
+                      >
+                        <Play size={14} /> Start camera check
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 1-Click Prescribe in Call */}
+                  <button
+                    type="button"
+                    className="side-dock-action-btn prescribe"
+                    onClick={() => setShowPrescribeModal(true)}
+                    title="Prescribe medication from Australian ARTG"
+                  >
+                    <Pill size={15} /> Prescribe medication
+                    {medications.length > 0 && <span className="hud-pill-count">{medications.length}</span>}
+                  </button>
+                </div>
+
+                <div className="side-dock-bottom">
+                  <button
+                    type="button"
+                    className="side-dock-scroll-btn"
+                    onClick={scrollToTelemetry}
+                    title="Scroll down to waveforms, trend graphs, and clinical notes"
+                  >
+                    <ChevronDown size={14} /> Full notes & waveforms below
+                  </button>
+                </div>
+              </aside>
+            )}
+          </div>
+
+          <div className="medication-context">
+            <div><Pill /></div>
+            <span><strong>Appointment privacy</strong>This call is available only to the clinician and the holder of the secure patient link.</span>
+          </div>
         </section>
-        <section className="consultation-measurements-panel">
+
+        {/* BOTTOM SECTION: ALL THE BULKY STUFF BELOW (Readings, Waveforms, Notes, Pharmacotherapy) */}
+        <section id="consultation-telemetry-section" className="consultation-measurements-panel">
           <MeasurementPanel
             appointmentId={appointmentId}
             role={role}
@@ -307,9 +534,38 @@ export function ConsultationPage() {
             stopRequest={measurementStopRequest}
             isFlaggedForReview={needsReview}
             onToggleReviewFlag={role === 'clinician' ? () => void handleToggleReviewFlag() : undefined}
+            patientId={patientId}
+            medications={medications}
+            onOpenPrescribe={role === 'clinician' ? () => setShowPrescribeModal(true) : undefined}
+            lastPrescribedMed={lastPrescribedMed}
           />
         </section>
       </main>
+
+      {/* AUSTRALIAN ARTG PRESCRIBE MODAL */}
+      {role === 'clinician' && (
+        <PrescribeMedicationModal
+          isOpen={showPrescribeModal}
+          patientId={patientId || appointmentId}
+          patientName={effectivePatientDisplay}
+          onClose={() => setShowPrescribeModal(false)}
+          onPrescribed={(created) => {
+            setMedications((prev) => [created, ...prev.filter((m) => m.id !== created.id)]);
+            setLastPrescribedMed(created);
+            setPrescribeNotice(`Prescribed: ${created.medication_name} ${created.dose} (${created.repeats} repeats)`);
+            setTimeout(() => setPrescribeNotice(''), 6000);
+          }}
+          existingMedications={medications}
+        />
+      )}
+
+      {/* IN-CALL PRESCRIPTION SUCCESS TOAST */}
+      {prescribeNotice && (
+        <div className="consult-prescribe-toast" role="status">
+          <CheckCircle2 size={16} />
+          <span>{prescribeNotice}</span>
+        </div>
+      )}
     </div>
   );
 }

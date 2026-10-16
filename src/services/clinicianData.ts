@@ -115,6 +115,8 @@ export async function loadClinicianWorkspace() {
 export type ConsultationDetails = {
   clinicianName: string;
   patientName: string;
+  patientId?: string;
+  patientEmail?: string;
   reason: string;
   startsAt: string;
   needsReview?: boolean;
@@ -162,6 +164,8 @@ export async function loadConsultationDetails(appointmentId: string): Promise<Co
   return {
     clinicianName: profile?.display_name ?? 'Clinician',
     patientName: patient?.display_name ?? 'Patient',
+    patientId: patient?.id,
+    patientEmail: patient?.email,
     reason: appointment.reason ?? '',
     startsAt: appointment.starts_at ?? '',
     needsReview: Boolean(appointment.needs_review),

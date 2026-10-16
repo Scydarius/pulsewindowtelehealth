@@ -1,7 +1,7 @@
-import { Activity, BookmarkCheck, BookmarkPlus, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Download, FileText, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Wind, X } from 'lucide-react';
+import { Activity, BookmarkCheck, BookmarkPlus, Check, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Download, FileText, LoaderCircle, LockKeyhole, Pill, Play, RotateCcw, ShieldCheck, Wind, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { type MeasurementUpdate, rppgClient } from '../services/rppgClient';
-import { loadPatientMeasurementTrend, loadPrivateClinicalNote, savePatientMeasurement, savePrivateClinicalNote, type SavedMeasurement } from '../services/clinicAccess';
+import { loadPatientMeasurementTrend, loadPrivateClinicalNote, savePatientMeasurement, savePrivateClinicalNote, type PatientMedication, type SavedMeasurement } from '../services/clinicAccess';
 import {
   broadcastCameraCheckRequest,
   broadcastCameraCheckResponse,
@@ -22,6 +22,10 @@ type MeasurementPanelProps = {
   stopRequest?: number;
   isFlaggedForReview?: boolean;
   onToggleReviewFlag?: () => void;
+  patientId?: string;
+  medications?: PatientMedication[];
+  onOpenPrescribe?: () => void;
+  lastPrescribedMed?: PatientMedication | null;
 };
 
 const initialState: MeasurementUpdate = {
@@ -103,6 +107,8 @@ function PrivateNotes({
   patientName,
   isFlaggedForReview,
   onToggleReviewFlag,
+  onOpenPrescribe,
+  lastPrescribedMed,
 }: {
   appointmentId: string;
   patientName?: string;
@@ -114,6 +120,8 @@ function PrivateNotes({
   } | null;
   isFlaggedForReview?: boolean;
   onToggleReviewFlag?: () => void;
+  onOpenPrescribe?: () => void;
+  lastPrescribedMed?: PatientMedication | null;
 }) {
   const [content, setContent] = useState('');
   const [status, setStatus] = useState<'loading' | 'saved' | 'saving' | 'error'>('loading');
@@ -124,6 +132,22 @@ function PrivateNotes({
     void loadPrivateClinicalNote(appointmentId).then((note) => { if (active) { setContent(note.content); setStatus('saved'); } }).catch(() => { if (active) setStatus('error'); });
     return () => { active = false; };
   }, [appointmentId]);
+
+  // Auto-log newly prescribed medication during call
+  useEffect(() => {
+    if (!lastPrescribedMed) return;
+    const timeStr = new Date().toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+    const pbsTag = lastPrescribedMed.is_pbs ? 'PBS Subsidised' : 'Private';
+    const repText = `${lastPrescribedMed.repeats} repeat${lastPrescribedMed.repeats === 1 ? '' : 's'}`;
+    const dirText = lastPrescribedMed.directions ? ` · Directions: ${lastPrescribedMed.directions}` : '';
+    const noteText = lastPrescribedMed.notes ? ` · Indication: ${lastPrescribedMed.notes}` : '';
+    const snippet = `[Rx Prescribed — ${timeStr}]\n• ${lastPrescribedMed.medication_name} — ${lastPrescribedMed.dose}, ${lastPrescribedMed.frequency} (${repText}, ${pbsTag})${dirText}${noteText}\n`;
+    setContent((prev) => {
+      if (prev.includes(lastPrescribedMed.medication_name) && prev.includes(timeStr)) return prev;
+      return prev.trim() ? `${prev.trimEnd()}\n\n${snippet}` : snippet;
+    });
+    setStatus('saved');
+  }, [lastPrescribedMed]);
 
   const save = async () => {
     setStatus('saving');
@@ -210,6 +234,16 @@ function PrivateNotes({
         >
           {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? 'Copied' : 'Copy for EHR'}
         </button>
+        {onOpenPrescribe && (
+          <button
+            type="button"
+            className="note-shortcut-btn"
+            onClick={onOpenPrescribe}
+            title="Prescribe medication for this patient (ARTG database)"
+          >
+            <Pill size={12} /> Prescribe
+          </button>
+        )}
         {onToggleReviewFlag && (
           <button
             type="button"
@@ -259,6 +293,10 @@ export function MeasurementPanel({
   stopRequest = 0,
   isFlaggedForReview,
   onToggleReviewFlag,
+  patientId,
+  medications = [],
+  onOpenPrescribe,
+  lastPrescribedMed,
 }: MeasurementPanelProps) {
   const [measurement, setMeasurement] = useState<MeasurementUpdate>(initialState);
   const stopRef = useRef<(() => void) | null>(null);
@@ -961,7 +999,62 @@ export function MeasurementPanel({
         }}
         isFlaggedForReview={isFlaggedForReview}
         onToggleReviewFlag={onToggleReviewFlag}
+        onOpenPrescribe={onOpenPrescribe}
+        lastPrescribedMed={lastPrescribedMed}
       />
+
+      {role === 'clinician' && (
+        <section className="consult-medications-panel" aria-label="Patient active medications">
+          <div className="section-heading compact">
+            <div>
+              <p className="eyebrow">Pharmacotherapy</p>
+              <h3>Active Medications ({medications.length})</h3>
+            </div>
+            {onOpenPrescribe && (
+              <button
+                type="button"
+                className="button button-primary button-small"
+                onClick={onOpenPrescribe}
+                title="Prescribe new medication (ARTG database)"
+              >
+                <Pill size={14} /> Prescribe medication
+              </button>
+            )}
+          </div>
+          {medications.length > 0 ? (
+            <div className="consult-med-list">
+              {medications.map((m) => (
+                <div key={m.id} className="consult-med-item">
+                  <div className="consult-med-info">
+                    <strong>{m.medication_name} — {m.dose}</strong>
+                    <span>{m.frequency} · {m.repeats} repeat{m.repeats === 1 ? '' : 's'} {m.directions ? `· ${m.directions}` : ''}</span>
+                    {m.notes && <small style={{ color: '#64748b', display: 'block', marginTop: '2px' }}>Indication: {m.notes}</small>}
+                  </div>
+                  <div className="consult-med-badges">
+                    <span className={m.is_pbs ? 'pbs-pill' : 'non-pbs-pill'}>
+                      {m.is_pbs ? 'PBS' : 'Private'}
+                    </span>
+                    {m.artg_id && <span className="aust-pill">{m.artg_id}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="consult-med-empty">
+              <span>No active medications recorded for this patient.</span>
+              {onOpenPrescribe && (
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  onClick={onOpenPrescribe}
+                >
+                  <Pill size={13} /> Record prescription
+                </button>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <p className="clinician-measurement-note">This is the clinician-only results panel. It updates automatically when {effectivePatientName !== 'Patient' ? effectivePatientName : 'the patient'} completes their camera check.</p>
 
