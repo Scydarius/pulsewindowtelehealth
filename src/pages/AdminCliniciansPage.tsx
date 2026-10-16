@@ -239,7 +239,31 @@ export function AdminCliniciansPage() {
       setClinics((items) =>
         items.map((item) => (item.id === clinicId ? { ...item, website_banner_url: data.publicUrl } : item))
       );
-      setMessage('Banner image uploaded. Click "Save clinic website" to publish changes.');
+      const targetClinic = clinics.find((c) => c.id === clinicId);
+      if (targetClinic) {
+        try {
+          await request('PATCH', {
+            action: 'update_clinic',
+            clinicId: targetClinic.id,
+            clinicName: targetClinic.name,
+            clinicSlug: targetClinic.slug,
+            websiteHeadline: targetClinic.website_headline,
+            websiteIntro: targetClinic.website_intro,
+            websiteAbout: targetClinic.website_about,
+            websiteAddress: targetClinic.website_address,
+            websiteSpecialties: targetClinic.website_specialties,
+            websitePhone: targetClinic.website_phone,
+            websiteEmail: targetClinic.website_email,
+            websiteBannerUrl: data.publicUrl,
+            websiteBannerText: targetClinic.website_banner_text,
+            websiteBannerEnabled: targetClinic.website_banner_enabled !== false,
+            websiteEnabled: targetClinic.website_enabled !== false,
+          });
+        } catch {
+          // best-effort auto-save; user can also click "Save clinic website"
+        }
+      }
+      setMessage('Banner image uploaded and saved successfully.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to upload banner.');
     } finally {

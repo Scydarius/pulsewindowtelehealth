@@ -167,7 +167,7 @@ async function handle(request: Request) {
         }
       }
 
-      let clinicQuery = db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled, created_at').order('name');
+      let clinicQuery = db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_banner_url, website_banner_text, website_banner_enabled, website_enabled, created_at').order('name');
       let allClinicsQuery = db.from('clinics').select('id, name, slug').order('name');
       let profileQuery = db.from('clinician_profiles').select('id, display_name, is_admin, is_platform_admin, clinic_id, professional_title, about_me, photo_url, created_at').order('created_at');
 
@@ -194,13 +194,18 @@ async function handle(request: Request) {
       }
 
       if (clinicResult.error && (clinicResult.error.message?.includes('column') || clinicResult.error.code === '42703')) {
-        let fallbackClinicQuery = db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name');
+        let fallbackClinicQuery = db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_address, website_specialties, website_enabled, created_at').order('name');
         if (!isSuperAdmin && profile.clinic_id) fallbackClinicQuery = fallbackClinicQuery.eq('id', profile.clinic_id);
         clinicResult = await fallbackClinicQuery;
         if (clinicResult.error && (clinicResult.error.message?.includes('column') || clinicResult.error.code === '42703')) {
-          let minimalQuery = db.from('clinics').select('id, name, slug, public_domain, created_at').order('name');
-          if (!isSuperAdmin && profile.clinic_id) minimalQuery = minimalQuery.eq('id', profile.clinic_id);
-          clinicResult = await minimalQuery;
+          let secondFallback = db.from('clinics').select('id, name, slug, public_domain, website_headline, website_intro, website_about, website_phone, website_email, website_enabled, created_at').order('name');
+          if (!isSuperAdmin && profile.clinic_id) secondFallback = secondFallback.eq('id', profile.clinic_id);
+          clinicResult = await secondFallback;
+          if (clinicResult.error && (clinicResult.error.message?.includes('column') || clinicResult.error.code === '42703')) {
+            let minimalQuery = db.from('clinics').select('id, name, slug, public_domain, created_at').order('name');
+            if (!isSuperAdmin && profile.clinic_id) minimalQuery = minimalQuery.eq('id', profile.clinic_id);
+            clinicResult = await minimalQuery;
+          }
         }
       }
 
@@ -313,7 +318,7 @@ async function handle(request: Request) {
       return Response.json({ message: `Clinician account added for ${email}.` });
     }
     if (request.method !== 'PATCH') return Response.json({ error: 'Method not allowed' }, { status: 405 });
-    const body = await request.json() as { action?: string; clinicianId?: string; displayName?: string; professionalTitle?: string; aboutMe?: string; photoUrl?: string; isAdmin?: boolean; isPlatformAdmin?: boolean; clinicId?: string; clinicName?: string; clinicSlug?: string; publicDomain?: string; websiteHeadline?: string; websiteIntro?: string; websiteAbout?: string; websiteAddress?: string; websiteSpecialties?: string; websitePhone?: string; websiteEmail?: string; websiteEnabled?: boolean };
+    const body = await request.json() as { action?: string; clinicianId?: string; displayName?: string; professionalTitle?: string; aboutMe?: string; photoUrl?: string; isAdmin?: boolean; isPlatformAdmin?: boolean; clinicId?: string; clinicName?: string; clinicSlug?: string; publicDomain?: string; websiteHeadline?: string; websiteIntro?: string; websiteAbout?: string; websiteAddress?: string; websiteSpecialties?: string; websitePhone?: string; websiteEmail?: string; websiteBannerUrl?: string | null; websiteBannerText?: string | null; websiteBannerEnabled?: boolean; websiteEnabled?: boolean };
     if (body.action === 'update_self_profile') { const { db, profile } = await signedIn(request); if (!body.displayName?.trim()) throw new Error('A display name is required.'); const { error } = await db.from('clinician_profiles').update({ display_name: body.displayName.trim().slice(0, 120), professional_title: body.professionalTitle?.trim().slice(0, 120) || null, about_me: body.aboutMe?.trim().slice(0, 800) || null, photo_url: body.photoUrl?.trim().slice(0, 1000) || null }).eq('id', profile.id); if (error) throw new Error('Unable to save your profile.'); return Response.json({ message: 'Your public clinician profile has been saved.' }); }
     const { db, profile } = await administrator(request);
     if (body.action === 'create_clinic') {
@@ -331,15 +336,26 @@ async function handle(request: Request) {
         website_specialties: body.websiteSpecialties?.trim() || null,
         website_phone: body.websitePhone?.trim() || null,
         website_email: body.websiteEmail?.trim() || null,
+        website_banner_url: body.websiteBannerUrl?.trim() || null,
+        website_banner_text: body.websiteBannerText?.trim() || null,
+        website_banner_enabled: body.websiteBannerEnabled !== false,
         website_enabled: true,
       };
       let { data, error } = await db.from('clinics').insert(insertData).select('id, name, slug, public_domain').single();
-      if (error && error.message?.includes('column')) {
-        delete insertData.website_address;
-        delete insertData.website_specialties;
-        const fallback = await db.from('clinics').insert(insertData).select('id, name, slug, public_domain').single();
-        data = fallback.data;
-        error = fallback.error;
+      if (error && (error.message?.includes('column') || error.code === '42703')) {
+        delete insertData.website_banner_url;
+        delete insertData.website_banner_text;
+        delete insertData.website_banner_enabled;
+        let retry = await db.from('clinics').insert(insertData).select('id, name, slug, public_domain').single();
+        data = retry.data;
+        error = retry.error;
+        if (error && (error.message?.includes('column') || error.code === '42703')) {
+          delete insertData.website_address;
+          delete insertData.website_specialties;
+          const fallback = await db.from('clinics').insert(insertData).select('id, name, slug, public_domain').single();
+          data = fallback.data;
+          error = fallback.error;
+        }
       }
       if (error) throw new Error(error.message.includes('unique') ? 'That clinic URL is already in use.' : 'Unable to create clinic.');
       return Response.json({ message: `Clinic created at ventricura.com/${slug}.`, clinic: data });
@@ -359,16 +375,26 @@ async function handle(request: Request) {
         website_specialties: body.websiteSpecialties?.trim() || null,
         website_phone: body.websitePhone?.trim() || null,
         website_email: body.websiteEmail?.trim() || null,
+        website_banner_url: body.websiteBannerUrl?.trim() || null,
+        website_banner_text: body.websiteBannerText?.trim() || null,
+        website_banner_enabled: body.websiteBannerEnabled !== false,
         website_enabled: body.websiteEnabled !== false,
         updated_at: new Date().toISOString()
       };
       if (body.publicDomain !== undefined && profile.is_platform_admin) update.public_domain = body.publicDomain.trim().toLowerCase() || null;
       let { error } = await db.from('clinics').update(update).eq('id', body.clinicId);
-      if (error && error.message?.includes('column')) {
-        delete update.website_address;
-        delete update.website_specialties;
-        const fallback = await db.from('clinics').update(update).eq('id', body.clinicId);
-        error = fallback.error;
+      if (error && (error.message?.includes('column') || error.code === '42703')) {
+        delete update.website_banner_url;
+        delete update.website_banner_text;
+        delete update.website_banner_enabled;
+        let retry = await db.from('clinics').update(update).eq('id', body.clinicId);
+        error = retry.error;
+        if (error && (error.message?.includes('column') || error.code === '42703')) {
+          delete update.website_address;
+          delete update.website_specialties;
+          const fallback = await db.from('clinics').update(update).eq('id', body.clinicId);
+          error = fallback.error;
+        }
       }
       if (error) throw new Error(error.message);
       return Response.json({ message: 'Clinic website updated.' });
