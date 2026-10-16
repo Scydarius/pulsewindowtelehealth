@@ -51,6 +51,126 @@ export async function loadClinicPatients(scope: 'mine' | 'clinic' | 'all' = 'cli
   return body.patients;
 }
 
+export type SearchPatientResult = {
+  id: string;
+  displayName: string;
+  email: string;
+  clinicianId?: string | null;
+  clinicianName?: string | null;
+  clinicianTitle?: string | null;
+  clinicName?: string | null;
+  clinicSlug?: string | null;
+  createdAt: string;
+};
+
+export type SearchAppointmentResult = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientEmail: string;
+  startsAt: string;
+  reason: string;
+  intakeNote: string;
+  clinicianId?: string | null;
+  clinicianName?: string | null;
+  needsReview: boolean;
+  reviewedAt?: string | null;
+};
+
+export type SearchMedicationResult = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientEmail: string;
+  medicationName: string;
+  genericName?: string | null;
+  brandName?: string | null;
+  dose: string;
+  frequency: string;
+  directions?: string | null;
+  prescribedDate: string;
+  prescribedByName: string;
+  repeats: number;
+  isPbs: boolean;
+  status: 'active' | 'ceased' | 'completed';
+  ceasedAt?: string | null;
+  ceasedReason?: string | null;
+  notes?: string | null;
+};
+
+export type SearchClinicalNoteResult = {
+  appointmentId: string;
+  patientId?: string | null;
+  patientName: string;
+  patientEmail: string;
+  appointmentDate?: string | null;
+  appointmentReason?: string;
+  content: string;
+  updatedAt: string;
+};
+
+export type SearchMeasurementResult = {
+  appointmentId: string;
+  patientId?: string | null;
+  patientName: string;
+  patientEmail: string;
+  measuredAt: string;
+  heartRateBpm: number;
+  respiratoryRateBpm: number;
+  signalQuality: number;
+};
+
+export type SearchClinicianResult = {
+  id: string;
+  displayName: string;
+  professionalTitle?: string | null;
+  aboutMe?: string | null;
+  photoUrl?: string | null;
+  clinicName?: string | null;
+  clinicSlug?: string | null;
+};
+
+export type SearchClinicResult = {
+  id: string;
+  name: string;
+  slug: string;
+  headline?: string | null;
+  specialties?: string | null;
+  address?: string | null;
+};
+
+export type DatabaseSearchResults = {
+  query: string;
+  totalCount: number;
+  results: {
+    patients: SearchPatientResult[];
+    appointments: SearchAppointmentResult[];
+    medications: SearchMedicationResult[];
+    clinicalNotes: SearchClinicalNoteResult[];
+    measurements: SearchMeasurementResult[];
+    clinicians: SearchClinicianResult[];
+    clinics: SearchClinicResult[];
+  };
+};
+
+export async function searchClinicalDatabase(
+  query: string,
+  scope: 'mine' | 'clinic' | 'all' = 'clinic',
+  signal?: AbortSignal
+): Promise<DatabaseSearchResults> {
+  const token = await getClinicianAccessToken();
+  const response = await fetch(
+    `/api/patient-profile?action=search&q=${encodeURIComponent(query)}&scope=${encodeURIComponent(scope)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    }
+  );
+  const body = (await response.json().catch(() => ({}))) as DatabaseSearchResults & { error?: string };
+  if (!response.ok || !body.results) throw new Error(body.error ?? 'Clinical database search failed.');
+  return body;
+}
+
 /** Confirm that an authenticated account is an administrator-approved clinician. */
 export async function verifyClinicianAccess(accessToken?: string): Promise<ApprovedClinician> {
   const token = accessToken ?? await getClinicianAccessToken();

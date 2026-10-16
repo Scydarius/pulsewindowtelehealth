@@ -1,12 +1,13 @@
-import { Activity, ArrowRight, BookmarkCheck, Building2, CalendarClock, CalendarDays, Check, CheckCircle2, CircleAlert, Copy, Globe, LoaderCircle, MessageSquareText, RotateCcw, Search, ShieldOff, Stethoscope, Trash2, UsersRound, Video, X } from 'lucide-react';
+import { Activity, ArrowRight, BookmarkCheck, Building2, CalendarClock, CalendarDays, Check, CheckCircle2, CircleAlert, Copy, FileText, Globe, LoaderCircle, MessageSquareText, Pill, RotateCcw, Search, ShieldOff, Stethoscope, Trash2, UsersRound, Video, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusPill } from '../components/StatusPill';
 import { InvitePatientForm, type ExistingPatientOption } from '../components/InvitePatientForm';
 import { ClinicianAvailabilityPanel } from '../components/ClinicianAvailabilityPanel';
 import { CopyButton } from '../components/CopyButton';
+import { OverviewSearchHub } from '../components/OverviewSearchHub';
 import { type ClinicAppointment, type ClinicianProfile, isAppointmentNeedingReview, loadClinicianWorkspace } from '../services/clinicianData';
-import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, deletePatient, loadClinicPatients, revokePatientInvitation, updateAppointmentReviewStatus, type DirectoryPatient } from '../services/clinicAccess';
+import { claimInitialAdministratorAccess, createReplacementPatientInvitation, deleteAppointment, deletePatient, loadClinicPatients, revokePatientInvitation, searchClinicalDatabase, updateAppointmentReviewStatus, type DatabaseSearchResults, type DirectoryPatient, type SearchAppointmentResult, type SearchPatientResult } from '../services/clinicAccess';
 
 type WorkspaceView = 'overview' | 'patients' | 'appointments' | 'measurements' | 'availability' | 'calendar';
 const workspaceView = (value: string | null): WorkspaceView => value === 'patients' || value === 'appointments' || value === 'measurements' || value === 'availability' || value === 'calendar' ? value : 'overview';
@@ -47,6 +48,89 @@ export function ClinicianPage() {
   const [claimingAccess, setClaimingAccess] = useState(false);
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
+  const [searchResults, setSearchResults] = useState<DatabaseSearchResults | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchCategory, setSearchCategory] = useState<
+    'all' | 'patients' | 'appointments' | 'medications' | 'notes' | 'vitals' | 'directory'
+  >('all');
+
+  // Debounced database-wide search across all accessible clinical records
+  useEffect(() => {
+    const term = search.trim();
+    if (!term || term.length < 2) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const data = await searchClinicalDatabase(term, patientScope, controller.signal);
+        setSearchResults(data);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        // Fallback to client-side loaded records if offline or database query fails
+        const lower = term.toLowerCase();
+        const fallbackPatients: SearchPatientResult[] = directoryPatients
+          .filter((p) =>
+            [p.displayName, p.email, p.clinicName, p.clinicianName].some((v) => v?.toLowerCase().includes(lower))
+          )
+          .map((p) => ({
+            id: p.id,
+            displayName: p.displayName,
+            email: p.email,
+            clinicianId: p.clinicianId,
+            clinicianName: p.clinicianName,
+            clinicianTitle: p.clinicianTitle,
+            clinicName: p.clinicName,
+            clinicSlug: p.clinicSlug,
+            createdAt: p.latestAppointment,
+          }));
+
+        const fallbackAppts: SearchAppointmentResult[] = appointments
+          .filter((a) =>
+            [a.patient?.display_name, a.patient?.email, a.reason].some((v) => v?.toLowerCase().includes(lower))
+          )
+          .map((a) => {
+            const parts = (a.reason || '').split('\n\nPatient notes:');
+            return {
+              id: a.id,
+              patientId: a.patient?.id || '',
+              patientName: a.patient?.display_name || 'Patient',
+              patientEmail: a.patient?.email || '',
+              startsAt: a.starts_at,
+              reason: parts[0]?.trim() || 'Consultation',
+              intakeNote: parts[1]?.trim() || '',
+              needsReview: Boolean(a.needs_review),
+              reviewedAt: a.reviewed_at || null,
+            };
+          });
+
+        setSearchResults({
+          query: term,
+          totalCount: fallbackPatients.length + fallbackAppts.length,
+          results: {
+            patients: fallbackPatients,
+            appointments: fallbackAppts,
+            medications: [],
+            clinicalNotes: [],
+            measurements: [],
+            clinicians: [],
+            clinics: [],
+          },
+        });
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 220);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search, patientScope, directoryPatients, appointments]);
 
   // Keep sub-tab in sync if URL query changes
   useEffect(() => {
@@ -275,7 +359,7 @@ export function ClinicianPage() {
   const title = view === 'patients' ? ['Patients', 'Active patients and their longitudinal records'] : view === 'appointments' ? ['Schedule & Bookings', 'Manage appointments, seven-day calendar, and patient self-booking availability.'] : view === 'measurements' ? ['Review queue', 'Readings received from patient sessions'] : ['Today', 'Your appointments, follow-up work, and patient activity in one place.'];
 
   return <div className="dashboard-page">
-    <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view === 'appointments' ? 'Schedule' : view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients and appointments" placeholder="Search name, email, or reason…" />{search && <button type="button" className="text-button" onClick={() => setSearch('')} aria-label="Clear search" style={{ padding: 0, margin: 0, border: 0, background: 'none' }}><X size={15} /></button>}</label></div></section>
+    <section className="page-intro clinician-intro"><div><p className="eyebrow">Clinician workspace / {view === 'appointments' ? 'Schedule' : view}</p><h1>{title[0]}</h1><p>Welcome, {profile?.display_name}. {title[1]}</p></div><div className="workspace-actions"><label className="search-field" style={{ minWidth: '320px' }}><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search patients, consultations, and database" placeholder="Search database: patients, notes, meds, visits, vitals…" />{searchLoading ? <LoaderCircle size={15} className="spin" style={{ color: '#888' }} /> : search ? <button type="button" className="text-button" onClick={() => setSearch('')} aria-label="Clear search" style={{ padding: 0, margin: 0, border: 0, background: 'none' }}><X size={15} /></button> : null}</label></div></section>
     <section className="summary-strip workspace-summary">
       <Link to="/clinician?view=appointments"><div><CalendarClock /></div><span><strong>{todayAppointments.length}</strong>Appointments today</span><ArrowRight size={16} /></Link>
       <Link to="/clinician?view=patients"><div><UsersRound /></div><span><strong>{directoryPatients.length || patientGroups.length}</strong>Active patients</span><ArrowRight size={16} /></Link>
@@ -283,7 +367,60 @@ export function ClinicianPage() {
       <Link to="/clinician?view=calendar"><div><CalendarDays /></div><span><strong>{scheduled.length}</strong>Upcoming calls</span><ArrowRight size={16} /></Link>
     </section>
 
-    {view === 'overview' && <><section className="command-centre"><div className="command-centre-main"><div className="section-heading"><div><p className="eyebrow">Today / schedule</p><h2>Your next appointments</h2><p>Join a call, check the patient record, or manage access without leaving this view.</p></div><button className="text-button" onClick={() => selectScheduleTab('calendar')}>Open calendar <ArrowRight size={16} /></button></div><div className="command-list">{scheduled.slice(0, 3).map(commandAppointmentRow)}{scheduled.length === 0 && <EmptyAppointments />}</div></div><aside className="command-centre-action"><p className="eyebrow">Quick action</p><h2>Create an appointment</h2><p>Add a new patient or schedule a follow-up for an existing patient.</p><InvitePatientForm patients={patientOptions} onCreated={() => void load()} triggerVariant="primary" /></aside></section><section className="panel review-queue-panel"><div className="section-heading"><div><p className="eyebrow">Review queue</p><h2>Patient readings ready</h2><p>Open the session record, review measurements, and document follow-up.</p></div><Link className="text-button" to="/clinician?view=measurements">View all <ArrowRight size={16} /></Link></div><MeasurementList appointments={reviewQueue.slice(0, 4)} onRemoveFromReview={handleRemoveFromReview} /></section></>}
+    {view === 'overview' && (
+      search.trim().length > 0 ? (
+        <OverviewSearchHub
+          query={search}
+          loading={searchLoading}
+          data={searchResults}
+          category={searchCategory}
+          onSelectCategory={setSearchCategory}
+          onClear={() => setSearch('')}
+          currentClinicianId={profile?.id}
+          clinicName={profile?.clinic_name || 'Ventricura Telehealth'}
+        />
+      ) : (
+        <>
+          <section className="command-centre">
+            <div className="command-centre-main">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Today / schedule</p>
+                  <h2>Your next appointments</h2>
+                  <p>Join a call, check the patient record, or manage access without leaving this view.</p>
+                </div>
+                <button className="text-button" onClick={() => selectScheduleTab('calendar')}>
+                  Open calendar <ArrowRight size={16} />
+                </button>
+              </div>
+              <div className="command-list">
+                {scheduled.slice(0, 3).map(commandAppointmentRow)}
+                {scheduled.length === 0 && <EmptyAppointments />}
+              </div>
+            </div>
+            <aside className="command-centre-action">
+              <p className="eyebrow">Quick action</p>
+              <h2>Create an appointment</h2>
+              <p>Add a new patient or schedule a follow-up for an existing patient.</p>
+              <InvitePatientForm patients={patientOptions} onCreated={() => void load()} triggerVariant="primary" />
+            </aside>
+          </section>
+          <section className="panel review-queue-panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Review queue</p>
+                <h2>Patient readings ready</h2>
+                <p>Open the session record, review measurements, and document follow-up.</p>
+              </div>
+              <Link className="text-button" to="/clinician?view=measurements">
+                View all <ArrowRight size={16} />
+              </Link>
+            </div>
+            <MeasurementList appointments={reviewQueue.slice(0, 4)} onRemoveFromReview={handleRemoveFromReview} />
+          </section>
+        </>
+      )
+    )}
     {view === 'patients' && (
       <section className="panel">
         <div className="section-heading">

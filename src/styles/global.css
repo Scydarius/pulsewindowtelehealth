@@ -5816,4 +5816,247 @@ body { background: var(--cream); color: var(--ink); }
   }
 }
 
+/* ==========================================================================
+   Clinician Workspace Overview Database Omni-Search Hub
+   ========================================================================== */
+.overview-search-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 32px;
+  animation: fadeInDown 0.2s ease-out;
+}
+
+.search-hub-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 24px;
+  background: #ffffff;
+  border: 1px solid #d4d4cd;
+  box-shadow: 2px 2px 0 #deded8;
+}
+
+.search-hub-banner-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+
+.search-hub-title-box h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #171717;
+  letter-spacing: -0.02em;
+  margin: 3px 0 4px;
+}
+
+.search-hub-stats-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #171717;
+  color: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+.search-hub-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0eb;
+}
+
+.search-hub-filter-pill {
+  background: #f5f5f0;
+  border: 1px solid #d8d8d0;
+  padding: 6px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #3b3b35;
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.search-hub-filter-pill:hover {
+  background: #ebebe3;
+  border-color: #b5b5ad;
+}
+
+.search-hub-filter-pill.active {
+  background: #181818;
+  color: #ffffff;
+  border-color: #181818;
+}
+
+.search-hub-filter-pill .pill-count {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+}
+
+.search-hub-filter-pill.active .pill-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.search-hub-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #ffffff;
+  border: 1px solid #deded8;
+  padding: 20px 24px;
+}
+
+.search-hub-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f0f0eb;
+  padding-bottom: 12px;
+}
+
+.search-hub-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: #181818;
+}
+
+.search-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.search-hub-item-card {
+  border: 1px solid #e5e5dc;
+  background: #fdfdfc;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.15s ease;
+}
+
+.search-hub-item-card:hover {
+  border-color: #181818;
+  background: #ffffff;
+  box-shadow: 2px 2px 0 #181818;
+}
+
+.search-hub-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.search-hub-item-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-hub-item-title {
+  font-size: 0.96rem;
+  font-weight: 750;
+  color: #181818;
+  text-decoration: none;
+}
+
+.search-hub-item-title:hover {
+  text-decoration: underline;
+}
+
+.search-hub-item-meta {
+  font-size: 0.78rem;
+  color: #666660;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.search-hub-item-body {
+  font-size: 0.83rem;
+  color: #383832;
+  line-height: 1.45;
+  background: #f6f6f2;
+  padding: 8px 12px;
+  border-left: 3px solid #181818;
+  border-radius: 2px;
+}
+
+.search-hub-item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px dashed #e8e8e2;
+}
+
+.search-hub-highlight {
+  background: #fef08a;
+  color: #854d0e;
+  padding: 0 3px;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
+.search-hub-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  background: #ffffff;
+  border: 1px solid #d4d4cd;
+  color: #555550;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.search-hub-empty {
+  text-align: center;
+  padding: 56px 24px;
+  background: #ffffff;
+  border: 1px solid #deded8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-hub-empty h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #181818;
+  margin: 0;
+}
+
+.search-hub-empty p {
+  color: #666660;
+  font-size: 0.88rem;
+  max-width: 520px;
+  margin: 0;
+}
+
+
 

@@ -76,6 +76,405 @@ export default {
       const action = url.searchParams.get('action');
 
       // -----------------------------------------------------------------------
+      // DATABASE OMNI-SEARCH ACTION (Search everything accessible to clinician)
+      // -----------------------------------------------------------------------
+      if (action === 'search' && request.method === 'GET') {
+        const { db, clinician } = await signedInClinician(request);
+        const query = (url.searchParams.get('q') || '').trim();
+        const scope = url.searchParams.get('scope') || 'clinic'; // 'clinic', 'mine', 'all'
+
+        if (!query || query.length < 2) {
+          return Response.json(
+            {
+              query,
+              totalCount: 0,
+              results: {
+                patients: [],
+                appointments: [],
+                medications: [],
+                clinicalNotes: [],
+                measurements: [],
+                clinicians: [],
+                clinics: [],
+              },
+            },
+            { headers: { 'Cache-Control': 'no-store' } }
+          );
+        }
+
+        const cleanTerm = query.replace(/[%_,*]/g, ' ').trim() || query;
+        const isSuperAdmin = Boolean(clinician.is_platform_admin);
+        const clinicId = clinician.clinic_id ?? null;
+
+        // 1. Patients Query
+        const patientsPromise = (async () => {
+          let { data, error } = await db
+            .from('patients')
+            .select(`
+              id,
+              display_name,
+              email,
+              clinician_id,
+              created_at,
+              clinician:clinician_profiles(
+                id,
+                display_name,
+                professional_title,
+                clinic_id,
+                clinic:clinics(id, name, slug)
+              )
+            `)
+            .or(`display_name.ilike.%${cleanTerm}%,email.ilike.%${cleanTerm}%`)
+            .limit(40);
+
+          if (error || !data) {
+            const fallback = await db
+              .from('patients')
+              .select('id, display_name, email, clinician_id, created_at')
+              .or(`display_name.ilike.%${cleanTerm}%,email.ilike.%${cleanTerm}%`)
+              .limit(40);
+            data = fallback.data as any;
+          }
+
+          return (data ?? [])
+            .filter((p: any) => {
+              if (isSuperAdmin || scope === 'all') return true;
+              const pClinicId = p.clinician?.clinic_id ?? null;
+              if (scope === 'mine') return p.clinician_id === clinician.id;
+              return !pClinicId || !clinicId || pClinicId === clinicId || p.clinician_id === clinician.id;
+            })
+            .map((p: any) => {
+              const pClinician = p.clinician;
+              return {
+                id: p.id,
+                displayName: p.display_name,
+                email: p.email,
+                clinicianId: p.clinician_id,
+                clinicianName: pClinician?.display_name || null,
+                clinicianTitle: pClinician?.professional_title || null,
+                clinicName: pClinician?.clinic?.name || null,
+                clinicSlug: pClinician?.clinic?.slug || null,
+                createdAt: p.created_at,
+              };
+            });
+        })();
+
+        // 2. Appointments Query
+        const appointmentsPromise = (async () => {
+          let { data, error } = await db
+            .from('appointments')
+            .select(`
+              id,
+              patient_id,
+              reason,
+              starts_at,
+              created_at,
+              clinician_id,
+              needs_review,
+              reviewed_at,
+              patient:patients(id, display_name, email),
+              clinician:clinician_profiles(id, display_name, professional_title, clinic_id)
+            `)
+            .or(`reason.ilike.%${cleanTerm}%`)
+            .order('starts_at', { ascending: false })
+            .limit(40);
+
+          if (error || !data) {
+            const fallback = await db
+              .from('appointments')
+              .select('id, patient_id, reason, starts_at, created_at, clinician_id')
+              .or(`reason.ilike.%${cleanTerm}%`)
+              .order('starts_at', { ascending: false })
+              .limit(40);
+            data = fallback.data as any;
+          }
+
+          return (data ?? [])
+            .filter((a: any) => {
+              if (isSuperAdmin || scope === 'all') return true;
+              const aClinicId = a.clinician?.clinic_id ?? null;
+              if (scope === 'mine') return a.clinician_id === clinician.id;
+              return !aClinicId || !clinicId || aClinicId === clinicId || a.clinician_id === clinician.id;
+            })
+            .map((a: any) => {
+              const reason = a.reason || '';
+              const parts = reason.split('\n\nPatient notes:');
+              return {
+                id: a.id,
+                patientId: a.patient_id,
+                patientName: a.patient?.display_name || 'Patient',
+                patientEmail: a.patient?.email || '',
+                startsAt: a.starts_at,
+                reason: parts[0]?.trim() || 'Consultation',
+                intakeNote: parts[1]?.trim() || '',
+                clinicianId: a.clinician_id,
+                clinicianName: a.clinician?.display_name || null,
+                needsReview: Boolean(a.needs_review),
+                reviewedAt: a.reviewed_at || null,
+              };
+            });
+        })();
+
+        // 3. Medications Query
+        const medicationsPromise = (async () => {
+          try {
+            const { data, error } = await db
+              .from('patient_medications')
+              .select(`
+                id,
+                patient_id,
+                clinic_id,
+                prescribed_by_id,
+                prescribed_by_name,
+                medication_name,
+                generic_name,
+                brand_name,
+                artg_id,
+                dose,
+                frequency,
+                directions,
+                prescribed_date,
+                repeats,
+                is_pbs,
+                status,
+                ceased_at,
+                ceased_reason,
+                notes,
+                patient:patients(id, display_name, email)
+              `)
+              .or(
+                `medication_name.ilike.%${cleanTerm}%,generic_name.ilike.%${cleanTerm}%,brand_name.ilike.%${cleanTerm}%,notes.ilike.%${cleanTerm}%,directions.ilike.%${cleanTerm}%,prescribed_by_name.ilike.%${cleanTerm}%`
+              )
+              .order('prescribed_date', { ascending: false })
+              .limit(40);
+
+            if (error || !data) return [];
+
+            return data
+              .filter((m: any) => {
+                if (isSuperAdmin || scope === 'all') return true;
+                if (scope === 'mine') return m.prescribed_by_id === clinician.id;
+                return !m.clinic_id || !clinicId || m.clinic_id === clinicId || m.prescribed_by_id === clinician.id;
+              })
+              .map((m: any) => ({
+                id: m.id,
+                patientId: m.patient_id,
+                patientName: m.patient?.display_name || 'Patient',
+                patientEmail: m.patient?.email || '',
+                medicationName: m.medication_name,
+                genericName: m.generic_name,
+                brandName: m.brand_name,
+                dose: m.dose,
+                frequency: m.frequency,
+                directions: m.directions,
+                prescribedDate: m.prescribed_date,
+                prescribedByName: m.prescribed_by_name,
+                repeats: m.repeats,
+                isPbs: m.is_pbs,
+                status: m.status,
+                ceasedAt: m.ceased_at,
+                ceasedReason: m.ceased_reason,
+                notes: m.notes,
+              }));
+          } catch {
+            return [];
+          }
+        })();
+
+        // 4. Clinical Private Notes Query
+        const notesPromise = (async () => {
+          try {
+            let { data, error } = await db
+              .from('clinician_private_notes')
+              .select(`
+                appointment_id,
+                clinician_id,
+                content,
+                updated_at,
+                appointment:appointments(
+                  id,
+                  patient_id,
+                  starts_at,
+                  reason,
+                  patient:patients(id, display_name, email)
+                )
+              `)
+              .ilike('content', `%${cleanTerm}%`)
+              .order('updated_at', { ascending: false })
+              .limit(30);
+
+            if (error || !data) {
+              const fallback = await db
+                .from('clinician_private_notes')
+                .select('appointment_id, clinician_id, content, updated_at')
+                .ilike('content', `%${cleanTerm}%`)
+                .order('updated_at', { ascending: false })
+                .limit(30);
+              data = fallback.data as any;
+            }
+
+            return (data ?? [])
+              .filter((n: any) => {
+                if (isSuperAdmin || scope === 'all') return true;
+                return n.clinician_id === clinician.id;
+              })
+              .map((n: any) => {
+                const appt = n.appointment;
+                const patient = appt?.patient;
+                return {
+                  appointmentId: n.appointment_id,
+                  patientId: appt?.patient_id || null,
+                  patientName: patient?.display_name || 'Patient',
+                  patientEmail: patient?.email || '',
+                  appointmentDate: appt?.starts_at || null,
+                  appointmentReason: appt?.reason ? appt.reason.split('\n\nPatient notes:')[0].trim() : 'Consultation',
+                  content: n.content,
+                  updatedAt: n.updated_at,
+                };
+              });
+          } catch {
+            return [];
+          }
+        })();
+
+        // 5. Measurements & Telemetry Query
+        const measurementsPromise = (async () => {
+          try {
+            const num = parseInt(cleanTerm, 10);
+            let query = db
+              .from('measurements')
+              .select(`
+                appointment_id,
+                measured_at,
+                heart_rate_bpm,
+                respiratory_rate_bpm,
+                signal_quality,
+                algorithm_version,
+                diagnostics,
+                appointment:appointments(
+                  id,
+                  patient_id,
+                  starts_at,
+                  reason,
+                  patient:patients(id, display_name, email)
+                )
+              `)
+              .order('measured_at', { ascending: false })
+              .limit(20);
+
+            if (!isNaN(num) && num >= 30 && num <= 240) {
+              query = query.gte('heart_rate_bpm', num - 4).lte('heart_rate_bpm', num + 4);
+            } else if (cleanTerm.toLowerCase().includes('tachy') || cleanTerm.toLowerCase().includes('high')) {
+              query = query.gte('heart_rate_bpm', 100);
+            } else if (cleanTerm.toLowerCase().includes('brady') || cleanTerm.toLowerCase().includes('low')) {
+              query = query.lte('heart_rate_bpm', 60);
+            }
+
+            const { data, error } = await query;
+            if (error || !data) return [];
+
+            return data.map((m: any) => ({
+              appointmentId: m.appointment_id,
+              patientId: m.appointment?.patient_id || null,
+              patientName: m.appointment?.patient?.display_name || 'Patient',
+              patientEmail: m.appointment?.patient?.email || '',
+              measuredAt: m.measured_at,
+              heartRateBpm: m.heart_rate_bpm,
+              respiratoryRateBpm: m.respiratory_rate_bpm,
+              signalQuality: m.signal_quality,
+            }));
+          } catch {
+            return [];
+          }
+        })();
+
+        // 6. Clinicians and Clinics Directory Query
+        const directoryPromise = (async () => {
+          const [cliniciansResult, clinicsResult] = await Promise.allSettled([
+            db
+              .from('clinician_profiles')
+              .select('id, display_name, professional_title, about_me, photo_url, clinic:clinics(id, name, slug)')
+              .or(`display_name.ilike.%${cleanTerm}%,professional_title.ilike.%${cleanTerm}%,about_me.ilike.%${cleanTerm}%`)
+              .limit(10),
+            db
+              .from('clinics')
+              .select('id, name, slug, website_headline, website_specialties, website_address')
+              .or(`name.ilike.%${cleanTerm}%,website_specialties.ilike.%${cleanTerm}%,website_headline.ilike.%${cleanTerm}%`)
+              .limit(10),
+          ]);
+
+          const clinicians =
+            cliniciansResult.status === 'fulfilled' && cliniciansResult.value.data
+              ? cliniciansResult.value.data.map((c: any) => ({
+                  id: c.id,
+                  displayName: c.display_name,
+                  professionalTitle: c.professional_title,
+                  aboutMe: c.about_me,
+                  photoUrl: c.photo_url,
+                  clinicName: c.clinic?.name || null,
+                  clinicSlug: c.clinic?.slug || null,
+                }))
+              : [];
+
+          const clinics =
+            clinicsResult.status === 'fulfilled' && clinicsResult.value.data
+              ? clinicsResult.value.data.map((cl: any) => ({
+                  id: cl.id,
+                  name: cl.name,
+                  slug: cl.slug,
+                  headline: cl.website_headline,
+                  specialties: cl.website_specialties,
+                  address: cl.website_address,
+                }))
+              : [];
+
+          return { clinicians, clinics };
+        })();
+
+        const [patientsRes, apptsRes, medsRes, notesRes, measurementsRes, dirRes] = await Promise.allSettled([
+          patientsPromise,
+          appointmentsPromise,
+          medicationsPromise,
+          notesPromise,
+          measurementsPromise,
+          directoryPromise,
+        ]);
+
+        const patients = patientsRes.status === 'fulfilled' ? patientsRes.value : [];
+        const appointments = apptsRes.status === 'fulfilled' ? apptsRes.value : [];
+        const medications = medsRes.status === 'fulfilled' ? medsRes.value : [];
+        const clinicalNotes = notesRes.status === 'fulfilled' ? notesRes.value : [];
+        const measurements = measurementsRes.status === 'fulfilled' ? measurementsRes.value : [];
+        const directory = dirRes.status === 'fulfilled' ? dirRes.value : { clinicians: [], clinics: [] };
+
+        const totalCount =
+          patients.length +
+          appointments.length +
+          medications.length +
+          clinicalNotes.length +
+          measurements.length +
+          directory.clinicians.length +
+          directory.clinics.length;
+
+        return Response.json(
+          {
+            query: cleanTerm,
+            totalCount,
+            results: {
+              patients,
+              appointments,
+              medications,
+              clinicalNotes,
+              measurements,
+              clinicians: directory.clinicians,
+              clinics: directory.clinics,
+            },
+          },
+          { headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
+
+      // -----------------------------------------------------------------------
       // PATIENT DIRECTORY ACTION (GET clinic-wide and cross-clinic patients)
       // -----------------------------------------------------------------------
       if (action === 'directory' && request.method === 'GET') {
