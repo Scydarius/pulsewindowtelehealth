@@ -870,6 +870,26 @@ export default {
 
       if (measurementError) throw new Error('Unable to load measurement history.');
 
+      let notesData: Array<{ appointment_id: string; content?: string }> | null = null;
+      if (appointmentIds.length) {
+        try {
+          const res = await db
+            .from('clinician_private_notes')
+            .select('appointment_id, content')
+            .in('appointment_id', appointmentIds);
+          notesData = res.data;
+        } catch {
+          // Graceful fallback if table is unavailable
+        }
+      }
+
+      const notesByAppointment = new Map<string, string>();
+      for (const note of notesData ?? []) {
+        if (note?.appointment_id && note?.content) {
+          notesByAppointment.set(note.appointment_id, note.content);
+        }
+      }
+
       let medications: unknown[] = [];
       let tablePending = false;
       try {
@@ -909,6 +929,7 @@ export default {
           clinic_name: apptClinician?.clinic?.name || null,
           clinic_slug: apptClinician?.clinic?.slug || null,
           measurements: samples,
+          clinical_notes: notesByAppointment.get(appointment.id) || null,
         };
       });
 

@@ -4106,6 +4106,53 @@ body { background: var(--cream); color: var(--ink); }
   border-top: 1px solid #e5e5df;
 }
 
+/* Clinical Summary Modal Preview */
+.summary-report-backdrop {
+  z-index: 1050;
+}
+.summary-report-modal-container {
+  max-width: 1040px !important;
+  width: 95vw !important;
+  height: 92vh !important;
+  max-height: 92vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 20px 24px !important;
+  background: #ffffff !important;
+  box-sizing: border-box !important;
+}
+.summary-report-modal-header {
+  margin-bottom: 12px !important;
+  padding-bottom: 12px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+}
+.summary-report-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.summary-report-preview-frame {
+  flex: 1;
+  min-height: 0;
+  background: #cbd5e1;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+.summary-report-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #ffffff;
+}
+
 /* Prescribe Form */
 .prescribe-form,
 .cease-form {

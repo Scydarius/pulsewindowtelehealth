@@ -30,6 +30,7 @@ export type PatientSummaryReportData = {
     clinician_name?: string | null;
     clinic_name?: string | null;
     measurements: SavedMeasurement[];
+    clinical_notes?: string | null;
   }>;
   medications?: PatientMedication[];
 };
@@ -680,6 +681,52 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
   const activeMeds = (data.medications ?? []).filter((m) => m.status === 'active');
   const ceasedMeds = (data.medications ?? []).filter((m) => m.status === 'ceased');
 
+  // Extract all telemetry samples across all encounters
+  const allSamples = (data.appointments ?? [])
+    .flatMap((a) => a.measurements ?? [])
+    .filter((s) => s && s.measured_at)
+    .sort((a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime());
+
+  const latestSample = allSamples.at(-1);
+  const latestDiag = latestSample?.diagnostics as {
+    cardiac?: { session_average_bpm?: number; clinical_bpm?: number; hrv_rmssd_ms?: number; stress_score?: number };
+    respiration?: { session_average_brpm?: number; clinical_brpm?: number };
+  } | undefined;
+
+  const bpmVal = latestDiag?.cardiac?.session_average_bpm ?? latestDiag?.cardiac?.clinical_bpm ?? latestSample?.heart_rate_bpm;
+  const brpmVal = latestDiag?.respiration?.session_average_brpm ?? latestDiag?.respiration?.clinical_brpm ?? latestSample?.respiratory_rate_bpm;
+  const hrvVal = latestDiag?.cardiac?.hrv_rmssd_ms;
+  const stressVal = latestDiag?.cardiac?.stress_score;
+  const hrClass = classifyHeartRate(bpmVal);
+  const respClass = classifyRespiration(brpmVal);
+  const qualClass = classifySignalQuality(latestSample?.signal_quality);
+
+  const vitalsHtml = latestSample
+    ? `<div class="section-title">Latest Cardiovascular & Respiratory Telemetry (Optical rPPG)</div>
+       <section class="vitals-cards-grid">
+         <div class="vital-tile">
+           <span class="tile-label">Resting Heart Rate</span>
+           <strong class="tile-val">${bpmVal ? `${Math.round(bpmVal)} BPM` : '—'}</strong>
+           <span class="tile-class ${hrClass.tone}">${hrClass.label}</span>
+         </div>
+         <div class="vital-tile">
+           <span class="tile-label">Respiration Rate</span>
+           <strong class="tile-val">${brpmVal ? `${Math.round(brpmVal)} /min` : '—'}</strong>
+           <span class="tile-class ${respClass.tone}">${respClass.label}</span>
+         </div>
+         <div class="vital-tile">
+           <span class="tile-label">Autonomic HRV (RMSSD)</span>
+           <strong class="tile-val">${hrvVal != null ? `${Math.round(hrvVal)} ms` : '—'}</strong>
+           <span class="tile-class normal">${stressVal != null ? `Stress: ${Math.round(stressVal)}/100` : 'Autonomic Tone'}</span>
+         </div>
+         <div class="vital-tile">
+           <span class="tile-label">Signal Fidelity</span>
+           <strong class="tile-val">${Math.round(latestSample.signal_quality * 100)}%</strong>
+           <span class="tile-class ${qualClass.tone}">${allSamples.length} sample${allSamples.length === 1 ? '' : 's'} logged</span>
+         </div>
+       </section>`
+    : `<div class="empty-vitals-banner">No optical vital sign telemetry recorded to date. Telemetry is collected synchronously during video consultations via facial rPPG.</div>`;
+
   const medsRows = activeMeds.length
     ? activeMeds
         .map(
@@ -702,22 +749,57 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
         .join('')
     : '<tr><td colspan="7" class="empty-cell">No active medications currently on file.</td></tr>';
 
+  const ceasedRows = ceasedMeds.length
+    ? ceasedMeds
+        .map(
+          (m) => `<tr>
+            <td><strong>${escapeHtml(m.medication_name)}</strong>${
+              m.generic_name ? `<br /><span class="generic-sub">${escapeHtml(m.generic_name)}</span>` : ''
+            }</td>
+            <td>${escapeHtml(m.dose)} (${escapeHtml(m.frequency)})</td>
+            <td>${m.ceased_at ? escapeHtml(formatDate(m.ceased_at)) : '—'}</td>
+            <td>${escapeHtml(m.ceased_reason || 'Ceased by clinician')}</td>
+          </tr>`
+        )
+        .join('')
+    : '';
+
   const apptRows = data.appointments.length
     ? data.appointments
         .map((a) => {
-          const latestSample = a.measurements.at(-1);
+          const rawReason = a.reason || 'General Telehealth Review';
+          const parts = rawReason.split('\n\nPatient notes:');
+          const cleanReason = parts[0]?.trim() || 'Consultation';
+          const intakeNote = parts[1]?.trim() || '';
+          const clinicalNote = a.clinical_notes?.trim() || '';
+          const apptLatest = a.measurements?.at(-1);
+          const apptBpm = apptLatest?.heart_rate_bpm;
+          const apptBrpm = apptLatest?.respiratory_rate_bpm;
+          const apptQuality = apptLatest?.signal_quality;
+          const vitalsSummary = apptBpm
+            ? `<strong>${Math.round(apptBpm)} BPM</strong>${apptBrpm ? ` / ${Math.round(apptBrpm)} /min` : ''}${
+                apptQuality ? `<br /><span class="generic-sub">Signal: ${Math.round(apptQuality * 100)}%</span>` : ''
+              }`
+            : 'No telemetry';
+
           return `<tr>
-            <td>${escapeHtml(formatDate(a.starts_at))}</td>
-            <td><strong>${escapeHtml(a.reason || 'Consultation')}</strong></td>
+            <td><strong>${escapeHtml(formatDate(a.starts_at))}</strong></td>
+            <td>
+              <div class="appt-reason-title"><strong>${escapeHtml(cleanReason)}</strong></div>
+              ${
+                intakeNote
+                  ? `<div class="appt-intake-note"><span>Patient Intake:</span> ${escapeHtml(intakeNote)}</div>`
+                  : ''
+              }
+              ${
+                clinicalNote
+                  ? `<div class="appt-clinical-note"><span>Clinician Note:</span> ${escapeHtml(clinicalNote)}</div>`
+                  : ''
+              }
+            </td>
             <td>${escapeHtml(a.clinician_name || 'Clinician')}</td>
             <td>${escapeHtml(a.clinic_name || 'Ventricura')}</td>
-            <td>${
-              latestSample?.heart_rate_bpm
-                ? `${Math.round(latestSample.heart_rate_bpm)} BPM / ${
-                    latestSample.respiratory_rate_bpm ? `${Math.round(latestSample.respiratory_rate_bpm)} brpm` : '—'
-                  }`
-                : 'No telemetry'
-            }</td>
+            <td>${vitalsSummary}</td>
           </tr>`;
         })
         .join('')
@@ -738,7 +820,7 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
       color: #0f172a;
       background: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 8.2pt;
+      font-size: 8pt;
       line-height: 1.35;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -786,10 +868,85 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
       page-break-inside: avoid;
       break-inside: avoid;
     }
+    .vitals-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin: 6px 0 10px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .vital-tile {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-top: 2.5px solid #0f172a;
+      padding: 5px 8px;
+    }
+    .vital-tile .tile-label {
+      display: block;
+      font-size: 6.4pt;
+      font-weight: 750;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #64748b;
+    }
+    .vital-tile strong.tile-val {
+      display: block;
+      font-size: 11.5pt;
+      font-weight: 900;
+      color: #0f172a;
+      margin: 1px 0;
+    }
+    .vital-tile .tile-class {
+      display: inline-block;
+      font-size: 6.2pt;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 2px;
+    }
+    .tile-class.normal { background: #dcfce7; color: #15803d; }
+    .tile-class.warning { background: #fef3c7; color: #b45309; }
+    .tile-class.alert { background: #fee2e2; color: #b91c1c; }
+    .empty-vitals-banner {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      padding: 6px 10px;
+      font-size: 7.2pt;
+      color: #64748b;
+      font-style: italic;
+      margin: 6px 0 10px;
+      text-align: center;
+    }
     table.report-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 7.4pt; margin-top: 4px; }
     table.report-table th { background: #f1f5f9; color: #334155; font-size: 6.8pt; font-weight: 800; text-transform: uppercase; padding: 4px 5px; text-align: left; border-bottom: 1.5px solid #0f172a; }
     table.report-table td { padding: 4px 5px; border-bottom: 1px solid #e2e8f0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
     table.report-table tr { page-break-inside: avoid; break-inside: avoid; }
+    .appt-reason-title { font-size: 7.6pt; font-weight: 750; color: #0f172a; }
+    .appt-intake-note {
+      margin-top: 3px;
+      padding: 3px 5px;
+      background: #f1f5f9;
+      border-left: 2px solid #64748b;
+      font-size: 6.8pt;
+      color: #334155;
+      line-height: 1.3;
+    }
+    .appt-intake-note span, .appt-clinical-note span {
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 6.2pt;
+      color: #475569;
+      margin-right: 3px;
+    }
+    .appt-clinical-note {
+      margin-top: 3px;
+      padding: 3px 5px;
+      background: #ecfdf5;
+      border-left: 2px solid #10b981;
+      font-size: 6.8pt;
+      color: #065f46;
+      line-height: 1.3;
+    }
     .generic-sub, .freq-sub { color: #64748b; font-size: 6.8pt; }
     .aust-pill { font-family: monospace; font-size: 6.5pt; font-weight: 700; background: #e0f2fe; color: #0369a1; padding: 1px 3px; border-radius: 2px; }
     .pbs-sub { font-size: 6.8pt; font-weight: 700; color: #047857; }
@@ -825,6 +982,8 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
       </div>
     </section>
 
+    ${vitalsHtml}
+
     <div class="section-title">Active Pharmacotherapy Regimen (ARTG Listings)</div>
     <table class="report-table">
       <colgroup>
@@ -850,19 +1009,42 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
       <tbody>${medsRows}</tbody>
     </table>
 
+    ${
+      ceasedMeds.length
+        ? `<div class="section-title">Ceased Pharmacotherapy & Inactive Regimens</div>
+    <table class="report-table">
+      <colgroup>
+        <col style="width: 28%;" />
+        <col style="width: 22%;" />
+        <col style="width: 16%;" />
+        <col style="width: 34%;" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Medication & Generic</th>
+          <th>Dose & Frequency</th>
+          <th>Ceased Date</th>
+          <th>Reason for Cessation</th>
+        </tr>
+      </thead>
+      <tbody>${ceasedRows}</tbody>
+    </table>`
+        : ''
+    }
+
     <div class="section-title">Longitudinal Consultation & Telehealth History Across Clinics</div>
     <table class="report-table">
       <colgroup>
-        <col style="width: 13%;" />
-        <col style="width: 28%;" />
-        <col style="width: 21%;" />
+        <col style="width: 12%;" />
+        <col style="width: 35%;" />
         <col style="width: 18%;" />
+        <col style="width: 15%;" />
         <col style="width: 20%;" />
       </colgroup>
       <thead>
         <tr>
           <th>Date</th>
-          <th>Consultation Reason</th>
+          <th>Consultation & Clinical Notes</th>
           <th>Attending Doctor</th>
           <th>Clinic Practice</th>
           <th>Telemetry Recorded</th>
@@ -892,22 +1074,77 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
 }
 
 /**
- * Open print dialog for the generated HTML report.
+ * Open print dialog for the generated HTML report using a reliable hidden iframe.
+ * Never blocked by browser popup blockers.
  */
 export function printHtmlReport(title: string, htmlContent: string): boolean {
-  const popup = window.open('', '_blank', 'noopener,noreferrer');
-  if (!popup) return false;
-  popup.document.write(htmlContent);
-  popup.document.close();
-  setTimeout(() => {
-    try {
-      popup.focus();
-      popup.print();
-    } catch {
-      // Ignored if window closed
+  try {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.setAttribute('title', title);
+    iframe.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (doc) {
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (err) {
+          console.warn('Iframe print failed:', err);
+        } finally {
+          setTimeout(() => iframe.remove(), 2500);
+        }
+      }, 350);
+      return true;
     }
-  }, 400);
-  return true;
+  } catch (err) {
+    console.warn('Iframe print setup error, attempting popup fallback:', err);
+  }
+
+  // Fallback: Blob URL + window.open without noopener
+  try {
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const win = window.open(blobUrl, '_blank');
+    if (win) {
+      setTimeout(() => {
+        try {
+          win.focus();
+          win.print();
+        } catch {}
+      }, 500);
+      return true;
+    }
+  } catch (e) {
+    console.error('Print fallback error:', e);
+  }
+
+  return false;
+}
+
+/**
+ * Open generated report in a new tab without popup blocker issues.
+ */
+export function openHtmlReportInNewTab(htmlContent: string): boolean {
+  try {
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const tab = window.open(blobUrl, '_blank');
+    return Boolean(tab);
+  } catch {
+    return false;
+  }
 }
 
 /**

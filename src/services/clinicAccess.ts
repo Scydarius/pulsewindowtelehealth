@@ -234,6 +234,7 @@ export type PatientProfile = {
     clinic_name?: string | null;
     clinic_slug?: string | null;
     measurements: SavedMeasurement[];
+    clinical_notes?: string | null;
   }>;
   medications?: PatientMedication[];
   tablePending?: boolean;

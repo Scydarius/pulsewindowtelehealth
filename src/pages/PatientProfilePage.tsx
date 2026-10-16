@@ -12,6 +12,8 @@ import {
   ChevronUp,
   ClipboardList,
   Copy,
+  Download,
+  ExternalLink,
   FileText,
   HeartPulse,
   Info,
@@ -49,7 +51,12 @@ import {
   getArtgMedicationById,
   getPregnancyDescription,
 } from '../utils/artgMedications';
-import { generatePatientSummaryReportHtml, printHtmlReport } from '../utils/clinicalReports';
+import {
+  generatePatientSummaryReportHtml,
+  printHtmlReport,
+  downloadHtmlReport,
+  openHtmlReportInNewTab,
+} from '../utils/clinicalReports';
 import { PrescribeMedicationModal } from '../components/PrescribeMedicationModal';
 
 const number = (value: number | null, digits = 0) => (value === null ? '—' : value.toFixed(digits));
@@ -147,6 +154,10 @@ export function PatientProfilePage() {
 
   // Delete medication state
   const [deletingMedId, setDeletingMedId] = useState<string | null>(null);
+
+  // Clinical summary report modal state
+  const [summaryReportModalOpen, setSummaryReportModalOpen] = useState(false);
+  const [summaryReportHtml, setSummaryReportHtml] = useState('');
 
   const handleRemovePatient = async () => {
     if (!patient) return;
@@ -331,9 +342,9 @@ notify pgrst, 'reload schema';`;
     window.print();
   };
 
-  const handlePrintSummaryReport = () => {
-    if (!patient) return;
-    const html = generatePatientSummaryReportHtml({
+  const getSummaryHtml = () => {
+    if (!patient) return '';
+    return generatePatientSummaryReportHtml({
       patientId,
       patientName: patient.display_name,
       patientEmail: patient.email,
@@ -342,7 +353,31 @@ notify pgrst, 'reload schema';`;
       appointments: patient.appointments,
       medications,
     });
+  };
+
+  const handleOpenSummaryReport = () => {
+    if (!patient) return;
+    const html = getSummaryHtml();
+    setSummaryReportHtml(html);
+    setSummaryReportModalOpen(true);
+  };
+
+  const handlePrintSummaryReportDirect = () => {
+    if (!patient) return;
+    const html = summaryReportHtml || getSummaryHtml();
     printHtmlReport(`Patient Summary — ${patient.display_name}`, html);
+  };
+
+  const handleDownloadSummaryReport = () => {
+    if (!patient) return;
+    const html = summaryReportHtml || getSummaryHtml();
+    const safeName = patient.display_name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    downloadHtmlReport(`ventricura-patient-summary-${safeName}.html`, html);
+  };
+
+  const handleOpenSummaryInNewTab = () => {
+    const html = summaryReportHtml || getSummaryHtml();
+    if (html) openHtmlReportInNewTab(html);
   };
 
   const activeMedications = useMemo(
@@ -432,10 +467,10 @@ notify pgrst, 'reload schema';`;
           <button
             type="button"
             className="button button-secondary"
-            onClick={handlePrintSummaryReport}
-            title="Generate and print comprehensive medical health summary report"
+            onClick={handleOpenSummaryReport}
+            title="View, print, and export comprehensive patient clinical health summary report"
           >
-            <Printer size={15} /> Clinical summary report
+            <FileText size={15} /> Clinical summary report
           </button>
           <button
             type="button"
@@ -1154,6 +1189,73 @@ notify pgrst, 'reload schema';`;
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* COMPREHENSIVE CLINICAL HEALTH SUMMARY REPORT PREVIEW MODAL */}
+      {summaryReportModalOpen && (
+        <div className="modal-backdrop summary-report-backdrop" onClick={() => setSummaryReportModalOpen(false)}>
+          <div
+            className="modal-container summary-report-modal-container"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="summary-report-title"
+          >
+            <div className="modal-header summary-report-modal-header">
+              <div>
+                <span className="clean-badge-capsule" style={{ marginBottom: '6px' }}>
+                  A4 Telehealth Record
+                </span>
+                <h3 id="summary-report-title">Patient Clinical Health Summary</h3>
+                <p className="modal-subtitle">
+                  {patient.display_name} · Complete clinical summary including pharmacotherapy, optical vital signs telemetry, clinical consultation notes, and appointments history.
+                </p>
+              </div>
+              <div className="summary-report-actions">
+                <button
+                  type="button"
+                  className="button button-primary button-small"
+                  onClick={handlePrintSummaryReportDirect}
+                  title="Print or export as PDF via system print dialog"
+                >
+                  <Printer size={15} /> Print / Export PDF
+                </button>
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  onClick={handleDownloadSummaryReport}
+                  title="Download self-contained offline HTML file"
+                >
+                  <Download size={15} /> Download HTML
+                </button>
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  onClick={handleOpenSummaryInNewTab}
+                  title="Open report in separate browser tab"
+                >
+                  <ExternalLink size={15} /> Open in tab
+                </button>
+                <button
+                  type="button"
+                  className="modal-close-btn"
+                  onClick={() => setSummaryReportModalOpen(false)}
+                  aria-label="Close report preview"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="summary-report-preview-frame">
+              <iframe
+                title={`Clinical Summary — ${patient.display_name}`}
+                srcDoc={summaryReportHtml}
+                className="summary-report-iframe"
+              />
+            </div>
           </div>
         </div>
       )}
