@@ -4651,6 +4651,13 @@ body { background: var(--cream); color: var(--ink); }
     margin: 0 0 3px;
     letter-spacing: -0.02em;
   }
+  .print-clinic-brand .print-logo {
+    max-height: 44px;
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 2px;
+  }
   .print-clinic-brand p {
     font-size: 8.5pt;
     margin: 0;
@@ -4705,6 +4712,18 @@ body { background: var(--cream); color: var(--ink); }
     font-family: monospace;
     font-size: 7pt;
     color: #000000;
+  }
+  .print-pbs-badge {
+    display: inline-block;
+    font-size: 11pt;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .print-pbs-tick {
+    color: #166534;
+  }
+  .print-pbs-cross {
+    color: #991b1b;
   }
   .print-ceased-section {
     margin-top: 18px;

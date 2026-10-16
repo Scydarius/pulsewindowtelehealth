@@ -1,4 +1,5 @@
 import type { PatientMedication, SavedMeasurement } from '../services/clinicAccess';
+import { VENTRICURA_LOGO_DATA_URI } from './ventricuraLogoBase64';
 
 export type EncounterReportData = {
   appointmentId: string;
@@ -112,12 +113,17 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
             <td>${m.artg_id ? `<span class="aust-pill">${escapeHtml(m.artg_id)}</span>` : '—'}</td>
             <td><strong>${escapeHtml(m.dose)}</strong><br /><span class="freq-sub">${escapeHtml(m.frequency)}</span></td>
             <td>${escapeHtml(m.directions || 'Take as instructed')}</td>
-            <td>${m.repeats} repeats<br /><span class="pbs-sub">${m.is_pbs ? 'PBS Subsidised' : 'Private'}</span></td>
+            <td style="text-align: center;">${m.repeats}</td>
+            <td style="text-align: center;">${
+              m.is_pbs
+                ? '<span class="pbs-badge pbs-tick" title="PBS Subsidised">✓</span>'
+                : '<span class="pbs-badge pbs-cross" title="Non-PBS / Private">✗</span>'
+            }</td>
             <td>${escapeHtml(m.prescribed_by_name || 'Attending Clinician')}</td>
           </tr>`
         )
         .join('')
-    : '<tr><td colspan="6" class="empty-cell">No active pharmacotherapy recorded in patient profile.</td></tr>';
+    : '<tr><td colspan="7" class="empty-cell">No active pharmacotherapy recorded in patient profile.</td></tr>';
 
   const telemetryRows = data.samples.length
     ? data.samples
@@ -176,13 +182,33 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
     .header-branding {
       max-width: 60%;
     }
-    .clinic-logo-text {
-      font-size: 15pt;
-      font-weight: 900;
-      letter-spacing: .08em;
-      color: #0284c7;
-      text-transform: uppercase;
-      line-height: 1.1;
+    .report-logo {
+      max-height: 38px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .pbs-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      font-size: 10pt;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .pbs-tick {
+      color: #15803d;
+      background: #dcfce7;
+      border: 1px solid #86efac;
+    }
+    .pbs-cross {
+      color: #b91c1c;
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
     }
     .clinic-sub-name {
       font-size: 10pt;
@@ -421,8 +447,8 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
 <body>
   <header class="report-header">
     <div class="header-branding">
-      <div class="clinic-logo-text">VENTRICURA</div>
-      <div class="clinic-sub-name">${escapeHtml(clinicTitle)}</div>
+      <img src="${VENTRICURA_LOGO_DATA_URI}" alt="Ventricura" class="report-logo" />
+      ${data.clinicName && data.clinicName !== 'Ventricura' && data.clinicName !== 'Ventricura Telehealth' ? `<div class="clinic-sub-name">${escapeHtml(data.clinicName)}</div>` : ''}
       <div class="header-accreditation">
         RACGP Standard 5 Telehealth Compliant · Australian Health Practitioner Regulation Agency (AHPRA) Standards
       </div>
@@ -440,7 +466,6 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
       <div class="patient-main">
         <h1>${escapeHtml(data.patientName)}</h1>
         <p><strong>Email:</strong> ${escapeHtml(data.patientEmail)}</p>
-        <p><strong>Patient ID:</strong> ${escapeHtml(data.patientId)}</p>
       </div>
       <div class="meta-col">
         <div class="meta-item">
@@ -509,7 +534,8 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
             <th>ARTG ID</th>
             <th>Dose & Frequency</th>
             <th>Patient Directions</th>
-            <th>Repeats / PBS</th>
+            <th style="text-align: center;">Repeats</th>
+            <th style="text-align: center;">PBS Subsidised</th>
             <th>Prescribing Doctor</th>
           </tr>
         </thead>
@@ -589,19 +615,18 @@ export function generateSoapNoteText(data: EncounterReportData): string {
           (m, i) =>
             `${i + 1}. ${m.medication_name}${m.generic_name ? ` (${m.generic_name})` : ''} ${m.dose} — ${m.frequency}${
               m.directions ? ` — Dir: ${m.directions}` : ''
-            } [${m.repeats} repeats, ${m.is_pbs ? 'PBS' : 'Private'}${m.artg_id ? `, ${m.artg_id}` : ''}]`
+            } [${m.repeats} repeats, PBS: ${m.is_pbs ? '✓' : '✗'}${m.artg_id ? `, ${m.artg_id}` : ''}]`
         )
         .join('\n')
     : 'None recorded.';
 
   return `======================================================================
-VENTRICURA TELEHEALTH — OFFICIAL CLINICAL ENCOUNTER SUMMARY
+VENTRICURA — OFFICIAL CLINICAL ENCOUNTER SUMMARY
 ======================================================================
 Patient: ${data.patientName} (${data.patientEmail})
-Patient ID: ${data.patientId}
 Encounter Date: ${formatDateTime(data.startsAt)}
 Attending Clinician: ${data.clinicianName || 'Attending Practitioner'} (${data.clinicianTitle || 'Clinician'})
-Clinic: ${data.clinicName || 'Ventricura Telehealth'}
+Clinic: ${data.clinicName || 'Ventricura'}
 Encounter ID: ${data.appointmentId}
 
 [SUBJECTIVE]
@@ -642,12 +667,17 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
             <td>${m.artg_id ? `<span class="aust-pill">${escapeHtml(m.artg_id)}</span>` : '—'}</td>
             <td><strong>${escapeHtml(m.dose)}</strong><br /><span class="freq-sub">${escapeHtml(m.frequency)}</span></td>
             <td>${escapeHtml(m.directions || 'Take as instructed')}</td>
-            <td>${m.repeats} repeats<br /><span class="pbs-sub">${m.is_pbs ? 'PBS' : 'Private'}</span></td>
+            <td style="text-align: center;">${m.repeats}</td>
+            <td style="text-align: center;">${
+              m.is_pbs
+                ? '<span class="pbs-badge pbs-tick" title="PBS Subsidised">✓</span>'
+                : '<span class="pbs-badge pbs-cross" title="Non-PBS / Private">✗</span>'
+            }</td>
             <td>${escapeHtml(m.prescribed_by_name || 'Clinician')}</td>
           </tr>`
         )
         .join('')
-    : '<tr><td colspan="6" class="empty-cell">No active medications currently on file.</td></tr>';
+    : '<tr><td colspan="7" class="empty-cell">No active medications currently on file.</td></tr>';
 
   const apptRows = data.appointments.length
     ? data.appointments
@@ -657,7 +687,7 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
             <td>${escapeHtml(formatDate(a.starts_at))}</td>
             <td><strong>${escapeHtml(a.reason || 'Consultation')}</strong></td>
             <td>${escapeHtml(a.clinician_name || 'Clinician')}</td>
-            <td>${escapeHtml(a.clinic_name || 'Ventricura Telehealth')}</td>
+            <td>${escapeHtml(a.clinic_name || 'Ventricura')}</td>
             <td>${
               latestSample?.heart_rate_bpm
                 ? `${Math.round(latestSample.heart_rate_bpm)} BPM / ${
@@ -697,11 +727,14 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
       padding-bottom: 12px;
       border-bottom: 2.5px solid #0f172a;
     }
-    .clinic-logo-text { font-size: 15pt; font-weight: 900; letter-spacing: .08em; color: #0284c7; }
+    .report-logo { max-height: 38px; width: auto; object-fit: contain; display: block; margin-bottom: 4px; }
     .clinic-sub-name { font-size: 10pt; font-weight: 700; color: #0f172a; }
     .header-accreditation { font-size: 6.8pt; font-weight: 600; color: #475569; text-transform: uppercase; margin-top: 3px; }
     .header-audit-meta { text-align: right; font-size: 7.2pt; color: #475569; }
     .doc-type-badge { display: inline-block; background: #0f172a; color: #ffffff; font-size: 7pt; font-weight: 800; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; margin-bottom: 4px; }
+    .pbs-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 10pt; font-weight: 800; line-height: 1; }
+    .pbs-tick { color: #15803d; background: #dcfce7; border: 1px solid #86efac; }
+    .pbs-cross { color: #b91c1c; background: #fee2e2; border: 1px solid #fca5a5; }
     .patient-box {
       margin: 14px 0;
       padding: 12px 14px;
@@ -740,14 +773,13 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
 <body>
   <header class="report-header">
     <div>
-      <div class="clinic-logo-text">VENTRICURA</div>
-      <div class="clinic-sub-name">${escapeHtml(data.clinicName || 'Ventricura Telehealth Network')}</div>
+      <img src="${VENTRICURA_LOGO_DATA_URI}" alt="Ventricura" class="report-logo" />
+      ${data.clinicName && data.clinicName !== 'Ventricura' && data.clinicName !== 'Ventricura Telehealth' ? `<div class="clinic-sub-name">${escapeHtml(data.clinicName)}</div>` : ''}
       <div class="header-accreditation">RACGP Standard 5 Telehealth Compliant · Encrypted Australian Health Records</div>
     </div>
     <div class="header-audit-meta">
       <div class="doc-type-badge">Comprehensive Health Summary</div>
       <div><strong>Record Date:</strong> ${escapeHtml(generatedTime)}</div>
-      <div><strong>Patient ID:</strong> ${escapeHtml(data.patientId)}</div>
     </div>
   </header>
 
@@ -771,7 +803,8 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
           <th>ARTG ID</th>
           <th>Dose & Frequency</th>
           <th>Directions</th>
-          <th>Repeats / PBS</th>
+          <th style="text-align: center;">Repeats</th>
+          <th style="text-align: center;">PBS Subsidised</th>
           <th>Prescribing Doctor</th>
         </tr>
       </thead>

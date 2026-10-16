@@ -312,7 +312,7 @@ notify pgrst, 'reload schema';`;
         `Australian Clinical Record — Generated on ${new Date().toLocaleDateString('en-AU')}\n\n` +
         activeList
           .map((m, idx) => {
-            const pbsTag = m.is_pbs ? '[PBS Subsidised]' : '[Private / Non-PBS]';
+            const pbsTag = m.is_pbs ? '[PBS: ✓]' : '[PBS: ✗]';
             const artgTag = m.artg_id ? ` (ARTG ${m.artg_id})` : '';
             const repText = `${m.repeats} repeat${m.repeats === 1 ? '' : 's'}`;
             const dirText = m.directions ? `\n   Directions: ${m.directions}` : '';
@@ -1135,8 +1135,7 @@ notify pgrst, 'reload schema';`;
       <div className="printable-medication-chart" aria-hidden="true">
         <div className="print-header">
           <div className="print-clinic-brand">
-            <h1>VENTRICURA TELEHEALTH</h1>
-            <p>Integrated Clinical & Cardiovascular Care • Australia</p>
+            <img src="/ventricura-logo-centred.png" alt="Ventricura" className="print-logo" />
           </div>
           <div className="print-doc-title">
             <h2>CURRENT MEDICATION SUMMARY</h2>
@@ -1149,10 +1148,7 @@ notify pgrst, 'reload schema';`;
             <strong>Patient Name:</strong> {patient.display_name}
           </div>
           <div>
-            <strong>Email / Identifier:</strong> {patient.email}
-          </div>
-          <div>
-            <strong>Patient ID:</strong> {patient.id || patientId}
+            <strong>Email:</strong> {patient.email}
           </div>
           <div>
             <strong>Active Medications:</strong> {activeMedications.length}
@@ -1167,7 +1163,7 @@ notify pgrst, 'reload schema';`;
               <th>Dose</th>
               <th>Frequency</th>
               <th>Repeats</th>
-              <th>PBS Benefit</th>
+              <th style={{ textAlign: 'center' }}>PBS Subsidised</th>
               <th>Directions for Patient</th>
               <th>Prescribed By / Date</th>
             </tr>
@@ -1191,7 +1187,13 @@ notify pgrst, 'reload schema';`;
                   <td>{m.dose}</td>
                   <td>{m.frequency}</td>
                   <td>{m.repeats}</td>
-                  <td>{m.is_pbs ? 'PBS Subsidised' : 'Private / Non-PBS'}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    {m.is_pbs ? (
+                      <span className="print-pbs-badge print-pbs-tick" title="PBS Subsidised">✓</span>
+                    ) : (
+                      <span className="print-pbs-badge print-pbs-cross" title="Non-PBS / Private">✗</span>
+                    )}
+                  </td>
                   <td>{m.directions || '—'}</td>
                   <td>
                     {m.prescribed_by_name}
