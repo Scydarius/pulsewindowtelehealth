@@ -1,4 +1,4 @@
-import { ArrowLeft, BookmarkCheck, BookmarkPlus, CheckCircle2, Clock3, LoaderCircle, Pill, UserRound, Video } from 'lucide-react';
+import { ArrowLeft, BookmarkCheck, BookmarkPlus, CheckCircle2, Clock3, LoaderCircle, Maximize2, Minimize2, Pill, UserRound, Video } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { MeasurementPanel } from '../components/MeasurementPanel';
@@ -59,6 +59,27 @@ export function ConsultationPage() {
   const [needsReview, setNeedsReview] = useState(false);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewNotice, setReviewNotice] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Browser prevented fullscreen or not supported
+    }
+  };
 
   // Live call timer counting up from appointment start
   useEffect(() => {
@@ -149,7 +170,7 @@ export function ConsultationPage() {
   const effectiveClinicianDisplay = clinicianName !== 'Clinician' ? clinicianName : 'Clinician';
 
   return (
-    <div className={`consultation-page ventricura-consultation ${role === 'clinician' ? 'clinician-consultation' : 'patient-consultation'}`}>
+    <div className={`consultation-page ventricura-consultation ${role === 'clinician' ? 'clinician-consultation' : 'patient-consultation'} ${isFullscreen ? 'is-fullscreen' : ''}`}>
       <header className="consultation-heading consultation-toolbar">
         <Link to={dashboardPath} className="back-link"><ArrowLeft size={18} /> Leave consultation</Link>
         <div className="consultation-person">
@@ -184,9 +205,21 @@ export function ConsultationPage() {
             {reviewNotice && <span className="consult-review-toast">{reviewNotice}</span>}
           </div>
         )}
-        <div className="call-time" aria-label={`Call elapsed time: ${formatCallDuration(elapsedSeconds)}`}>
-          <span className="live-dot" />
-          <Clock3 size={16} /> {formatCallDuration(elapsedSeconds)}
+        <div className="consultation-toolbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '9px', justifySelf: 'end' }}>
+          <button
+            type="button"
+            className="consultation-fullscreen-btn"
+            onClick={() => void toggleFullscreen()}
+            title={isFullscreen ? 'Exit full screen (Esc)' : 'Expand video call to full screen'}
+            aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
+          >
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            <span>{isFullscreen ? 'Exit full screen' : 'Full screen'}</span>
+          </button>
+          <div className="call-time" aria-label={`Call elapsed time: ${formatCallDuration(elapsedSeconds)}`}>
+            <span className="live-dot" />
+            <Clock3 size={16} /> {formatCallDuration(elapsedSeconds)}
+          </div>
         </div>
       </header>
 

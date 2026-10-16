@@ -55,7 +55,7 @@ export function AppShell() {
   }, [isClinician]);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isConsultation ? 'app-shell-consultation' : ''}`}>
       <header className="app-header">
         <NavLink
           to={isClinician ? '/clinician' : '/'}
@@ -121,7 +121,7 @@ export function AppShell() {
         </nav>
       )}
 
-      <main key={location.pathname} className="app-main">
+      <main key={location.pathname} className={`app-main ${isConsultation ? 'app-main-consultation' : ''}`}>
         <RouteErrorBoundary>
           <Outlet />
         </RouteErrorBoundary>
