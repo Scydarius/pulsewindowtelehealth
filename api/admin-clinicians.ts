@@ -310,12 +310,26 @@ async function handle(request: Request) {
       const clinicianNameMap = new Map(clinicians.map((c) => [c.id, c.display_name]));
 
       const parsedClinics = ((clinicResult.data ?? []) as Record<string, unknown>[]).map((item) => {
-        const decoded = decodeClinicBanner(
+        let decoded = decodeClinicBanner(
           item.website_about as string | null | undefined,
           item.website_banner_url as string | null | undefined,
           item.website_banner_text as string | null | undefined,
           item.website_banner_enabled as boolean | null | undefined
         );
+        if (!decoded.url) {
+          const doctor = clinicians.find((c) => c.clinic_id === item.id && c.about_me);
+          if (doctor?.about_me) {
+            const fallbackBanner = decodeClinicBanner(doctor.about_me);
+            if (fallbackBanner.url) {
+              decoded = {
+                ...decoded,
+                url: fallbackBanner.url,
+                text: decoded.text || fallbackBanner.text,
+                enabled: decoded.enabled !== false && fallbackBanner.enabled !== false,
+              };
+            }
+          }
+        }
         return {
           ...item,
           website_about: decoded.cleanAbout,
@@ -485,21 +499,40 @@ async function handle(request: Request) {
       if (body.publicDomain !== undefined && profile.is_platform_admin) update.public_domain = body.publicDomain.trim().toLowerCase() || null;
       let bannerColumnsMissing = false;
       let { error } = await db.from('clinics').update(update).eq('id', body.clinicId);
-      if (error && (error.message?.includes('column') || error.code === '42703')) {
+      while (error && (error.message?.includes('column') || error.code === '42703')) {
         bannerColumnsMissing = true;
-        delete update.website_banner_url;
-        delete update.website_banner_text;
-        delete update.website_banner_enabled;
-        let retry = await db.from('clinics').update(update).eq('id', body.clinicId);
-        error = retry.error;
-        if (error && (error.message?.includes('column') || error.code === '42703')) {
+        const match = error.message?.match(/column\s+"?([a-zA-Z0-9_]+)"?/i);
+        if (match && match[1] && match[1] in update) {
+          delete update[match[1]];
+        } else if ('website_banner_url' in update) {
+          delete update.website_banner_url;
+          delete update.website_banner_text;
+          delete update.website_banner_enabled;
+        } else if ('website_address' in update) {
           delete update.website_address;
           delete update.website_specialties;
-          const fallback = await db.from('clinics').update(update).eq('id', body.clinicId);
-          error = fallback.error;
+        } else if ('website_headline' in update) {
+          delete update.website_headline;
+          delete update.website_intro;
+          delete update.website_phone;
+          delete update.website_email;
+        } else if ('website_about' in update) {
+          delete update.website_about;
+        } else {
+          break;
         }
+        const retry = await db.from('clinics').update(update).eq('id', body.clinicId);
+        error = retry.error;
       }
       if (error) throw new Error(error.message);
+
+      try {
+        const encodedForProfile = encodeClinicBanner(profile.about_me, bannerPayload);
+        await db.from('clinician_profiles').update({ about_me: encodedForProfile }).eq('id', profile.id);
+      } catch {
+        // non-blocking
+      }
+
       return Response.json({
         message: bannerColumnsMissing
           ? 'Clinic website and banner saved successfully (embedded storage active).'

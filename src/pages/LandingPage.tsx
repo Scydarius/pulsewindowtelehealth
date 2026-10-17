@@ -71,14 +71,27 @@ export function LandingPage() {
     } catch {}
     return null;
   });
+  const [activeBannerUrl, setActiveBannerUrl] = useState<string | null>(() => {
+    try {
+      const cached = localStorage.getItem('ventricura_banner_active')
+        || localStorage.getItem('ventricura_banner_ventricura')
+        || localStorage.getItem('ventricura_banner_ventricura-telehealth');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.url && parsed.enabled !== false) return parsed.url;
+      }
+    } catch {}
+    return null;
+  });
   const storyRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     void fetch('/api/clinician-invitations?action=clinic-site&slug=ventricura')
       .then((res) => res.json())
-      .then((data: { clinic?: { bannerText?: string | null; bannerEnabled?: boolean } }) => {
-        if (data?.clinic?.bannerText && data.clinic.bannerEnabled !== false) {
-          setActiveAnnouncement(data.clinic.bannerText);
+      .then((data: { clinic?: { bannerText?: string | null; bannerUrl?: string | null; bannerEnabled?: boolean } }) => {
+        if (data?.clinic?.bannerEnabled !== false) {
+          if (data?.clinic?.bannerText) setActiveAnnouncement(data.clinic.bannerText);
+          if (data?.clinic?.bannerUrl) setActiveBannerUrl(data.clinic.bannerUrl);
         }
       })
       .catch(() => {});
@@ -187,6 +200,15 @@ Plan: Continue current regimen. Follow up in 3 months.`;
           <span>{activeAnnouncement}</span>
         </div>
       </aside>
+    )}
+
+    {activeBannerUrl && (
+      <div className="clinic-site-wrapper clinic-cover-banner-container" style={{ margin: '18px auto 0', padding: '0 24px' }}>
+        <div className="clinic-cover-banner-wrapper" style={{ maxHeight: '280px' }}>
+          <img src={activeBannerUrl} alt="Ventricura Telehealth Cover Banner" style={{ maxHeight: '280px', objectFit: 'cover' }} />
+          <div className="clinic-cover-banner-overlay" />
+        </div>
+      </div>
     )}
 
     <section className="v6-hero">

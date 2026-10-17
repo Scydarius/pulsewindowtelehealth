@@ -70,7 +70,7 @@ const DEFAULT_VENTRICURA_SITE: ClinicSite = {
   ],
   phone: '1300 000 836',
   email: 'admin@ventricura.com',
-  bannerUrl: null,
+  bannerUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1600&q=80',
   bannerText: null,
   bannerEnabled: true,
   bookingUrl: null,
@@ -130,7 +130,7 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
             || (slug === 'ventricura' ? getLocalClinicBanner('ventricura') || getLocalClinicBanner('ventricura-telehealth') : null)
             || getLocalClinicBanner('active');
 
-          const bannerUrl = body.clinic.bannerUrl || cached?.url || null;
+          const bannerUrl = body.clinic.bannerUrl || cached?.url || (slug === 'ventricura' ? DEFAULT_VENTRICURA_SITE.bannerUrl : null);
           const bannerText = body.clinic.bannerText || cached?.text || null;
           const bannerEnabled = body.clinic.bannerEnabled !== undefined
             ? body.clinic.bannerEnabled

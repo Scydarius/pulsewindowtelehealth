@@ -1,4 +1,4 @@
-import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, Stethoscope, UserRound } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, LogOut, ShieldCheck, Sparkles, Stethoscope, UserRound } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
@@ -21,6 +21,16 @@ export function AppShell() {
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [clinicBannerText, setClinicBannerText] = useState<string | null>(() => {
+    try {
+      const raw = localStorage.getItem('ventricura_banner_active');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.text && parsed.enabled !== false) return parsed.text;
+      }
+    } catch {}
+    return null;
+  });
   const signOut = async () => {
     setSigningOut(true);
     await supabase?.auth.signOut({ scope: 'local' });
@@ -43,6 +53,7 @@ export function AppShell() {
           setIsPlatformAdmin(clinician.isPlatformAdmin === true);
           if (clinician.photoUrl) setProfilePhoto(clinician.photoUrl);
           if (clinician.displayName) setDisplayName(clinician.displayName);
+          if (clinician.clinicBannerText) setClinicBannerText(clinician.clinicBannerText);
         }
       })
       .catch(() => {
@@ -110,6 +121,17 @@ export function AppShell() {
           {isClinician && <button className="header-sign-out" onClick={() => void signOut()} disabled={signingOut}><LogOut size={16} /> {signingOut ? 'Signing out…' : 'Sign out'}</button>}
         </div>
       </header>
+
+      {clinicBannerText && isClinician && !isConsultation && (
+        <aside className="clinician-practice-announcement-strip" aria-label="Practice announcement">
+          <div className="clinician-announcement-inner">
+            <span className="clinician-announcement-tag">
+              <Sparkles size={12} /> Practice Announcement
+            </span>
+            <span>{clinicBannerText}</span>
+          </div>
+        </aside>
+      )}
 
       {!isConsultation && isClinician && (
         <nav className="clinician-mobile-nav" aria-label="Mobile workspace navigation">

@@ -24,6 +24,8 @@ export type ApprovedClinician = {
   clinicId?: string | null;
   clinicName?: string | null;
   clinicSlug?: string | null;
+  clinicBannerUrl?: string | null;
+  clinicBannerText?: string | null;
   photoUrl?: string | null;
 };
 

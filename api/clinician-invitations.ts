@@ -401,6 +401,17 @@ export default { async fetch(request: Request) {
           }
         }
 
+        if (!bannerUrl && doctors.length > 0) {
+          for (const d of doctors) {
+            const docBanner = decodeClinicBanner(d.about);
+            if (docBanner.url) {
+              bannerUrl = docBanner.url;
+              if (!bannerText) bannerText = docBanner.text;
+              break;
+            }
+          }
+        }
+
         const defaultBooking = doctors.find((d) => Boolean(d.bookingUrl))?.bookingUrl ?? null;
 
         return Response.json({
@@ -437,24 +448,36 @@ export default { async fetch(request: Request) {
             .from('clinician_profiles')
             .select('display_name, professional_title, about_me, photo_url, clinic:clinics(name, website_about)')
             .eq('id', profile.clinician_id)
-            .single();
+            .maybeSingle();
           clinician = fallback.data as typeof clinician;
           if (!clinician) {
             const minFallback = await db
               .from('clinician_profiles')
               .select('display_name, professional_title, about_me, photo_url, clinic:clinics(name)')
               .eq('id', profile.clinician_id)
-              .single();
+              .maybeSingle();
             clinician = minFallback.data as typeof clinician;
           }
+        }
         const clinicRaw = clinician?.clinic;
         const clinic = (Array.isArray(clinicRaw) ? clinicRaw[0] : clinicRaw) as unknown as { name?: string; website_about?: string; website_banner_url?: string; website_banner_text?: string; website_banner_enabled?: boolean } | null;
-        const decoded = decodeClinicBanner(
+        let decoded = decodeClinicBanner(
           clinic?.website_about,
           clinic?.website_banner_url,
           clinic?.website_banner_text,
           clinic?.website_banner_enabled
         );
+        if (!decoded.url && clinician?.about_me) {
+          const profileBanner = decodeClinicBanner(clinician.about_me);
+          if (profileBanner.url) {
+            decoded = {
+              ...decoded,
+              url: profileBanner.url,
+              text: decoded.text || profileBanner.text,
+              enabled: decoded.enabled !== false && profileBanner.enabled !== false,
+            };
+          }
+        }
         return Response.json({
           clinicianName: clinician?.display_name ?? 'Your clinician',
           professionalTitle: clinician?.professional_title ?? '',

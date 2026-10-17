@@ -358,6 +358,19 @@ export function AdminCliniciansPage() {
         enabled: clinic.website_banner_enabled !== false,
       });
 
+      setClinics((items) =>
+        items.map((item) =>
+          item.id === clinic.id
+            ? {
+                ...item,
+                website_banner_url: normalizedBannerUrl,
+                website_banner_text: clinic.website_banner_text?.trim() || null,
+                website_banner_enabled: clinic.website_banner_enabled !== false,
+              }
+            : item
+        )
+      );
+
       const res = await request('PATCH', {
         action: 'update_clinic',
         clinicId: clinic.id,
@@ -375,7 +388,7 @@ export function AdminCliniciansPage() {
         websiteBannerEnabled: clinic.website_banner_enabled !== false,
         websiteEnabled: clinic.website_enabled !== false,
       });
-      setMessage(res || 'Clinic website updated.');
+      setMessage(res || `Clinic website updated. Banner active at ventricura.com/${clinic.slug}`);
       setEditingClinic(null);
       await load();
     } catch (reason) {
@@ -597,6 +610,26 @@ export function AdminCliniciansPage() {
               const assignedDoctors = clinicians.filter((c) => c.clinic_id === clinic.id);
               return (
               <article key={clinic.id} className="clinic-site-admin">
+                {clinic.website_banner_url ? (
+                  <div className="admin-clinic-card-banner">
+                    <img src={clinic.website_banner_url} alt={`${clinic.name} banner preview`} />
+                    <div className="admin-clinic-card-banner-overlay">
+                      <span className="admin-clinic-card-banner-badge">
+                        <Sparkles size={11} /> Cover Banner Active · ventricura.com/{clinic.slug}
+                      </span>
+                    </div>
+                    {clinic.website_banner_text && (
+                      <div className="admin-clinic-card-announcement-strip">
+                        <Sparkles size={12} /> {clinic.website_banner_text}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="admin-clinic-card-nobanner">
+                    <Image size={15} />
+                    <span>No banner set yet · Click &ldquo;Edit clinic details&rdquo; below to choose a cover banner</span>
+                  </div>
+                )}
                 <div>
                   <strong>{clinic.name}</strong>
                   <span>ventricura.com/{clinic.slug}</span>
@@ -859,11 +892,16 @@ export function AdminCliniciansPage() {
                               key={preset.label}
                               type="button"
                               className="admin-banner-preset-btn"
-                              onClick={() =>
+                              onClick={() => {
                                 setClinics((items) =>
                                   items.map((item) => (item.id === clinic.id ? { ...item, website_banner_url: preset.url } : item))
-                                )
-                              }
+                                );
+                                setLocalClinicBanner(clinic.id, clinic.slug, {
+                                  url: preset.url,
+                                  text: clinic.website_banner_text?.trim() || null,
+                                  enabled: clinic.website_banner_enabled !== false,
+                                });
+                              }}
                             >
                               {preset.label}
                             </button>
