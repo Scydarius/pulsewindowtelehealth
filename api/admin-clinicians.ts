@@ -180,12 +180,18 @@ async function handle(request: Request) {
     if (request.method === 'GET' && action === 'self-profile') {
       const { db, profile } = await signedIn(request);
       let clinicData: Record<string, unknown> | null = null;
+      if (!profile.clinic_id) {
+        const { data: defaultClinic } = await db.from('clinics').select('id').order('created_at').limit(1).maybeSingle();
+        if (defaultClinic) {
+          profile.clinic_id = defaultClinic.id;
+        }
+      }
       if (profile.clinic_id) {
         let clinicQuery = await db.from('clinics').select('name, slug, website_about, website_banner_url, website_banner_text, website_banner_enabled').eq('id', profile.clinic_id).maybeSingle();
-        if (clinicQuery.error && clinicQuery.error.message?.includes('column')) {
+        if (clinicQuery.error && (clinicQuery.error.message?.includes('column') || clinicQuery.error.code === '42703' || clinicQuery.error.code === 'PGRST204')) {
           const fallback = await db.from('clinics').select('name, slug, website_about').eq('id', profile.clinic_id).maybeSingle();
           clinicQuery = fallback as typeof clinicQuery;
-          if (clinicQuery.error && clinicQuery.error.message?.includes('column')) {
+          if (clinicQuery.error && (clinicQuery.error.message?.includes('column') || clinicQuery.error.code === '42703' || clinicQuery.error.code === 'PGRST204')) {
             const minFallback = await db.from('clinics').select('name, slug').eq('id', profile.clinic_id).maybeSingle();
             clinicQuery = minFallback as typeof clinicQuery;
           }

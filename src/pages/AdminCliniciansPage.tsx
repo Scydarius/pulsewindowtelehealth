@@ -47,6 +47,12 @@ function setLocalClinicBanner(clinicId: string, slug: string, banner: { url: str
     const serialized = JSON.stringify(banner);
     if (clinicId) localStorage.setItem(`ventricura_banner_${clinicId}`, serialized);
     if (slug) localStorage.setItem(`ventricura_banner_${slug}`, serialized);
+    localStorage.setItem('ventricura_banner_active', serialized);
+    const isVentricura = slug === 'ventricura' || slug.includes('ventricura') || clinicId.includes('ventricura');
+    if (isVentricura) {
+      localStorage.setItem('ventricura_banner_ventricura', serialized);
+      localStorage.setItem('ventricura_banner_ventricura-telehealth', serialized);
+    }
   } catch {
     // best-effort
   }
@@ -339,9 +345,16 @@ export function AdminCliniciansPage() {
     setError('');
     setMessage('');
     try {
+      const rawBannerUrl = clinic.website_banner_url?.trim() || null;
+      const normalizedBannerUrl = rawBannerUrl
+        ? (rawBannerUrl.startsWith('http://') || rawBannerUrl.startsWith('https://') || rawBannerUrl.startsWith('data:') || rawBannerUrl.startsWith('/')
+            ? rawBannerUrl
+            : `https://${rawBannerUrl}`)
+        : null;
+
       setLocalClinicBanner(clinic.id, clinic.slug, {
-        url: clinic.website_banner_url ?? null,
-        text: clinic.website_banner_text ?? null,
+        url: normalizedBannerUrl,
+        text: clinic.website_banner_text?.trim() || null,
         enabled: clinic.website_banner_enabled !== false,
       });
 
@@ -357,8 +370,8 @@ export function AdminCliniciansPage() {
         websiteSpecialties: clinic.website_specialties,
         websitePhone: clinic.website_phone,
         websiteEmail: clinic.website_email,
-        websiteBannerUrl: clinic.website_banner_url,
-        websiteBannerText: clinic.website_banner_text,
+        websiteBannerUrl: normalizedBannerUrl,
+        websiteBannerText: clinic.website_banner_text?.trim() || null,
         websiteBannerEnabled: clinic.website_banner_enabled !== false,
         websiteEnabled: clinic.website_enabled !== false,
       });

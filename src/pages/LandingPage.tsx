@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, Camera, Check, Copy, FileText, Lock, Smartphone } from 'lucide-react';
+import { Activity, ArrowRight, Camera, Check, Copy, FileText, Lock, Smartphone, Sparkles } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -61,7 +61,28 @@ export function LandingPage() {
   const [clinicianSignedIn, setClinicianSignedIn] = useState(false);
   const [activeStory, setActiveStory] = useState(0);
   const [soapCopied, setSoapCopied] = useState(false);
+  const [activeAnnouncement, setActiveAnnouncement] = useState<string | null>(() => {
+    try {
+      const cached = localStorage.getItem('ventricura_banner_active') || localStorage.getItem('ventricura_banner_ventricura');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.text && parsed.enabled !== false) return parsed.text;
+      }
+    } catch {}
+    return null;
+  });
   const storyRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    void fetch('/api/clinician-invitations?action=clinic-site&slug=ventricura')
+      .then((res) => res.json())
+      .then((data: { clinic?: { bannerText?: string | null; bannerEnabled?: boolean } }) => {
+        if (data?.clinic?.bannerText && data.clinic.bannerEnabled !== false) {
+          setActiveAnnouncement(data.clinic.bannerText);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleCopySoap = () => {
     const soapSnippet = `VENTRICURA ENCOUNTER — #VN-8429
@@ -156,6 +177,17 @@ Plan: Continue current regimen. Follow up in 3 months.`;
   return <main className="ventricura-public home-v6">
     <Seo title="Ventricura | Contactless telehealth technology" description="Contactless rPPG technology for clinician-controlled telehealth and remote care." path="/" jsonLd={organizationSchema} />
     <PublicHeader />
+
+    {activeAnnouncement && (
+      <aside className="clinic-announcement-strip" aria-label="Practice announcement">
+        <div className="clinic-site-wrapper clinic-announcement-inner">
+          <span className="clinic-announcement-tag">
+            <Sparkles size={12} /> Practice Announcement
+          </span>
+          <span>{activeAnnouncement}</span>
+        </div>
+      </aside>
+    )}
 
     <section className="v6-hero">
       <div className="v6-grid" aria-hidden="true" />

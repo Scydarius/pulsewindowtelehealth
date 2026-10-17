@@ -1159,3 +1159,362 @@ export function downloadHtmlReport(filename: string, htmlContent: string): void 
   link.click();
   URL.revokeObjectURL(url);
 }
+
+export type MedicationChartReportData = {
+  patientName: string;
+  patientEmail: string;
+  clinicName?: string;
+  assignedClinicianName?: string;
+  medications: PatientMedication[];
+};
+
+/**
+ * Generate a dedicated, isolated A4 medication summary chart without web UI clutter.
+ */
+export function generateMedicationChartReportHtml(data: MedicationChartReportData): string {
+  const activeMeds = (data.medications ?? []).filter((m) => m.status === 'active');
+  const ceasedMeds = (data.medications ?? []).filter((m) => m.status === 'ceased');
+  const generatedTime = formatDateTime(new Date().toISOString());
+
+  const activeRows = activeMeds.length === 0
+    ? `<tr><td colspan="7" class="empty-cell">No active medications recorded for this patient.</td></tr>`
+    : activeMeds.map((m) => `
+        <tr>
+          <td>
+            <strong>${escapeHtml(m.medication_name)}</strong>
+            ${m.generic_name ? `<div class="generic-sub">${escapeHtml(m.generic_name)}</div>` : ''}
+            ${m.artg_id ? `<div style="margin-top:2px"><span class="aust-pill">${escapeHtml(m.artg_id)}</span></div>` : ''}
+          </td>
+          <td style="font-weight:700">${escapeHtml(m.dose)}</td>
+          <td>${escapeHtml(m.frequency)}</td>
+          <td style="text-align:center">${m.repeats}</td>
+          <td style="text-align:center">
+            ${m.is_pbs ? `<span class="pbs-badge pbs-tick" title="PBS Subsidised">✓ PBS</span>` : `<span class="pbs-badge pbs-cross" title="Private">✗ Private</span>`}
+          </td>
+          <td class="directions-cell">${escapeHtml(m.directions || 'As directed by prescribing medical practitioner.')}</td>
+          <td>
+            <div>${escapeHtml(m.prescribed_by_name)}</div>
+            <div class="date-sub">${formatDate(m.prescribed_date)}</div>
+          </td>
+        </tr>
+      `).join('');
+
+  const ceasedSection = ceasedMeds.length === 0 ? '' : `
+    <div class="section-title" style="margin-top:16px">Recently Ceased / Deprescribed Regimens</div>
+    <table class="report-table ceased-table">
+      <thead>
+        <tr>
+          <th style="width:28%">Medication</th>
+          <th style="width:10%">Dose</th>
+          <th style="width:14%">Prior Frequency</th>
+          <th style="width:18%">Prescriber</th>
+          <th style="width:30%">Cease Reason / Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${ceasedMeds.map((m) => `
+          <tr>
+            <td>
+              <strong>${escapeHtml(m.medication_name)}</strong>
+              ${m.generic_name ? `<div class="generic-sub">${escapeHtml(m.generic_name)}</div>` : ''}
+            </td>
+            <td>${escapeHtml(m.dose)}</td>
+            <td>${escapeHtml(m.frequency)}</td>
+            <td>${escapeHtml(m.prescribed_by_name)}</td>
+            <td>
+              <div style="color:#b91c1c; font-weight:600">${escapeHtml(m.ceased_reason || 'Ceased by clinician')}</div>
+              <div class="date-sub">${m.ceased_at ? `Ceased on ${formatDate(m.ceased_at)}` : ''}</div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Medication Chart — ${escapeHtml(data.patientName)}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm 10mm;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 8pt;
+      line-height: 1.35;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .report-wrap {
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+    header.report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+    }
+    .report-logo {
+      max-height: 36px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .clinic-sub-name {
+      font-size: 8.5pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 3px;
+      letter-spacing: -0.01em;
+    }
+    .header-accreditation {
+      font-size: 6.5pt;
+      color: #64748b;
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .header-audit-meta {
+      text-align: right;
+      font-size: 7pt;
+      color: #475569;
+    }
+    .doc-type-badge {
+      display: inline-block;
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 7.2pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: 2px;
+      margin-bottom: 4px;
+    }
+    section.patient-box {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid #0f172a;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 10px;
+    }
+    section.patient-box h1 {
+      margin: 0 0 3px;
+      font-size: 11pt;
+      font-weight: 850;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    section.patient-box p {
+      margin: 2px 0;
+      font-size: 7.5pt;
+      color: #334155;
+    }
+    .section-title {
+      font-size: 8pt;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #0f172a;
+      border-bottom: 1px solid #94a3b8;
+      padding-bottom: 3px;
+      margin: 10px 0 6px;
+    }
+    table.report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 7.5pt;
+      margin-top: 4px;
+    }
+    table.report-table th {
+      background: #f1f5f9;
+      color: #334155;
+      font-size: 6.8pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 5px 6px;
+      text-align: left;
+      border-bottom: 1.5px solid #0f172a;
+      letter-spacing: 0.02em;
+    }
+    table.report-table td {
+      padding: 5px 6px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+    table.report-table tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .generic-sub { color: #64748b; font-size: 6.8pt; margin-top: 1px; }
+    .date-sub { color: #64748b; font-size: 6.5pt; margin-top: 1px; }
+    .aust-pill {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 6.5pt;
+      font-weight: 700;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 1px 4px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+    .pbs-badge {
+      font-size: 6.8pt;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 2px;
+      white-space: nowrap;
+    }
+    .pbs-tick { background: #dcfce7; color: #15803d; }
+    .pbs-cross { background: #f1f5f9; color: #64748b; }
+    .directions-cell {
+      line-height: 1.35;
+      color: #1e293b;
+    }
+    .ceased-table td {
+      background: #fafafa;
+    }
+    .empty-cell {
+      text-align: center;
+      color: #64748b;
+      padding: 12px;
+      font-style: italic;
+    }
+    .signature-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+      padding-top: 8px;
+      border-top: 1px solid #cbd5e1;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .signature-box .sig-line {
+      border-bottom: 1px solid #0f172a;
+      height: 20px;
+      margin-top: 4px;
+    }
+    .signature-box span {
+      font-size: 6.8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+    .certification-note {
+      margin-top: 12px;
+      font-size: 6.8pt;
+      color: #64748b;
+      line-height: 1.35;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    footer.report-footer {
+      margin-top: 12px;
+      padding-top: 6px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 6.5pt;
+      color: #94a3b8;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+  </style>
+</head>
+<body>
+  <div class="report-wrap">
+    <header class="report-header">
+      <div>
+        <img src="${VENTRICURA_LOGO_DATA_URI}" alt="Ventricura" class="report-logo" />
+        ${data.clinicName && data.clinicName !== 'Ventricura' && data.clinicName !== 'Ventricura Telehealth' ? `<div class="clinic-sub-name">${escapeHtml(data.clinicName)}</div>` : ''}
+        <div class="header-accreditation">RACGP Standard 5 Telehealth Compliant · Australian PBS & ARTG Indexed Record</div>
+      </div>
+      <div class="header-audit-meta">
+        <div class="doc-type-badge">Clinical Medication Chart</div>
+        <div><strong>Record Date:</strong> ${escapeHtml(generatedTime)}</div>
+      </div>
+    </header>
+
+    <section class="patient-box">
+      <div>
+        <h1>${escapeHtml(data.patientName)}</h1>
+        <p><strong>Email:</strong> ${escapeHtml(data.patientEmail)}</p>
+      </div>
+      <div>
+        <p><strong>Primary Clinic:</strong> ${escapeHtml(data.clinicName || 'Ventricura Telehealth')}</p>
+        ${data.assignedClinicianName ? `<p><strong>Supervising Doctor:</strong> ${escapeHtml(data.assignedClinicianName)}</p>` : ''}
+        <p><strong>Active Prescriptions:</strong> ${activeMeds.length}</p>
+      </div>
+    </section>
+
+    <div class="section-title">Current Active Pharmacotherapy</div>
+    <table class="report-table">
+      <colgroup>
+        <col style="width: 25%" />
+        <col style="width: 9%" />
+        <col style="width: 12%" />
+        <col style="width: 7%" />
+        <col style="width: 8%" />
+        <col style="width: 26%" />
+        <col style="width: 13%" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Medication & Molecule</th>
+          <th>Dose</th>
+          <th>Frequency</th>
+          <th style="text-align:center">Repeats</th>
+          <th style="text-align:center">PBS</th>
+          <th>Directions for Patient</th>
+          <th>Prescribed By / Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${activeRows}
+      </tbody>
+    </table>
+
+    ${ceasedSection}
+
+    <div class="certification-note">
+      This clinical medication summary represents the active prescribed pharmacotherapy for this patient recorded in the Ventricura Clinical Suite. All listings correspond to the Australian Register of Therapeutic Goods (ARTG) and Schedule of Pharmaceutical Benefits. For clinical inquiries, contact the prescribing practice.
+    </div>
+
+    <div class="signature-grid">
+      <div class="signature-box">
+        <span>Prescribing Medical Practitioner Signature</span>
+        <div class="sig-line"></div>
+      </div>
+      <div class="signature-box">
+        <span>Provider Number & Stamp</span>
+        <div class="sig-line"></div>
+      </div>
+    </div>
+
+    <footer class="report-footer">
+      <span>Ventricura Clinical Suite · Telehealth & Biometric Care</span>
+      <span>Confidential Australian Medical Document · Page 1 of 1</span>
+    </footer>
+  </div>
+</body>
+</html>`;
+}
+

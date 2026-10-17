@@ -216,8 +216,9 @@ export default { async fetch(request: Request) {
             try {
               // 1. Exact slug match
               const q1 = await db.from('clinics').select(fields).eq('slug', slug).maybeSingle();
-              if (q1.error && (q1.error.message?.includes('column') || q1.error.code === '42703' || q1.error.code === 'PGRST204')) {
-                continue; // try narrower fieldset
+              if (q1.error) {
+                // If this fieldset has columns not present in DB schema, try narrower fieldset
+                continue;
               }
               if (q1.data) {
                 clinicRecord = q1.data as Record<string, unknown>;
@@ -259,10 +260,7 @@ export default { async fetch(request: Request) {
                 }
               }
 
-              // If query succeeded without column error and found nothing, no need to retry with fewer columns
-              if (!q1.error) {
-                break;
-              }
+              break;
             } catch {
               // try next fieldset
             }
@@ -449,8 +447,8 @@ export default { async fetch(request: Request) {
               .single();
             clinician = minFallback.data as typeof clinician;
           }
-        }
-        const clinic = clinician?.clinic as unknown as { name?: string; website_about?: string; website_banner_url?: string; website_banner_text?: string; website_banner_enabled?: boolean } | null;
+        const clinicRaw = clinician?.clinic;
+        const clinic = (Array.isArray(clinicRaw) ? clinicRaw[0] : clinicRaw) as unknown as { name?: string; website_about?: string; website_banner_url?: string; website_banner_text?: string; website_banner_enabled?: boolean } | null;
         const decoded = decodeClinicBanner(
           clinic?.website_about,
           clinic?.website_banner_url,

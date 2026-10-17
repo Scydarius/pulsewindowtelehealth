@@ -53,6 +53,7 @@ import {
 } from '../utils/artgMedications';
 import {
   generatePatientSummaryReportHtml,
+  generateMedicationChartReportHtml,
   printHtmlReport,
   downloadHtmlReport,
   openHtmlReportInNewTab,
@@ -339,7 +340,15 @@ notify pgrst, 'reload schema';`;
   };
 
   const handlePrintMedications = () => {
-    window.print();
+    if (!patient) return;
+    const html = generateMedicationChartReportHtml({
+      patientName: patient.display_name,
+      patientEmail: patient.email,
+      clinicName: patient.clinic_name ?? undefined,
+      assignedClinicianName: patient.assigned_clinician_name ?? undefined,
+      medications,
+    });
+    printHtmlReport(`Medication Summary — ${patient.display_name}`, html);
   };
 
   const getSummaryHtml = () => {

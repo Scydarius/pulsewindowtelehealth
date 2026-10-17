@@ -80,8 +80,10 @@ const DEFAULT_VENTRICURA_SITE: ClinicSite = {
 function getLocalClinicBanner(clinicIdOrSlug: string): { url: string | null; text: string | null; enabled: boolean } | null {
   try {
     const raw = localStorage.getItem(`ventricura_banner_${clinicIdOrSlug}`);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    if (raw) return JSON.parse(raw);
+    const active = localStorage.getItem('ventricura_banner_active');
+    if (active) return JSON.parse(active);
+    return null;
   } catch {
     return null;
   }
@@ -92,6 +94,7 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [isManager, setIsManager] = useState(false);
+  const [bannerImgError, setBannerImgError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -107,7 +110,7 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
         const body = (await response.json().catch(() => null)) as { clinic?: ClinicSite; isManager?: boolean; error?: string } | null;
         if (!response.ok || !body?.clinic) {
           if (slug === 'ventricura' || !slug) {
-            const cached = getLocalClinicBanner('ventricura') || getLocalClinicBanner('ventricura-telehealth');
+            const cached = getLocalClinicBanner('ventricura') || getLocalClinicBanner('ventricura-telehealth') || getLocalClinicBanner('active');
             if (active) {
               setClinic({
                 ...DEFAULT_VENTRICURA_SITE,
@@ -121,17 +124,18 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
           throw new Error(body?.error ?? 'Clinic page not found.');
         }
         if (active) {
-          let bannerUrl = body.clinic.bannerUrl;
-          let bannerText = body.clinic.bannerText;
-          let bannerEnabled = body.clinic.bannerEnabled !== false;
-          if (!bannerUrl) {
-            const cached = getLocalClinicBanner(body.clinic.slug) || getLocalClinicBanner(body.clinic.id);
-            if (cached) {
-              bannerUrl = cached.url;
-              if (!bannerText && cached.text) bannerText = cached.text;
-              if (cached.enabled !== undefined) bannerEnabled = cached.enabled;
-            }
-          }
+          const cached = getLocalClinicBanner(slug)
+            || getLocalClinicBanner(body.clinic.slug)
+            || getLocalClinicBanner(body.clinic.id)
+            || (slug === 'ventricura' ? getLocalClinicBanner('ventricura') || getLocalClinicBanner('ventricura-telehealth') : null)
+            || getLocalClinicBanner('active');
+
+          const bannerUrl = body.clinic.bannerUrl || cached?.url || null;
+          const bannerText = body.clinic.bannerText || cached?.text || null;
+          const bannerEnabled = body.clinic.bannerEnabled !== undefined
+            ? body.clinic.bannerEnabled
+            : (cached?.enabled !== undefined ? cached.enabled : true);
+
           setClinic({
             ...body.clinic,
             bannerUrl,
@@ -143,7 +147,7 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
       } catch (reason) {
         if (active) {
           if (slug === 'ventricura' || !slug) {
-            const cached = getLocalClinicBanner('ventricura') || getLocalClinicBanner('ventricura-telehealth');
+            const cached = getLocalClinicBanner('ventricura') || getLocalClinicBanner('ventricura-telehealth') || getLocalClinicBanner('active');
             setClinic({
               ...DEFAULT_VENTRICURA_SITE,
               bannerUrl: cached?.url ?? DEFAULT_VENTRICURA_SITE.bannerUrl,
@@ -240,15 +244,26 @@ export function ClinicWebsitePage({ slug }: { slug: string }) {
       )}
 
       {clinic.bannerUrl && clinic.bannerEnabled !== false && (
-        <div className="clinic-site-wrapper" style={{ marginTop: '24px', marginBottom: '-40px', position: 'relative', zIndex: 2 }}>
+        <div className="clinic-site-wrapper clinic-cover-banner-container">
           <div className="clinic-cover-banner-wrapper">
-            <img
-              src={clinic.bannerUrl}
-              alt={`${clinic.name} clinical banner`}
-              onError={(e) => {
-                (e.currentTarget.parentElement?.parentElement as HTMLElement | null)?.style.setProperty('display', 'none');
-              }}
-            />
+            {!bannerImgError ? (
+              <img
+                src={clinic.bannerUrl}
+                alt={`${clinic.name} clinical banner`}
+                onError={() => setBannerImgError(true)}
+              />
+            ) : (
+              <div className="clinic-cover-banner-fallback">
+                <div className="clinic-cover-banner-fallback-inner">
+                  <div className="clinic-badge">
+                    <HeartPulse size={15} />
+                    <span>{clinic.name.toUpperCase()} · ACCREDITED TELEHEALTH PRACTICE</span>
+                  </div>
+                  <strong className="clinic-cover-banner-title">{clinic.name}</strong>
+                  <p>{clinic.headline || 'Specialist telehealth & contactless vitals consultations.'}</p>
+                </div>
+              </div>
+            )}
             <div className="clinic-cover-banner-overlay" />
           </div>
         </div>
