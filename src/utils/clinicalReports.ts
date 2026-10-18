@@ -160,11 +160,16 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
   <style>
     @page {
       size: A4 portrait;
-      margin: 12mm 14mm 14mm;
+      margin: 10mm 12mm 10mm;
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
       color: #0f172a;
       background: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -441,14 +446,30 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
       color: #0f172a;
       margin-top: 4px;
     }
+    .report-bottom-block {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+      margin-top: 10px;
+    }
     footer.report-footer {
-      margin-top: 16px;
-      padding-top: 6px;
+      margin-top: 10px;
+      padding-top: 4px;
       border-top: 1px solid #e2e8f0;
       display: flex;
       justify-content: space-between;
       font-size: 6.8pt;
       color: #94a3b8;
+    }
+    body > *:last-child,
+    main > *:last-child,
+    .report-bottom-block > *:last-child,
+    footer:last-child {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
     }
   </style>
 </head>
@@ -590,28 +611,30 @@ export function generateEncounterReportHtml(data: EncounterReportData): string {
       </table>
     </section>
 
-    <div class="disclaimer-box">
-      <strong>Clinical Telehealth Governance Notice:</strong> This encounter summary constitutes an official contemporaneous clinical record of a synchronous video telehealth encounter. Optical vital signs are derived from remote facial photoplethysmography (rPPG) and are intended to provide supplementary clinical physiological metrics to be reviewed alongside clinical history and professional medical examination. Not certified as an independent automated diagnostic device.
+    <div class="report-bottom-block">
+      <div class="disclaimer-box">
+        <strong>Clinical Telehealth Governance Notice:</strong> This encounter summary constitutes an official contemporaneous clinical record of a synchronous video telehealth encounter. Optical vital signs are derived from remote facial photoplethysmography (rPPG) and are intended to provide supplementary clinical physiological metrics to be reviewed alongside clinical history and professional medical examination. Not certified as an independent automated diagnostic device.
+      </div>
+
+      <section class="signature-grid">
+        <div class="signature-box">
+          <span>Attending Medical Practitioner Certification & Signature</span>
+          <div class="sig-line"></div>
+          <strong class="practitioner-name">${escapeHtml(clinicianDisplay)} — ${escapeHtml(clinicianTitleDisplay)}</strong>
+        </div>
+        <div class="signature-box">
+          <span>Date & Sign-Off Certification</span>
+          <div class="sig-line"></div>
+          <strong class="practitioner-name">${escapeHtml(generatedTime)}</strong>
+        </div>
+      </section>
+
+      <footer class="report-footer">
+        <span>Ventricura Telehealth Network · Australian Encrypted Health Records</span>
+        <span>Page 1 of 1 · Encrypted Audit Hash: ${escapeHtml(data.appointmentId.slice(0, 16))}</span>
+      </footer>
     </div>
-
-    <section class="signature-grid">
-      <div class="signature-box">
-        <span>Attending Medical Practitioner Certification & Signature</span>
-        <div class="sig-line"></div>
-        <strong class="practitioner-name">${escapeHtml(clinicianDisplay)} — ${escapeHtml(clinicianTitleDisplay)}</strong>
-      </div>
-      <div class="signature-box">
-        <span>Date & Sign-Off Certification</span>
-        <div class="sig-line"></div>
-        <strong class="practitioner-name">${escapeHtml(generatedTime)}</strong>
-      </div>
-    </section>
   </main>
-
-  <footer class="report-footer">
-    <span>Ventricura Telehealth Network · Australian Encrypted Health Records</span>
-    <span>Page 1 of 1 · Encrypted Audit Hash: ${escapeHtml(data.appointmentId.slice(0, 16))}</span>
-  </footer>
 </body>
 </html>`;
 }
@@ -813,10 +836,15 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
   <meta charset="utf-8" />
   <title>Patient Clinical Health Summary — ${escapeHtml(data.patientName)}</title>
   <style>
-    @page { size: A4 portrait; margin: 9mm 12mm 10mm; }
+    @page { size: A4 portrait; margin: 8mm 10mm 8mm; }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
       color: #0f172a;
       background: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -824,6 +852,10 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
       line-height: 1.35;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+    }
+    main {
+      height: auto !important;
+      min-height: 0 !important;
     }
     header.report-header {
       display: flex;
@@ -951,10 +983,26 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
     .aust-pill { font-family: monospace; font-size: 6.5pt; font-weight: 700; background: #e0f2fe; color: #0369a1; padding: 1px 3px; border-radius: 2px; }
     .pbs-sub { font-size: 6.8pt; font-weight: 700; color: #047857; }
     .empty-cell { text-align: center; color: #64748b; padding: 8px; font-style: italic; }
-    .signature-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-top: 14px; padding-top: 8px; border-top: 1px solid #cbd5e1; page-break-inside: avoid; break-inside: avoid; }
-    .signature-box .sig-line { border-bottom: 1px solid #0f172a; height: 18px; margin-top: 4px; }
+    .report-bottom-block {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+      margin-top: 10px;
+    }
+    .signature-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-top: 8px; padding-top: 6px; border-top: 1px solid #cbd5e1; page-break-inside: avoid; break-inside: avoid; }
+    .signature-box .sig-line { border-bottom: 1px solid #0f172a; height: 16px; margin-top: 3px; }
     .signature-box span { font-size: 6.8pt; font-weight: 700; text-transform: uppercase; color: #64748b; }
-    footer.report-footer { margin-top: 10px; padding-top: 4px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 6.6pt; color: #94a3b8; page-break-inside: avoid; break-inside: avoid; }
+    footer.report-footer { margin-top: 8px; padding-top: 4px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 6.6pt; color: #94a3b8; page-break-inside: avoid; break-inside: avoid; }
+    body > *:last-child,
+    main > *:last-child,
+    .report-bottom-block > *:last-child,
+    footer:last-child {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
   </style>
 </head>
 <body>
@@ -1053,22 +1101,23 @@ export function generatePatientSummaryReportHtml(data: PatientSummaryReportData)
       <tbody>${apptRows}</tbody>
     </table>
 
-    <section class="signature-grid">
-      <div class="signature-box">
-        <span>Attending Clinician Certification</span>
-        <div class="sig-line"></div>
-      </div>
-      <div class="signature-box">
-        <span>Date & Formal Sign-Off</span>
-        <div class="sig-line"></div>
-      </div>
-    </section>
+    <div class="report-bottom-block">
+      <section class="signature-grid">
+        <div class="signature-box">
+          <span>Attending Clinician Certification</span>
+          <div class="sig-line"></div>
+        </div>
+        <div class="signature-box">
+          <span>Date & Formal Sign-Off</span>
+          <div class="sig-line"></div>
+        </div>
+      </section>
+      <footer class="report-footer">
+        <span>Ventricura Telehealth Network · Shared Cross-Clinic Patient Record</span>
+        <span>Generated: ${escapeHtml(generatedTime)}</span>
+      </footer>
+    </div>
   </main>
-
-  <footer class="report-footer">
-    <span>Ventricura Telehealth Network · Shared Cross-Clinic Patient Record</span>
-    <span>Generated: ${escapeHtml(generatedTime)}</span>
-  </footer>
 </body>
 </html>`;
 }
@@ -1081,11 +1130,14 @@ export function printHtmlReport(title: string, htmlContent: string): boolean {
   try {
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
+    iframe.style.top = '0';
+    iframe.style.left = '0';
+    iframe.style.width = '100vw';
+    iframe.style.height = '100vh';
     iframe.style.border = '0';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.zIndex = '-9999';
     iframe.setAttribute('title', title);
     iframe.setAttribute('aria-hidden', 'true');
     document.body.appendChild(iframe);
@@ -1239,35 +1291,46 @@ export function generateMedicationChartReportHtml(data: MedicationChartReportDat
   <style>
     @page {
       size: A4 portrait;
-      margin: 10mm 12mm 10mm;
+      margin: 8mm 10mm 8mm;
     }
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     html, body {
-      margin: 0;
-      padding: 0;
+      margin: 0 !important;
+      padding: 0 !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
       background: #ffffff;
       color: #0f172a;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 8pt;
       line-height: 1.35;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
     }
     .report-wrap {
       width: 100%;
       max-width: 100%;
-      margin: 0 auto;
+      margin: 0 !important;
+      padding: 0 !important;
+      height: auto !important;
+      min-height: 0 !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
     }
     header.report-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       border-bottom: 2px solid #0f172a;
-      padding-bottom: 8px;
-      margin-bottom: 10px;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
     }
     .report-logo {
-      max-height: 36px;
+      max-height: 34px;
       width: auto;
       object-fit: contain;
       display: block;
@@ -1276,7 +1339,7 @@ export function generateMedicationChartReportHtml(data: MedicationChartReportDat
       font-size: 8.5pt;
       font-weight: 800;
       color: #0f172a;
-      margin-top: 3px;
+      margin-top: 2px;
       letter-spacing: -0.01em;
     }
     .header-accreditation {
@@ -1299,29 +1362,29 @@ export function generateMedicationChartReportHtml(data: MedicationChartReportDat
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      padding: 3px 8px;
+      padding: 2px 7px;
       border-radius: 2px;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
     section.patient-box {
       background: #f8fafc;
       border: 1px solid #cbd5e1;
       border-left: 4px solid #0f172a;
-      padding: 8px 12px;
-      margin-bottom: 10px;
+      padding: 6px 10px;
+      margin-bottom: 8px;
       display: grid;
       grid-template-columns: 1.2fr 1fr;
-      gap: 10px;
+      gap: 8px;
     }
     section.patient-box h1 {
-      margin: 0 0 3px;
-      font-size: 11pt;
+      margin: 0 0 2px;
+      font-size: 10.5pt;
       font-weight: 850;
       color: #0f172a;
       letter-spacing: -0.02em;
     }
     section.patient-box p {
-      margin: 2px 0;
+      margin: 1px 0;
       font-size: 7.5pt;
       color: #334155;
     }
@@ -1332,14 +1395,15 @@ export function generateMedicationChartReportHtml(data: MedicationChartReportDat
       letter-spacing: 0.05em;
       color: #0f172a;
       border-bottom: 1px solid #94a3b8;
-      padding-bottom: 3px;
-      margin: 10px 0 6px;
+      padding-bottom: 2px;
+      margin: 8px 0 4px;
     }
     table.report-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 7.5pt;
-      margin-top: 4px;
+      margin-top: 3px;
+      margin-bottom: 6px;
     }
     table.report-table th {
       background: #f1f5f9;
@@ -1347,13 +1411,13 @@ export function generateMedicationChartReportHtml(data: MedicationChartReportDat
       font-size: 6.8pt;
       font-weight: 800;
       text-transform: uppercase;
-      padding: 5px 6px;
+      padding: 4px 6px;
       text-align: left;
       border-bottom: 1.5px solid #0f172a;
       letter-spacing: 0.02em;
     }
     table.report-table td {
-      padding: 5px 6px;
+      padding: 4px 6px;
       border-bottom: 1px solid #e2e8f0;
       vertical-align: top;
       word-break: break-word;
@@ -1394,23 +1458,37 @@ export function generateMedicationChartReportHtml(data: MedicationChartReportDat
     .empty-cell {
       text-align: center;
       color: #64748b;
-      padding: 12px;
+      padding: 10px;
       font-style: italic;
+    }
+    .report-bottom-block {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+      margin-top: 10px;
+    }
+    .certification-note {
+      font-size: 6.8pt;
+      color: #64748b;
+      line-height: 1.3;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .signature-grid {
       display: grid;
       grid-template-columns: 1.4fr 1fr;
-      gap: 16px;
-      margin-top: 16px;
-      padding-top: 8px;
+      gap: 14px;
+      margin-top: 8px;
+      padding-top: 6px;
       border-top: 1px solid #cbd5e1;
       page-break-inside: avoid;
       break-inside: avoid;
     }
     .signature-box .sig-line {
       border-bottom: 1px solid #0f172a;
-      height: 20px;
-      margin-top: 4px;
+      height: 16px;
+      margin-top: 3px;
     }
     .signature-box span {
       font-size: 6.8pt;
@@ -1418,17 +1496,9 @@ export function generateMedicationChartReportHtml(data: MedicationChartReportDat
       text-transform: uppercase;
       color: #64748b;
     }
-    .certification-note {
-      margin-top: 12px;
-      font-size: 6.8pt;
-      color: #64748b;
-      line-height: 1.35;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
     footer.report-footer {
-      margin-top: 12px;
-      padding-top: 6px;
+      margin-top: 8px;
+      padding-top: 4px;
       border-top: 1px solid #e2e8f0;
       display: flex;
       justify-content: space-between;
@@ -1436,6 +1506,15 @@ export function generateMedicationChartReportHtml(data: MedicationChartReportDat
       color: #94a3b8;
       page-break-inside: avoid;
       break-inside: avoid;
+    }
+    body > *:last-child,
+    .report-wrap > *:last-child,
+    .report-bottom-block > *:last-child,
+    footer:last-child {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
     }
   </style>
 </head>
@@ -1494,25 +1573,27 @@ export function generateMedicationChartReportHtml(data: MedicationChartReportDat
 
     ${ceasedSection}
 
-    <div class="certification-note">
-      This clinical medication summary represents the active prescribed pharmacotherapy for this patient recorded in the Ventricura Clinical Suite. All listings correspond to the Australian Register of Therapeutic Goods (ARTG) and Schedule of Pharmaceutical Benefits. For clinical inquiries, contact the prescribing practice.
-    </div>
-
-    <div class="signature-grid">
-      <div class="signature-box">
-        <span>Prescribing Medical Practitioner Signature</span>
-        <div class="sig-line"></div>
+    <div class="report-bottom-block">
+      <div class="certification-note">
+        This clinical medication summary represents the active prescribed pharmacotherapy for this patient recorded in the Ventricura Clinical Suite. All listings correspond to the Australian Register of Therapeutic Goods (ARTG) and Schedule of Pharmaceutical Benefits. For clinical inquiries, contact the prescribing practice.
       </div>
-      <div class="signature-box">
-        <span>Provider Number & Stamp</span>
-        <div class="sig-line"></div>
-      </div>
-    </div>
 
-    <footer class="report-footer">
-      <span>Ventricura Clinical Suite · Telehealth & Biometric Care</span>
-      <span>Confidential Australian Medical Document · Page 1 of 1</span>
-    </footer>
+      <div class="signature-grid">
+        <div class="signature-box">
+          <span>Prescribing Medical Practitioner Signature</span>
+          <div class="sig-line"></div>
+        </div>
+        <div class="signature-box">
+          <span>Provider Number & Stamp</span>
+          <div class="sig-line"></div>
+        </div>
+      </div>
+
+      <footer class="report-footer">
+        <span>Ventricura Clinical Suite · Telehealth & Biometric Care</span>
+        <span>Confidential Australian Medical Document</span>
+      </footer>
+    </div>
   </div>
 </body>
 </html>`;
