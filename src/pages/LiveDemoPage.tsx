@@ -1,4 +1,4 @@
-import { Camera, CircleStop, LoaderCircle, Play, ScanFace, ShieldCheck } from 'lucide-react';
+import { Camera, CircleStop, Play, ScanFace, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PublicFooter, PublicHeader, Seo } from '../components/PublicSite';
 
@@ -47,9 +47,15 @@ export function LiveDemoPage() {
   const videoRef = useRef<HTMLVideoElement>(null); const canvasRef = useRef<HTMLCanvasElement>(null); const streamRef = useRef<MediaStream | null>(null); const socketRef = useRef<WebSocket | null>(null); const intervalRef = useRef<number | null>(null); const sessionTimerRef = useRef<number | null>(null); const displayTimerRef = useRef<number | null>(null); const busyRef = useRef(false); const finishedRef = useRef(false); const measurementStartedRef = useRef<number | null>(null);
   const latestSessionBpmRef = useRef<number | null>(null);
   const latestSessionBrpmRef = useRef<number | null>(null);
+  const lastTelemetryRef = useRef<number | null>(null);
+  const watchdogRef = useRef<number | null>(null);
   const [stage, setStage] = useState<Stage>('idle'); const [status, setStatus] = useState('Camera off — start when you are ready.'); const [reading, setReading] = useState<Reading>(emptyReading); const [seconds, setSeconds] = useState(0);
   const running = stage === 'permission' || stage === 'connecting' || stage === 'positioning' || stage === 'calibrating' || stage === 'measuring';
   const stop = useCallback((nextStatus = 'Camera off — start when you are ready.') => {
+    finishedRef.current = true;
+    if (watchdogRef.current !== null) window.clearInterval(watchdogRef.current);
+    watchdogRef.current = null; lastTelemetryRef.current = null;
+    latestSessionBpmRef.current = null; latestSessionBrpmRef.current = null; setReading(emptyReading);
     if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
     if (sessionTimerRef.current !== null) window.clearTimeout(sessionTimerRef.current); if (displayTimerRef.current !== null) window.clearInterval(displayTimerRef.current);
     intervalRef.current = null; sessionTimerRef.current = null; displayTimerRef.current = null; socketRef.current?.close(); socketRef.current = null;
@@ -58,6 +64,13 @@ export function LiveDemoPage() {
     finishedRef.current = true; measurementStartedRef.current = null; setSeconds(0); setStage('idle'); setStatus(nextStatus);
   }, []);
   const finishSession = useCallback(() => {
+    if (finishedRef.current) return;
+    if (lastTelemetryRef.current === null || Date.now() - lastTelemetryRef.current > 5000) {
+      stop('The live signal stopped. Please start a new reading.'); setStage('error'); return;
+    }
+    finishedRef.current = true;
+    if (watchdogRef.current !== null) window.clearInterval(watchdogRef.current);
+    watchdogRef.current = null;
     if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
     if (displayTimerRef.current !== null) window.clearInterval(displayTimerRef.current);
     intervalRef.current = null; sessionTimerRef.current = null; displayTimerRef.current = null; socketRef.current?.close(); socketRef.current = null;
@@ -71,7 +84,7 @@ export function LiveDemoPage() {
         respiratoryRate: latestSessionBrpmRef.current ?? prev.respiratoryRate,
       }));
     }
-  }, []);
+  }, [stop]);
   useEffect(() => () => stop(), [stop]);
 
   const transmit = useCallback(() => {
@@ -85,6 +98,7 @@ export function LiveDemoPage() {
 
   const receive = useCallback((data: Record<string, unknown>) => {
     if (finishedRef.current) return;
+    lastTelemetryRef.current = Date.now();
     const cardiac = (data.cardiac ?? {}) as Record<string, unknown>; const respiration = (data.respiration ?? {}) as Record<string, unknown>;
     const diag = (data.diagnostics ?? {}) as Record<string, unknown>;
 
@@ -107,6 +121,9 @@ export function LiveDemoPage() {
     const faceDetected = data.face_detected === true;
     const motionDetected = data.motion_detected === true;
     const valid = data.is_valid_readout === true && bpm != null;
+    if ((measurementStartedRef.current !== null && (!faceDetected || motionDetected || !isCalibrated || !valid)) || (calibProgress > 0 && (!faceDetected || motionDetected))) {
+      stop('The face or a stable signal was lost. Please start a new reading.'); setStage('error'); return;
+    }
 
     const next: Reading = {
       bpm: isCalibrated && valid ? bpm : null,
@@ -144,6 +161,9 @@ export function LiveDemoPage() {
       return;
     }
 
+    if (!valid || motionDetected) {
+      setStage('positioning'); setStatus('Waiting for a stable signal — keep your face in view and hold still.'); return;
+    }
     if (!measurementStartedRef.current) {
       measurementStartedRef.current = Date.now();
       sessionTimerRef.current = window.setTimeout(finishSession, 30_000);
@@ -155,7 +175,7 @@ export function LiveDemoPage() {
     const captureElapsed = measurementStartedRef.current ? Math.floor((Date.now() - measurementStartedRef.current) / 1000) : 0;
     setStage('measuring');
     setStatus(`Live signal connected — completing the 30-second reading (${Math.max(0, 30 - captureElapsed)}s remaining).`);
-  }, [finishSession]);
+  }, [finishSession, stop]);
 
   const start = async () => {
     if (!navigator.mediaDevices?.getUserMedia) { setStage('error'); setStatus('This browser does not provide camera access.'); return; }
@@ -168,6 +188,9 @@ export function LiveDemoPage() {
       const ticket = await response.json().catch(() => ({})) as { websocketUrl?: string; error?: string };
       if (!response.ok || !ticket.websocketUrl) throw new Error(ticket.error ?? 'The live demo is not configured.');
       const socket = new WebSocket(ticket.websocketUrl); socketRef.current = socket;
+      lastTelemetryRef.current = Date.now();
+      watchdogRef.current = window.setInterval(() => { if (!finishedRef.current && lastTelemetryRef.current !== null && Date.now() - lastTelemetryRef.current > 5000) { stop('The live signal stopped. Please start a new reading.'); setStage('error'); } }, 1000);
+      socket.addEventListener('close', () => { if (!finishedRef.current) { stop('The live signal disconnected. Please start a new reading.'); setStage('error'); } });
       socket.addEventListener('message', (event) => { try { const data = JSON.parse(event.data) as Record<string, unknown>; if (data.type === 'ready') { setStage('positioning'); setStatus('Camera connected — position your face in the guide. The 30-second reading will begin once your signal is ready.'); intervalRef.current = window.setInterval(transmit, 1000 / 30); } else if (data.type === 'telemetry') receive(data); else if (data.type === 'error') { stop(String(data.message ?? 'The live signal session could not start.')); setStage('error'); } } catch { /* Ignore non-telemetry socket data. */ } });
       socket.addEventListener('error', () => { stop('The live signal service could not be opened.'); setStage('error'); });
     } catch (error) {
